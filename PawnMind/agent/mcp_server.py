@@ -111,6 +111,11 @@ def build_server(client):
         return client.action("return_home", rev=rev)
 
     @server.tool()
+    def buy_wholesale(rev: int) -> dict:
+        """Buy the current client's whole wholesale offer (requires isOfferWholesale)."""
+        return client.action("buy_wholesale", rev=rev)
+
+    @server.tool()
     def commissary_buy(identifier: str, rev: int) -> dict:
         """Buy one item from the supply station (commissary) by identifier."""
         return client.action("commissary_buy", identifier=identifier, rev=rev)

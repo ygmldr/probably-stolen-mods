@@ -116,6 +116,10 @@ namespace PawnMind.AdapterTests
             CheckProperty(assembly, "MapUIManager", "Current");
             CheckField(assembly, "PlayerStore", "commissaryData");
             CheckMethod(assembly, "CommissaryUIManager", "CanBuy");
+            CheckMethod(assembly, "PlayerStore", "GetWholesalePrice");
+            CheckMethod(assembly, "EmporiumEntry", "GetAllNonOwnedItem");
+            CheckMethod(assembly, "PlayerStore", "OnItemBought");
+            CheckMethod(assembly, "PlayerStore", "MoveDealItemToInventory");
             CheckMethod(assembly, "CommissaryData", "BuyItem");
             CheckProperty(assembly, "GameItem", "modifiedXOrigin");
             CheckProperty(assembly, "GameItem", "modifiedYOrigin");

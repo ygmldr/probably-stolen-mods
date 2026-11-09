@@ -134,6 +134,42 @@ namespace PawnMind.Bridge
             return ActionResult.Success("sleep");
         }
 
+        public static ActionResult BuyWholesale()
+        {
+            PlayerStore store;
+            if (!TryStore(out store)) return ActionResult.Failure("buy_wholesale", "not_in_game");
+
+            StoreClient client = GameState.GetCurrentClient();
+            if (client == null) return ActionResult.Failure("buy_wholesale", "no_client");
+            if (!client.isOfferWholesale) return ActionResult.Failure("buy_wholesale", "no_wholesale_offer");
+
+            List<GameItem> items = EmporiumEntry.Instance.GetAllNonOwnedItem();
+            if (items.Count == 0) return ActionResult.Failure("buy_wholesale", "no_items");
+
+            int price = store.GetWholesalePrice();
+            if (price < 0) return ActionResult.Failure("buy_wholesale", "no_wholesale_offer");
+            if (store.playerCash < price) return ActionResult.Failure("buy_wholesale", "cannot_afford");
+
+            try
+            {
+                store.playerCash -= price;
+                for (int i = 0; i < items.Count; i++)
+                {
+                    int cost = RNG.CalculatePercentageOff((int)items[i].GetNegociatedValue(), client.wholesaleDiscount);
+                    store.OnItemBought(items[i], cost);
+                }
+
+                for (int i = 0; i < items.Count; i++) store.MoveDealItemToInventory(items[i]);
+                client.isOfferWholesale = false;
+            }
+            catch (Exception e)
+            {
+                return ActionResult.Failure("buy_wholesale", "wholesale_failed: " + e.Message);
+            }
+
+            return ActionResult.Success("buy_wholesale");
+        }
+
         public static ActionResult BuyCommissary(string identifier)
         {
             PlayerStore store;

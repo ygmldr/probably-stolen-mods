@@ -141,6 +141,9 @@ public sealed class PawnMindMod : IMod
             case "return_home":
                 return ActionResult.SuccessRaw("return_home", NightService.ReturnHomeJson());
 
+            case "buy_wholesale":
+                return GameActions.BuyWholesale();
+
             case "commissary_buy":
                 return GameActions.BuyCommissary((string)request["identifier"]);
 
