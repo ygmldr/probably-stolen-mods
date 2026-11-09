@@ -101,6 +101,13 @@ namespace PawnMind.AdapterTests
             CheckMethod(assembly, "GameInventory", "IsInsertLocked");
             CheckProperty(assembly, "GameItem", "parentInventory");
             CheckProperty(assembly, "GameItem", "modifiedShape");
+            CheckMethod(assembly, "AfterhourLocation", "Get");
+            CheckMethod(assembly, "AfterhourLocation", "GetDiscovered");
+            CheckMethod(assembly, "MapUIManager", "OpenUI");
+            CheckMethod(assembly, "MapUIManager", "Travel");
+            CheckMethod(assembly, "MapUIManager", "Return");
+            CheckMethod(assembly, "ScavHelper", "ScavengeDumpingGrounds");
+            CheckMethod(assembly, "ScavHelper", "CanScavenge");
             CheckProperty(assembly, "MapUIManager", "IsOutside");
             CheckProperty(assembly, "MapUIManager", "Current");
             CheckField(assembly, "PlayerStore", "commissaryData");

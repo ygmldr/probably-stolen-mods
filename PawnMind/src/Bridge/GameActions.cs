@@ -140,8 +140,11 @@ namespace PawnMind.Bridge
             if (!TryStore(out store)) return ActionResult.Failure("commissary_buy", "not_in_game");
             if (string.IsNullOrEmpty(identifier)) return ActionResult.Failure("commissary_buy", "missing_identifier");
 
-            if (!CommissaryUIManager.CanBuy(identifier))
-                return ActionResult.Failure("commissary_buy", "cannot_buy");
+            CommissaryItemData data = store.commissaryData.GetItemData(identifier);
+            if (data == null) return ActionResult.Failure("commissary_buy", "unknown_item");
+            if (store.commissaryData.redeemedCredit < data.price)
+                return ActionResult.Failure("commissary_buy", "insufficient_credit");
+            if (data.StockCount <= 0) return ActionResult.Failure("commissary_buy", "out_of_stock");
 
             store.commissaryData.BuyItem(identifier);
             return ActionResult.Success("commissary_buy");

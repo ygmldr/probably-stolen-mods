@@ -91,6 +91,26 @@ def build_server(client):
         return client.action("list_goods", scope=scope)
 
     @server.tool()
+    def list_locations() -> dict:
+        """List discovered night locations (dumping ground / commissary / Dr Jackson) and availability."""
+        return client.action("list_locations")
+
+    @server.tool()
+    def go_out(location: str, rev: int) -> dict:
+        """Leave the shop and travel to a night location."""
+        return client.action("go_out", location=location, rev=rev)
+
+    @server.tool()
+    def scavenge(rev: int) -> dict:
+        """Scavenge at the dumping ground; returns gained items and remaining attempts."""
+        return client.action("scavenge", rev=rev)
+
+    @server.tool()
+    def return_home(rev: int) -> dict:
+        """Return from a night location to the shop."""
+        return client.action("return_home", rev=rev)
+
+    @server.tool()
     def commissary_buy(identifier: str, rev: int) -> dict:
         """Buy one item from the supply station (commissary) by identifier."""
         return client.action("commissary_buy", identifier=identifier, rev=rev)

@@ -47,6 +47,9 @@ namespace PawnMind.Bridge
 
             state["day"] = GameState.GetDay();
             state["shop_state"] = GameState.GetShopState();
+            state["outside"] = GameState.IsOutside;
+            state["location"] = GameState.CurrentLocationId;
+            state["afterhour_count"] = GameState.GetAfterhourItemCount();
             state["cash"] = GameState.GetCash();
             state["rent_days_left"] = GameState.GetRentDaysLeft();
             state["rent_value"] = GameState.GetRentValue();

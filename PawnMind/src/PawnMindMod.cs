@@ -129,6 +129,18 @@ public sealed class PawnMindMod : IMod
                 Diagnostics.DumpState();
                 return ActionResult.Success("debug_dump");
 
+            case "list_locations":
+                return ActionResult.SuccessRaw("list_locations", NightService.ListLocationsJson());
+
+            case "go_out":
+                return ActionResult.SuccessRaw("go_out", NightService.GoOutJson((string)request["location"]));
+
+            case "scavenge":
+                return ActionResult.SuccessRaw("scavenge", NightService.ScavengeJson());
+
+            case "return_home":
+                return ActionResult.SuccessRaw("return_home", NightService.ReturnHomeJson());
+
             case "commissary_buy":
                 return GameActions.BuyCommissary((string)request["identifier"]);
 

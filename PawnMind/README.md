@@ -37,6 +37,26 @@ confirm_trade(id=111, side=buy)
 - 待验证：`choose_dialogue`（选项）、`bargain`、`sell`、`end_day`
 - 已确认的坑：`PlayerStore.OpenShutter()` 只改状态，必须走 `StoreShutterButton.OpenShutter()` 才会生成当日顾客；顾客货物由对话 `endAction` 摆到前台
 
+## 夜间三地点（2026-11-10）
+
+真机：
+
+```
+list_locations -> 垃圾倾倒场 / 配给站 / 杰克逊博士
+go_out("dumping_ground") -> outside=true
+scavenge -> 报废模组 x1，剩余 4 次，小伤 6% / 大伤 1.25%
+move_item(55, main) -> 背包
+return_home -> outside=false
+go_out("dr_jackson") -> 25 件柜台货
+go_out("commissary") -> 7 种配给 + redeemed_credit=0
+commissary_buy -> insufficient_credit
+```
+
+- `list_locations` / `go_out` / `scavenge` / `return_home`
+- `list_goods(scope=jackson)` 返回博士柜台货
+- 补给站用 `redeemed_credit`（回收代币），不是现金；0 代币时 `insufficient_credit`
+- `return_home` 是异步的，响应给 `return_requested`，用 `/state.outside` 确认
+
 ## 商品目录扩展（2026-11-10）
 
 - `list_goods(scope=commissary)`：补给站库存（identifier/名称/价格/库存），真机 7 种货、库存 4–8

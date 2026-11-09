@@ -200,6 +200,18 @@ namespace PawnMind.Game
             }
         }
 
+        public static int GetAfterhourItemCount()
+        {
+            try
+            {
+                return EmporiumEntry.Instance.afterhourInventory.childItems.Count;
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
         public static List<StockItem> GetCommissaryStock()
         {
             var rows = new List<StockItem>();

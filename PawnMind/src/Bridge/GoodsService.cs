@@ -79,6 +79,7 @@ namespace PawnMind.Bridge
                 { "ok", true },
                 { "scope", "commissary" },
                 { "items", rows },
+                { "redeemed_credit", PlayerStore.Instance.commissaryData.redeemedCredit },
                 { "outside", GameState.IsOutside },
                 { "location", GameState.CurrentLocationId }
             });
