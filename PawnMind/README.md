@@ -37,6 +37,12 @@ confirm_trade(id=111, side=buy)
 - 待验证：`choose_dialogue`（选项）、`bargain`、`sell`、`end_day`
 - 已确认的坑：`PlayerStore.OpenShutter()` 只改状态，必须走 `StoreShutterButton.OpenShutter()` 才会生成当日顾客；顾客货物由对话 `endAction` 摆到前台
 
+## 自动摆放失败重排（2026-11-10）
+
+- 新增 `RepackSolver`：带 4 向旋转、阻挡格、节点上限的回溯 packer（纯逻辑，4 项单测）
+- `move_item` 自动摆放失败时：收集目标容器可移动物品 + 新物品，重排；成功则逐个 `UncheckedAccept`，失败整体回滚到原父容器/原形状
+- 不依赖 CompactSort，避免跨 Mod 反射/能力声明
+
 ## 整包二维布局（2026-11-10）
 
 `get_layout(container)` 现在返回：
