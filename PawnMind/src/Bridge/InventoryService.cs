@@ -105,7 +105,7 @@ namespace PawnMind.Bridge
                     row["count"] = item.unitCount;
                     row["owned"] = GameState.IsOwned(item);
                     row["locked"] = ItemPinHelper.IsPinned(item);
-                    row["sellable"] = GameState.CanSellItem(item);
+                    row["sellable"] = GameState.IsOwned(item) && !ItemPinHelper.IsPinned(item);
                     row["short_description"] = item.shortDescription;
                     row["long_description"] = item.longDescription;
                     row["flavor_text"] = item.flavorText;
@@ -283,7 +283,7 @@ namespace PawnMind.Bridge
                 Count = item.unitCount,
                 Owned = GameState.IsOwned(item),
                 Locked = ItemPinHelper.IsPinned(item),
-                Sellable = GameState.IsOwned(item) && GameState.CanSellItem(item),
+                Sellable = GameState.IsOwned(item) && !ItemPinHelper.IsPinned(item),
                 X = item.modifiedShape != null ? item.modifiedShape.minX : item.modifiedXOrigin,
                 Y = item.modifiedShape != null ? item.modifiedShape.minY : item.modifiedYOrigin,
                 Width = item.modifiedShape != null ? item.modifiedShape.globalWidth : 0,
