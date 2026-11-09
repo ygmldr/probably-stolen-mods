@@ -91,6 +91,11 @@ def build_server(client):
         return client.action("list_goods", scope=scope)
 
     @server.tool()
+    def commissary_buy(identifier: str, rev: int) -> dict:
+        """Buy one item from the supply station (commissary) by identifier."""
+        return client.action("commissary_buy", identifier=identifier, rev=rev)
+
+    @server.tool()
     def list_containers() -> dict:
         """List player containers (main/front/back/showcase/hidden/afterhour/trash/sold) with counts."""
         return client.action("list_containers")

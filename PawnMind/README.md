@@ -37,6 +37,13 @@ confirm_trade(id=111, side=buy)
 - 待验证：`choose_dialogue`（选项）、`bargain`、`sell`、`end_day`
 - 已确认的坑：`PlayerStore.OpenShutter()` 只改状态，必须走 `StoreShutterButton.OpenShutter()` 才会生成当日顾客；顾客货物由对话 `endAction` 摆到前台
 
+## 商品目录扩展（2026-11-10）
+
+- `list_goods(scope=commissary)`：补给站库存（identifier/名称/价格/库存），真机 7 种货、库存 4–8
+- `list_goods(scope=jackson)`：只在 `dr_jackson` 且 outside 时返回柜台货，否则 `not_at_location`
+- `list_goods(scope=wholesale)`：只有当前顾客 `isOfferWholesale` 时返回，含折扣/整包价
+- `commissary_buy(identifier)`：补给站购买；店内 `CanBuy=false` 返回 `cannot_buy`（需夜间到补给站）
+
 ## 砍价预览（2026-11-10）
 
 `bargain_preview(direction, percent)` 返回：

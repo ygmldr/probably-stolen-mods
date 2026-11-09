@@ -129,6 +129,9 @@ public sealed class PawnMindMod : IMod
                 Diagnostics.DumpState();
                 return ActionResult.Success("debug_dump");
 
+            case "commissary_buy":
+                return GameActions.BuyCommissary((string)request["identifier"]);
+
             case "list_goods":
                 return ActionResult.SuccessRaw("list_goods", GoodsService.ListJson((string)request["scope"]));
 

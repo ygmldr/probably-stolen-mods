@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using PawnMind.Core;
 using System.Reflection;
 
 namespace PawnMind.Game
@@ -166,6 +167,65 @@ namespace PawnMind.Game
             {
                 return new List<GameItem>();
             }
+        }
+
+        public static bool IsOutside
+        {
+            get
+            {
+                try
+                {
+                    return MapUIManager.Instance != null && MapUIManager.Instance.IsOutside;
+                }
+                catch
+                {
+                    return false;
+                }
+            }
+        }
+
+        public static string CurrentLocationId
+        {
+            get
+            {
+                try
+                {
+                    AfterhourLocation current = MapUIManager.Instance == null ? null : MapUIManager.Instance.Current;
+                    return current == null ? null : current.Id;
+                }
+                catch
+                {
+                    return null;
+                }
+            }
+        }
+
+        public static List<StockItem> GetCommissaryStock()
+        {
+            var rows = new List<StockItem>();
+            try
+            {
+                PlayerStore store = PlayerStore.Instance;
+                if (store == null || store.commissaryData == null) return rows;
+
+                List<CommissaryItemData> items = store.commissaryData.commissaryItemDatas;
+                for (int i = 0; i < items.Count; i++)
+                {
+                    CommissaryItemData item = items[i];
+                    if (item == null) continue;
+                    rows.Add(new StockItem
+                    {
+                        Identifier = item.identifier,
+                        Price = item.price,
+                        Stock = item.StockCount
+                    });
+                }
+            }
+            catch
+            {
+            }
+
+            return rows;
         }
 
         public static GameItem GetFirstClientItem()

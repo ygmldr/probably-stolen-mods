@@ -134,6 +134,19 @@ namespace PawnMind.Bridge
             return ActionResult.Success("sleep");
         }
 
+        public static ActionResult BuyCommissary(string identifier)
+        {
+            PlayerStore store;
+            if (!TryStore(out store)) return ActionResult.Failure("commissary_buy", "not_in_game");
+            if (string.IsNullOrEmpty(identifier)) return ActionResult.Failure("commissary_buy", "missing_identifier");
+
+            if (!CommissaryUIManager.CanBuy(identifier))
+                return ActionResult.Failure("commissary_buy", "cannot_buy");
+
+            store.commissaryData.BuyItem(identifier);
+            return ActionResult.Success("commissary_buy");
+        }
+
         public static ActionResult SaveGame()
         {
             PlayerStore store;
