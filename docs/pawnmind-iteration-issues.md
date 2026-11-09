@@ -10,7 +10,7 @@
 | # | 问题 | 证据/现象 | 下一步 |
 |---|---|---|---|
 | 1 | ~~旋转只支持 90°~~ 已解决 | `turns=0..3`，真机 180/270 通过 | — |
-| 2 | 重排成功路径未真机强制触发 | 失败路径已验：3x3 移入 2x2 暗格返回 `no_space`、物品留在 main；`RepackSolver` 单测覆盖碎片/满/阻挡/旋转 | 下一轮构造碎片容器验证成功重排 |
+| 2 | ~~重排成功路径未验证~~ 已解决 | 展示柜 7x5 精确摆成 6x4 满块 + 无 2x2 空洞，自动放入 2x2 触发 repack：5 件全部重排成功、无重叠 | — |
 | 3 | 异形物品“右下角”按包围盒算，可能有空角 | `PlacementMath.BottomRight` 用 width/height | 形状感知锚点；或文档标注 |
 | 4 | `get_layout.rows` 只保留每格最上层 id | 完整层在 `cells` | 文档已标注；如需 3D 再加 `layer_rows` |
 | 5 | 机器内部容器（熔炉/水培/打印机等）不在 `list_containers` | 目前只列 8 个玩家容器 | P2/P3 之后按需补 |
@@ -34,6 +34,7 @@
 | C | 异形物品只给宽高 | 加 `mask`/`cells` |
 | D | 同容器内不能重排 | `move_item` 指定坐标时允许同容器 |
 | E | 指定格子/旋转未实现 | `move_item(x,y,turns=0..3)` + `GridShapeBuilder` + 回滚 |
+| I | 自动摆放失败不会重排 | 内置 `RepackSolver` + 回滚；真机成功重排 5 件 |
 | F | 后台线程会被新扫描器拒绝 | HTTP 改主线程轮询，无 Thread/Task/协程 |
 | G | F7 全局按键打到浏览器 | 不再注入系统键鼠；调试走 HTTP |
 | H | `TryAcceptAll` 非 null 不代表真的移动 | 3x3 移 2x2 暗格曾误报 ok；现在以 `item.parentInventory == target` 判定 |

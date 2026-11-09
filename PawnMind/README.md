@@ -86,6 +86,7 @@ commissary_buy -> insufficient_credit
 - 新增 `RepackSolver`：带 4 向旋转、阻挡格、节点上限的回溯 packer（纯逻辑，4 项单测）
 - `move_item` 自动摆放失败时：收集目标容器可移动物品 + 新物品，重排；成功则逐个 `UncheckedAccept`，失败整体回滚到原父容器/原形状
 - 不依赖 CompactSort，避免跨 Mod 反射/能力声明
+- 真机：展示柜 7x5 摆成 6x4 满块（3x3 + 两个 3x2 + 3x1），再自动放入 2x2；重排后 5 件全部落位，布局无重叠
 
 ## 整包二维布局（2026-11-10）
 
