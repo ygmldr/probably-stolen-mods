@@ -1,0 +1,117 @@
+import asyncio
+import json
+import os
+import sys
+import tempfile
+import threading
+import unittest
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+try:
+    from mcp import ClientSession
+    from mcp.client.stdio import StdioServerParameters, stdio_client
+except ImportError:  # the mcp package is optional for the stdlib-only client tests
+    ClientSession = None
+    StdioServerParameters = None
+    stdio_client = None
+
+TOKEN = "0123456789abcdef0123456789abcdef"
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+MCP_SERVER = os.path.join(ROOT, "mcp_server.py")
+RECEIVED = []
+
+
+class _BridgeHandler(BaseHTTPRequestHandler):
+    def log_message(self, *args):
+        pass
+
+    def _json(self, payload, status=200):
+        data = json.dumps(payload).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+    def do_GET(self):
+        if self.path == "/health":
+            self._json({"ok": True, "name": "pawnmind"})
+        elif self.path == "/state":
+            self._json({
+                "in_game": True,
+                "cash": 550,
+                "rev": 3,
+                "client": None,
+                "negotiated_item": None,
+            })
+        else:
+            self._json({"ok": False}, 404)
+
+    def do_POST(self):
+        length = int(self.headers.get("Content-Length", "0"))
+        body = json.loads(self.rfile.read(length) or b"{}")
+        RECEIVED.append(body)
+        self._json({"ok": True, "op": body.get("op"), "rev": 3})
+
+
+@unittest.skipIf(ClientSession is None, "mcp package not installed")
+class McpServerTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.httpd = ThreadingHTTPServer(("127.0.0.1", 0), _BridgeHandler)
+        cls.port = cls.httpd.server_address[1]
+        cls.thread = threading.Thread(target=cls.httpd.serve_forever, daemon=True)
+        cls.thread.start()
+
+        handle, cls.config_path = tempfile.mkstemp()
+        with os.fdopen(handle, "w") as config:
+            config.write("port=%d\ntoken=%s\n" % (cls.port, TOKEN))
+
+        cls.params = StdioServerParameters(
+            command=sys.executable,
+            args=[MCP_SERVER, "--config", cls.config_path],
+        )
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.httpd.shutdown()
+        cls.httpd.server_close()
+        os.unlink(cls.config_path)
+
+    def test_tools_are_listed_and_state_roundtrips(self):
+        async def scenario():
+            async with stdio_client(self.params) as (read, write):
+                async with ClientSession(read, write) as session:
+                    await session.initialize()
+                    tools = await session.list_tools()
+                    names = {tool.name for tool in tools.tools}
+                    for expected in (
+                        "get_state", "ping", "open_shop", "call_next_customer",
+                        "advance_dialogue", "choose_dialogue", "end_day", "bargain",
+                        "confirm_trade", "save_game", "load_game", "new_game", "sleep",
+                        "get_legal_actions", "get_run_summary", "get_action_history",
+                        "act", "wait_until", "get_ui_snapshot", "press",
+                        "list_containers", "list_inventory", "get_item", "move_item", "get_layout", "wait_for_change",
+                    ):
+                        self.assertIn(expected, names)
+
+                    state = await session.call_tool("get_state", {})
+                    payload = json.loads(state.content[0].text)
+                    self.assertTrue(payload["in_game"])
+                    self.assertEqual(3, payload["rev"])
+
+                    result = await session.call_tool("open_shop", {"rev": 3})
+                    body = json.loads(result.content[0].text)
+                    self.assertTrue(body["ok"])
+                    self.assertEqual("open_shop", body["op"])
+
+        asyncio.run(scenario())
+
+        actions = [item for item in RECEIVED if item.get("op") == "open_shop"]
+        self.assertEqual(1, len(actions))
+        self.assertEqual(3, actions[0]["rev"])
+        self.assertIn("action_id", actions[0])
+
+
+if __name__ == "__main__":
+    unittest.main()

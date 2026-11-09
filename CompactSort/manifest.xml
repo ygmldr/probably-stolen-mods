@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ModManifest>
+  <ID>CompactInventorySort</ID>
+  <Name>紧凑整理</Name>
+  <Author>local</Author>
+  <ModVersion>1.9.3</ModVersion>
+  <Description><![CDATA[
+### 紧凑整理 / Compact Sort
+
+在右键整理菜单的四个原版选项下面新增“紧凑整理”，**原版四个按钮保持原样**：
+
+- 以“空格尽量连成整块”为目标，而不是只按高度分货架；
+- 同类（医疗/食品/枪械等目录）尽量聚在一起，相同物品再按 identifier 聚拢；
+- 大件先放，自动尝试旋转，优先贴边、贴同类；
+- 放完后做重力收拢，把能往上/往左挪的物品继续挤紧；
+- 严格禁止两个物品占用同一格（同层或不同层都不允许），提交后再次检查重叠；
+- 保留锁定物品、残骸和固定家具，不会移动它们；
+- 结果会与原布局比较，已经足够紧凑时不做破坏性重排；
+- 支持原版撤销（整理后重新打开右键菜单，撤销按钮可用）；
+- 拖拽放不下时，会尝试把目标容器和未放入物品一起重排后再放入；
+- 右键物品可“锁定排序 / 解锁排序”，或悬停按快捷键（默认 Ctrl+Q）；锁定物品不会被原版或紧凑整理移动；
+- 设置 → 紧凑整理锁定键 可修改修饰键和锁定键；
+- 全局池和快捷键整理已从游戏内移除；Ctrl+R / Ctrl+Shift+R 不再触发整理；
+- 展示柜、垃圾桶、前台/后台/内部柜台桌面不参与自动补位，只能手动整理；暗格作为普通存储参与；
+- 每次游戏内睡眠/新一天开始时自动写入只读快照到 `CompactSortSnapshots`，用于 benchmark；
+- 新增行主序阅读顺序与同 identifier 矩形度目标，尽量减少“虽然在一起但不整齐”。
+
+**用法**：右键容器空白处打开整理菜单，点“紧凑整理”。原版四个整理按钮不受影响。
+**限制**：拖拽补位只处理普通格子容器；拖拽补位不注册撤销。
+
+安装：把 `CompactInventorySort` 文件夹整个放进游戏根目录的 `Mods` 文件夹，
+确保第一层有 `manifest.xml` 和 `CompactInventorySort.dll`。
+  ]]></Description>
+  <GameVersions>
+    <Version>0.46D</Version>
+  </GameVersions>
+  <Assemblies>
+    <Assembly>CompactInventorySort.dll</Assembly>
+  </Assemblies>
+  <Capabilities>
+    <Capability>files</Capability>
+  </Capabilities>
+</ModManifest>

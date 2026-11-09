@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <AssemblyName>PawnMind.Tests</AssemblyName>
+    <RootNamespace>PawnMind.Tests</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="TestRunner.cs" />
+    <Compile Include="BridgeCoreTests.cs" />
+    <Compile Include="ActionGateTests.cs" />
+    <Compile Include="ActionRouterTests.cs" />
+    <Compile Include="LegalActionTests.cs" />
+    <Compile Include="ActionHistoryTests.cs" />
+    <Compile Include="InventoryPagerTests.cs" />
+    <Compile Include="MoveValidatorTests.cs" />
+    <Compile Include="HotkeyLatchTests.cs" />
+    <Compile Include="PlacementMathTests.cs" />
+    <Compile Include="ShapeMaskTests.cs" />
+    <Compile Include="BridgeServerTests.cs" />
+    <Compile Include="../../src/Core/*.cs" />
+    <Compile Include="../../src/Bridge/BridgeServer.cs" />
+    <Compile Include="../../src/Bridge/ActionRouter.cs" />
+    <Compile Include="../../src/Bridge/ActionResult.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>D:\Program Files\steam\steamapps\common\Probably Stolen\Probably Stolen_Data\Managed\Newtonsoft.Json.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+</Project>

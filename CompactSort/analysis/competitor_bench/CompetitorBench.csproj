@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <AssemblyName>CompetitorBench</AssemblyName>
+    <RootNamespace>CompactSort.CompetitorBench</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="../global_bench/BenchModel.cs" />
+    <Compile Include="../global_bench/BenchSnapshotLoader.cs" />
+    <Compile Include="../../src/Packing/PackModels.cs" />
+    <Compile Include="../../src/Packing/GridPacker.cs" />
+    <Compile Include="../../src/Packing/BeamPacker.cs" />
+    <Compile Include="../../src/Packing/AdvancedPacker.cs" />
+    <Compile Include="../../src/Packing/VisualPacker.cs" />
+    <Compile Include="../sia_decompiled/SmartInventoryArrange.Core/Cell.cs" />
+    <Compile Include="../sia_decompiled/SmartInventoryArrange.Core/ShapeMask.cs" />
+    <Compile Include="../sia_decompiled/SmartInventoryArrange.Core/Orientation.cs" />
+    <Compile Include="../sia_decompiled/SmartInventoryArrange.Core/Placement.cs" />
+    <Compile Include="../sia_decompiled/SmartInventoryArrange.Core/LayoutItem.cs" />
+    <Compile Include="../sia_decompiled/SmartInventoryArrange.Core/LayoutProblem.cs" />
+    <Compile Include="../sia_decompiled/SmartInventoryArrange.Core/LayoutScore.cs" />
+    <Compile Include="../sia_decompiled/SmartInventoryArrange.Core/LayoutResult.cs" />
+    <Compile Include="../sia_decompiled/SmartInventoryArrange.Core/DeterministicSolver.cs" />
+  </ItemGroup>
+</Project>

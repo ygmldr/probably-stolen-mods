@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+*.pyc
+src/bin/
+src/obj/
+test/**/bin/
+test/**/obj/

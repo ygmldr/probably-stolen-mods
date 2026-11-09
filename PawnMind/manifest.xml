@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ModManifest>
+  <ID>pawnmind</ID>
+  <Name>PawnMind · AI Bridge</Name>
+  <Author>local</Author>
+  <ModVersion>0.2.1</ModVersion>
+  <Description><![CDATA[
+Local MCP bridge for Probably Stolen (experimental, M0).
+
+Starts a read-only HTTP endpoint on 127.0.0.1 that exposes a compact snapshot of
+what the player can currently see in the shop. The token is generated on first
+enable and stored in the game's ModData directory.
+
+No gameplay action is executed in M0. The server binds to loopback only and
+requires a bearer token; it never reads hidden fields (appraisal truth, hidden
+customer identity).
+  ]]></Description>
+  <GameVersions>
+    <Version>0.46D</Version>
+  </GameVersions>
+  <Assemblies>
+    <Assembly>PawnMind.dll</Assembly>
+  </Assemblies>
+  <Capabilities>
+    <Capability>network</Capability>
+  </Capabilities>
+</ModManifest>

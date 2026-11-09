@@ -1,0 +1,9 @@
+[project]
+name = "pawnmind-mcp"
+version = "0.1.0"
+description = "Local MCP bridge for Probably Stolen (PawnMind)"
+requires-python = ">=3.11"
+dependencies = ["mcp>=1.2.0"]
+
+[tool.setuptools]
+py-modules = ["pawnmind_client", "mcp_server"]

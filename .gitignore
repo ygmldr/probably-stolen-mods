@@ -1,0 +1,25 @@
+# Build outputs
+**/bin/
+**/obj/
+**/dist/
+CompactSort/backup/
+
+# Python
+PawnMind/.venv/
+**/__pycache__/
+*.pyc
+*.pyo
+
+# Local scratch / debug artifacts
+_tools/
+_decomp/
+_shot*.png
+*.log
+
+# Editor / OS
+.vs/
+.idea/
+*.user
+*.suo
+.DS_Store
+Thumbs.db

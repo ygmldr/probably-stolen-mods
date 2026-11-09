@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <LangVersion>7.3</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <AssemblyName>CompactSort.AdapterTests</AssemblyName>
+    <RootNamespace>CompactSort.AdapterTests</RootNamespace>
+    <NoWarn>SYSLIB0050</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="TestSettings.cs" />
+    <Compile Include="Fakes.cs" />
+    <Compile Include="AdapterTests.cs" />
+    <Compile Include="../CompactSort.Tests/TestRunner.cs" />
+    <Compile Include="../../src/Packing/PackModels.cs" />
+    <Compile Include="../../src/Packing/GridPacker.cs" />
+    <Compile Include="../../src/Packing/BeamPacker.cs" />
+    <Compile Include="../../src/Packing/AdvancedPacker.cs" />
+    <Compile Include="../../src/Packing/VisualPacker.cs" />
+    <Compile Include="../../src/ModLog.cs" />
+    <Compile Include="../../src/SortUndo.cs" />
+    <Compile Include="../../src/SortFeatures.cs" />
+    <Compile Include="../../src/CompactSorter.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="Assembly-CSharp">
+      <HintPath>D:/Program Files/steam/steamapps/common/Probably Stolen/Probably Stolen_Data/Managed/Assembly-CSharp.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="UnityEngine">
+      <HintPath>D:/Program Files/steam/steamapps/common/Probably Stolen/Probably Stolen_Data/Managed/UnityEngine.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>D:/Program Files/steam/steamapps/common/Probably Stolen/Probably Stolen_Data/Managed/UnityEngine.CoreModule.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+</Project>
