@@ -37,6 +37,12 @@ confirm_trade(id=111, side=buy)
 - 待验证：`choose_dialogue`（选项）、`bargain`、`sell`、`end_day`
 - 已确认的坑：`PlayerStore.OpenShutter()` 只改状态，必须走 `StoreShutterButton.OpenShutter()` 才会生成当日顾客；顾客货物由对话 `endAction` 摆到前台
 
+## 商品目录（2026-11-10）
+
+- `list_goods(scope=client|sellable|all)`：前台/后台商品 + 当前顾客（名字/意图/预算/是否可砍价）
+- 真机：拾荒客 SELL → `client` 返回 8 件货（id/名称/价格/container），买一件后 cash 550→538、front 9→8、库存 14→15
+- 补给站/博士/批发 scope 尚未接
+
 ## 自动摆放失败重排（2026-11-10）
 
 - 新增 `RepackSolver`：带 4 向旋转、阻挡格、节点上限的回溯 packer（纯逻辑，4 项单测）

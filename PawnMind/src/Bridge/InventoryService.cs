@@ -247,6 +247,7 @@ namespace PawnMind.Bridge
             row["count"] = record.Count;
             row["owned"] = record.Owned;
             row["locked"] = record.Locked;
+            row["sellable"] = record.Sellable;
             row["x"] = record.X;
             row["y"] = record.Y;
             row["width"] = record.Width;
@@ -268,7 +269,7 @@ namespace PawnMind.Bridge
             return row;
         }
 
-        private static ItemRecord Describe(string container, GameItem item)
+        internal static ItemRecord Describe(string container, GameItem item)
         {
             if (item == null) return null;
 
@@ -282,6 +283,7 @@ namespace PawnMind.Bridge
                 Count = item.unitCount,
                 Owned = GameState.IsOwned(item),
                 Locked = ItemPinHelper.IsPinned(item),
+                Sellable = GameState.IsOwned(item) && GameState.CanSellItem(item),
                 X = item.modifiedShape != null ? item.modifiedShape.minX : item.modifiedXOrigin,
                 Y = item.modifiedShape != null ? item.modifiedShape.minY : item.modifiedYOrigin,
                 Width = item.modifiedShape != null ? item.modifiedShape.globalWidth : 0,

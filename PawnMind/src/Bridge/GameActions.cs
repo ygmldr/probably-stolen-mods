@@ -165,10 +165,11 @@ namespace PawnMind.Bridge
                 if (sameContainer) return ActionResult.Failure("move_item", "same_container");
 
                 GameInventory result = target.TryAcceptAll(item);
-                if (result != null) return ActionResult.Success("move_item");
+                if (result != null && item.parentInventory == target) return ActionResult.Success("move_item");
 
                 var targetGrid = target as GameGridInventory;
-                if (targetGrid != null && TryRepack(targetGrid, item)) return ActionResult.Success("move_item");
+                if (targetGrid != null && TryRepack(targetGrid, item) && item.parentInventory == targetGrid)
+                    return ActionResult.Success("move_item");
 
                 return ActionResult.Failure("move_item", "no_space");
             }
@@ -293,6 +294,13 @@ namespace PawnMind.Bridge
                 }
 
                 grid.Validate();
+                for (int i = 0; i < solved.Placements.Count; i++)
+                {
+                    GameItem placed = FindById(movables, incoming, solved.Placements[i].Id);
+                    if (placed == null || placed.parentInventory != grid)
+                        throw new InvalidOperationException("item not in target after repack");
+                }
+
                 return true;
             }
             catch (Exception e)

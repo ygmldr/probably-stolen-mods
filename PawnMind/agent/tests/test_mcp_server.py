@@ -91,7 +91,7 @@ class McpServerTests(unittest.TestCase):
                         "confirm_trade", "save_game", "load_game", "new_game", "sleep",
                         "get_legal_actions", "get_run_summary", "get_action_history",
                         "act", "wait_until", "get_ui_snapshot", "press",
-                        "list_containers", "list_inventory", "get_item", "move_item", "get_layout", "wait_for_change",
+                        "list_goods", "list_containers", "list_inventory", "get_item", "move_item", "get_layout", "wait_for_change",
                     ):
                         self.assertIn(expected, names)
 

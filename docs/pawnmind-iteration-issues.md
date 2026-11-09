@@ -10,13 +10,13 @@
 | # | 问题 | 证据/现象 | 下一步 |
 |---|---|---|---|
 | 1 | ~~旋转只支持 90°~~ 已解决 | `turns=0..3`，真机 180/270 通过 | — |
-| 2 | 自动摆放失败的重排已实现，未真机强制触发 | 重排构建下普通移动回归通过；`RepackSolver` 单测覆盖碎片/满/阻挡/旋转 | 下一轮构造碎片容器强制触发成功/回滚 |
+| 2 | 重排成功路径未真机强制触发 | 失败路径已验：3x3 移入 2x2 暗格返回 `no_space`、物品留在 main；`RepackSolver` 单测覆盖碎片/满/阻挡/旋转 | 下一轮构造碎片容器验证成功重排 |
 | 3 | 异形物品“右下角”按包围盒算，可能有空角 | `PlacementMath.BottomRight` 用 width/height | 形状感知锚点；或文档标注 |
 | 4 | `get_layout.rows` 只保留每格最上层 id | 完整层在 `cells` | 文档已标注；如需 3D 再加 `layer_rows` |
 | 5 | 机器内部容器（熔炉/水培/打印机等）不在 `list_containers` | 目前只列 8 个玩家容器 | P2/P3 之后按需补 |
-| 6 | 补给站/博士/批发商品目录未接 | 只有前台/后台顾客物品 | P2 |
+| 6 | 补给站/博士/批发商品目录未接 | 顾客 `list_goods` 已真机；其余 scope 未接 | P2 剩余 |
 | 7 | 砍价成功率/走人率/声望增减未暴露 | 只有 `bargain` 成功/失败 | P2 |
-| 8 | `sell` 未真机验证 | 只验证过 buy | P2 |
+| 8 | `sell` 未真机验证 | 只验证过 buy；`sellable` 目录当前为空（该顾客 SELL-only） | P2 |
 | 9 | 夜间三地点全部未实现 | 无 `list_locations/go_out/scavenge/...` | P3 |
 | 10 | 阅读（书/物品详情）未实现 | 无 `list_books/read_book` | P4 |
 | 11 | F7 / `debug_pulse` 日志行未出现在 `Player.log` | dump 文件正常，pulse 无日志 | 切 ModLog 或写文件确认 |
@@ -36,6 +36,7 @@
 | E | 指定格子/旋转未实现 | `move_item(x,y,turns=0..3)` + `GridShapeBuilder` + 回滚 |
 | F | 后台线程会被新扫描器拒绝 | HTTP 改主线程轮询，无 Thread/Task/协程 |
 | G | F7 全局按键打到浏览器 | 不再注入系统键鼠；调试走 HTTP |
+| H | `TryAcceptAll` 非 null 不代表真的移动 | 3x3 移 2x2 暗格曾误报 ok；现在以 `item.parentInventory == target` 判定 |
 
 ## 模板（每轮新增）
 

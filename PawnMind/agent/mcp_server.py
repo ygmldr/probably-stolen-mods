@@ -86,6 +86,11 @@ def build_server(client):
         return client.action("press", control_id=control_id, rev=rev)
 
     @server.tool()
+    def list_goods(scope: str = "all") -> dict:
+        """List goods on the front/back counters: scope=client (non-owned), sellable (owned+client wants), all."""
+        return client.action("list_goods", scope=scope)
+
+    @server.tool()
     def list_containers() -> dict:
         """List player containers (main/front/back/showcase/hidden/afterhour/trash/sold) with counts."""
         return client.action("list_containers")

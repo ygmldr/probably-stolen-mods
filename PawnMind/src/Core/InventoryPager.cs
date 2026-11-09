@@ -13,6 +13,7 @@ namespace PawnMind.Core
         public int Count;
         public bool Owned;
         public bool Locked;
+        public bool Sellable;
         public int X;
         public int Y;
         public int Width;
