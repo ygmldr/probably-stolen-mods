@@ -101,6 +101,10 @@ namespace PawnMind.AdapterTests
             CheckMethod(assembly, "GameInventory", "IsInsertLocked");
             CheckProperty(assembly, "GameItem", "parentInventory");
             CheckProperty(assembly, "GameItem", "modifiedShape");
+            CheckMethod(assembly, "StoreBookData", "GetBookById");
+            CheckMethod(assembly, "PaperBookRegistry", "Resolve");
+            CheckProperty(assembly, "PaperBookRegistry", "All");
+            CheckMethod(assembly, "GameItem", "IsTag");
             CheckMethod(assembly, "AfterhourLocation", "Get");
             CheckMethod(assembly, "AfterhourLocation", "GetDiscovered");
             CheckMethod(assembly, "MapUIManager", "OpenUI");

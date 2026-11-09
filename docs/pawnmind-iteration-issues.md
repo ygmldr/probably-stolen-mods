@@ -18,7 +18,7 @@
 | 7 | 砍价成功率/走人率已暴露；声望为估算 | `bargain_preview` 真机 50/20/30，`rep_per_1000=-2.48`；未计难度/Perk 最终修正 | 文档标注估算；如需精确再接预览 UI |
 | 8 | `sell` 未真机验证 | 只验证过 buy；`sellable` 目录当前为空（该顾客 SELL-only） | P2 |
 | 9 | 夜间三地点已通，细节待补 | 真机 go_out/scavenge/return/杰克逊列表；补给站 0 代币 | 代币获取、杰克逊买卖、拾荒伤口 |
-| 10 | 阅读（书/物品详情）未实现 | 无 `list_books/read_book` | P4 |
+| 10 | 阅读已通；多页手册索引硬编码 | 真机 water_guide 4 页；仅 8 本 vanilla 手册，Mod 书走 PaperBookRegistry | 新增手册需补映射 |
 | 11 | F7 / `debug_pulse` 日志行未出现在 `Player.log` | dump 文件正常，pulse 无日志 | 切 ModLog 或写文件确认 |
 | 12 | 测试档槽位会累积（每次 `new_game` 新建） | 内存/存档列表变长 | 提供测试档清理或复用 |
 | 13 | UI 快照只覆盖 `TabletButton` + 标准 `Button` | 开关/输入框/拖拽未纳入 | P2/P3 遇到再补 |

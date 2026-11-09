@@ -116,6 +116,21 @@ def build_server(client):
         return client.action("commissary_buy", identifier=identifier, rev=rev)
 
     @server.tool()
+    def list_books() -> dict:
+        """List owned/unlocked books (vanilla BOOK_TAG and paper GUIDE_PAPER_TAG)."""
+        return client.action("list_books")
+
+    @server.tool()
+    def read_book(book_id: str, page: int = -1) -> dict:
+        """Read an owned book by item id or book id; returns pages and optionally one page."""
+        return client.action("read_book", book_id=book_id, page=page)
+
+    @server.tool()
+    def read_item(item_id: int) -> dict:
+        """Read one item's visible details plus book/document flags."""
+        return client.action("read_item", item_id=item_id)
+
+    @server.tool()
     def list_containers() -> dict:
         """List player containers (main/front/back/showcase/hidden/afterhour/trash/sold) with counts."""
         return client.action("list_containers")

@@ -171,6 +171,17 @@ public sealed class PawnMindMod : IMod
                     ReadInt(request, "y", -1),
                     turns);
 
+            case "list_books":
+                return ActionResult.SuccessRaw("list_books", BookService.ListJson());
+
+            case "read_book":
+                return ActionResult.SuccessRaw("read_book", BookService.ReadJson(
+                    (string)request["book_id"], ReadInt(request, "page", -1)));
+
+            case "read_item":
+                return ActionResult.SuccessRaw("read_item", BookService.ReadItemJson(
+                    ReadInt(request, "item_id", -1)));
+
             case "get_layout":
                 return ActionResult.SuccessRaw("get_layout", InventoryService.LayoutJson((string)request["container"]));
 
