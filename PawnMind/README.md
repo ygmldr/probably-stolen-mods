@@ -37,6 +37,17 @@ confirm_trade(id=111, side=buy)
 - 待验证：`choose_dialogue`（选项）、`bargain`、`sell`、`end_day`
 - 已确认的坑：`PlayerStore.OpenShutter()` 只改状态，必须走 `StoreShutterButton.OpenShutter()` 才会生成当日顾客；顾客货物由对话 `endAction` 摆到前台
 
+## 砍价预览（2026-11-10）
+
+`bargain_preview(direction, percent)` 返回：
+
+- `success_chance / leave_chance / refuse_chance`（游戏原值）
+- `price_before / price_after`
+- `rep_multiplier`、`rep_per_1000`（倍率 × 2.5 × 阵营系数）、`rep_estimate_exact`
+- 真机：拾荒客 Lower Level，`sell_markup 25` -> 50/20/30，`rep_per_1000=-2.48`
+
+声望是**估算**（未计难度/Perk 的最终修正）；成交仍走游戏 `bargain`。
+
 ## 商品目录（2026-11-10）
 
 - `list_goods(scope=client|sellable|all)`：前台/后台商品 + 当前顾客（名字/意图/预算/是否可砍价）

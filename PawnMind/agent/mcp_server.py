@@ -148,6 +148,11 @@ def build_server(client):
         return client.action("end_day", rev=rev)
 
     @server.tool()
+    def bargain_preview(direction: str, percent: int) -> dict:
+        """Preview one bargain: success/leave/refuse chance, price before/after, reputation estimate."""
+        return client.action("bargain_preview", direction=direction, percent=percent)
+
+    @server.tool()
     def bargain(direction: str, percent: int, rev: int) -> dict:
         """One bargain offer: direction is sell_discount|sell_markup|buy_markup|buy_discount; percent is 10|25|50|75."""
         return client.action("bargain", direction=direction, percent=percent, rev=rev)

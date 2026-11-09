@@ -25,6 +25,7 @@
     <Compile Include="LayoutDisplayTests.cs" />
     <Compile Include="RepackSolverTests.cs" />
     <Compile Include="GoodsFilterTests.cs" />
+    <Compile Include="BargainMathTests.cs" />
     <Compile Include="BridgeServerTests.cs" />
     <Compile Include="../../src/Core/*.cs" />
     <Compile Include="../../src/Bridge/BridgeServer.cs" />

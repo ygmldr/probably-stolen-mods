@@ -15,7 +15,7 @@
 | 4 | `get_layout.rows` 只保留每格最上层 id | 完整层在 `cells` | 文档已标注；如需 3D 再加 `layer_rows` |
 | 5 | 机器内部容器（熔炉/水培/打印机等）不在 `list_containers` | 目前只列 8 个玩家容器 | P2/P3 之后按需补 |
 | 6 | 补给站/博士/批发商品目录未接 | 顾客 `list_goods` 已真机；其余 scope 未接 | P2 剩余 |
-| 7 | 砍价成功率/走人率/声望增减未暴露 | 只有 `bargain` 成功/失败 | P2 |
+| 7 | 砍价成功率/走人率已暴露；声望为估算 | `bargain_preview` 真机 50/20/30，`rep_per_1000=-2.48`；未计难度/Perk 最终修正 | 文档标注估算；如需精确再接预览 UI |
 | 8 | `sell` 未真机验证 | 只验证过 buy；`sellable` 目录当前为空（该顾客 SELL-only） | P2 |
 | 9 | 夜间三地点全部未实现 | 无 `list_locations/go_out/scavenge/...` | P3 |
 | 10 | 阅读（书/物品详情）未实现 | 无 `list_books/read_book` | P4 |

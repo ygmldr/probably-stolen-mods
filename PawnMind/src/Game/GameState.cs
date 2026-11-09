@@ -168,6 +168,17 @@ namespace PawnMind.Game
             }
         }
 
+        public static GameItem GetFirstClientItem()
+        {
+            List<GameItem> items = GetFrontCounterItems();
+            for (int i = 0; i < items.Count; i++)
+            {
+                if (items[i] != null && !IsOwned(items[i])) return items[i];
+            }
+
+            return null;
+        }
+
         public static List<GameItem> GetClientItems()
         {
             try

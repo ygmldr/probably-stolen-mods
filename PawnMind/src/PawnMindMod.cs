@@ -177,6 +177,10 @@ public sealed class PawnMindMod : IMod
                     ReadInt(request, "item_id", -1),
                     (string)request["side"]);
 
+            case "bargain_preview":
+                return ActionResult.SuccessRaw("bargain_preview", BargainService.PreviewJson(
+                    (string)request["direction"], ReadInt(request, "percent", 0)));
+
             case "bargain":
                 return GameActions.Bargain(
                     (string)request["direction"],
