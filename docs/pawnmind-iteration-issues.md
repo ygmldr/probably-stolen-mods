@@ -9,8 +9,8 @@
 
 | # | 问题 | 证据/现象 | 下一步 |
 |---|---|---|---|
-| 1 | 旋转只支持 90°，180°/270° 未实现 | `move_item(rotate=true)` 固定 orientation=1 | 改成 `turns=0..3`，补纯测试 + 真机 |
-| 2 | 自动摆放失败不会调 CompactSort 重排 | `TryAcceptAll` 返回 null 直接 `no_space` | 反射/依赖 CompactSort 的整理入口，重试一次 |
+| 1 | ~~旋转只支持 90°~~ 已解决 | `turns=0..3`，真机 180/270 通过 | — |
+| 2 | 自动摆放失败不会重排 | `TryAcceptAll` 返回 null 直接 `no_space` | 方案待定：内置简化 repack（避免跨 mod 反射/能力）或显式依赖 CompactSort |
 | 3 | 异形物品“右下角”按包围盒算，可能有空角 | `PlacementMath.BottomRight` 用 width/height | 形状感知锚点；或文档标注 |
 | 4 | `get_layout.rows` 只保留每格最上层 id | 完整层在 `cells` | 文档已标注；如需 3D 再加 `layer_rows` |
 | 5 | 机器内部容器（熔炉/水培/打印机等）不在 `list_containers` | 目前只列 8 个玩家容器 | P2/P3 之后按需补 |
@@ -33,7 +33,7 @@
 | B | 布局只有摘要，没有二维图 | `get_layout` 加 `rows/display/symbols/cells` |
 | C | 异形物品只给宽高 | 加 `mask`/`cells` |
 | D | 同容器内不能重排 | `move_item` 指定坐标时允许同容器 |
-| E | 指定格子/旋转未实现 | `move_item(x,y,rotate)` + `GridShapeBuilder` + 回滚 |
+| E | 指定格子/旋转未实现 | `move_item(x,y,turns=0..3)` + `GridShapeBuilder` + 回滚 |
 | F | 后台线程会被新扫描器拒绝 | HTTP 改主线程轮询，无 Thread/Task/协程 |
 | G | F7 全局按键打到浏览器 | 不再注入系统键鼠；调试走 HTTP |
 

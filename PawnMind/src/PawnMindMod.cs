@@ -140,12 +140,18 @@ public sealed class PawnMindMod : IMod
                     ReadInt(request, "page_size", 20)));
 
             case "move_item":
+                int turns = ReadInt(request, "turns", -1);
+                if (turns < 0)
+                {
+                    turns = request["rotate"] != null && (bool)request["rotate"] ? 1 : 0;
+                }
+
                 return GameActions.MoveItem(
                     ReadInt(request, "item_id", -1),
                     (string)request["target"],
                     ReadInt(request, "x", -1),
                     ReadInt(request, "y", -1),
-                    request["rotate"] != null && (bool)request["rotate"]);
+                    turns);
 
             case "get_layout":
                 return ActionResult.SuccessRaw("get_layout", InventoryService.LayoutJson((string)request["container"]));

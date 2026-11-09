@@ -143,7 +143,7 @@ namespace PawnMind.Bridge
             return ActionResult.Success("save_game");
         }
 
-        public static ActionResult MoveItem(int itemId, string targetContainer, int x, int y, bool rotate)
+        public static ActionResult MoveItem(int itemId, string targetContainer, int x, int y, int turns)
         {
             PlayerStore store;
             if (!TryStore(out store)) return ActionResult.Failure("move_item", "not_in_game");
@@ -151,6 +151,7 @@ namespace PawnMind.Bridge
             GameItem item = GameState.FindItemAnywhere(itemId);
             GameInventory target = GameState.GetContainer(targetContainer);
 
+            if (turns < 0 || turns > 3) return ActionResult.Failure("move_item", "bad_rotation");
             if (item == null) return ActionResult.Failure("move_item", "item_not_found");
             if (target == null) return ActionResult.Failure("move_item", "unknown_container");
             if (ItemPinHelper.IsPinned(item)) return ActionResult.Failure("move_item", "item_locked");
@@ -175,7 +176,7 @@ namespace PawnMind.Bridge
 
             GridShape originalShape = item.modifiedShape.Clone();
             GridShape shape = new GridShapeBuilder(item.modifiedShape)
-                .SetOrientation(rotate ? 1 : 0)
+                .SetOrientation(turns)
                 .SetPosition(x, y)
                 .Build();
             if (shape == null) return ActionResult.Failure("move_item", "bad_shape");

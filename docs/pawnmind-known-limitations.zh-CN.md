@@ -9,7 +9,7 @@
 - `get_layout` 的 `rows` 是每格**最上层**的 item id；同一格不同 layer 的完整占用在 `cells`（含 layer）里。
 - `get_layout` 只支持格子容器（main/front/back/showcase/hidden/afterhour）；垃圾桶/已售这类槽位容器返回 `not_a_grid_container`。
 - `move_item` 的“右下角”按包围盒算；异形物品可能视觉上有空角。
-- 旋转只支持 90°（`rotate=true`），180°/270° 未实现。
+- 旋转支持 0/90/180/270（`turns=0..3`）；异形旋转后的包围盒/锚点仍按 bbox。
 - 指定位置放置失败会回滚；但“自动摆放失败 → 调 CompactSort 重排再试”还没接。
 - 机器内部容器（熔炉/水培/打印机等）没有纳入 `list_containers`。
 

@@ -96,9 +96,11 @@ def build_server(client):
         return client.action("list_inventory", container=container, search=search, page=page, page_size=page_size)
 
     @server.tool()
-    def move_item(item_id: int, target: str, rev: int, x: int = -1, y: int = -1, rotate: bool = False) -> dict:
-        """Move one item; omit x/y to auto-place, or pass x/y/rotate for exact placement."""
-        return client.action("move_item", item_id=item_id, target=target, x=x, y=y, rotate=rotate, rev=rev)
+    def move_item(item_id: int, target: str, rev: int, x: int = -1, y: int = -1,
+                  rotate: bool = False, turns: int = 0) -> dict:
+        """Move one item; omit x/y to auto-place. turns=0..3 rotates 0/90/180/270 degrees."""
+        return client.action("move_item", item_id=item_id, target=target, x=x, y=y,
+                             rotate=rotate, turns=turns, rev=rev)
 
     @server.tool()
     def get_layout(container: str = "main") -> dict:

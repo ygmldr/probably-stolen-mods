@@ -82,7 +82,7 @@ get_layout 行 7..9 的列 22..23 都是 43
 
 新增：
 
-- `move_item` 支持 `x/y/rotate`；同容器内重排也允许
+- `move_item` 支持 `x/y/turns=0..3`（0/90/180/270）；同容器内重排也允许
 - `get_layout(container)`：返回网格宽高 + 每格 item id 的二维数组 + 物品列表
 - `list_inventory` 的 `x/y` 改为真实 `modifiedShape.minX/minY`（之前误用了 transform origin，全是 0）
 
