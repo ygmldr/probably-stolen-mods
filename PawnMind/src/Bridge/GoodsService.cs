@@ -105,9 +105,7 @@ namespace PawnMind.Bridge
             if (client == null || !client.isOfferWholesale)
                 return "{\"ok\":false,\"error\":\"no_wholesale_offer\"}";
 
-            var records = new List<ItemRecord>();
-            Collect("front", records);
-            Collect("back", records);
+            var records = GoodsFilter.Filter(CollectAll(), GoodsScope.Client);
 
             var payload = new Dictionary<string, object>();
             payload["ok"] = true;
@@ -146,6 +144,14 @@ namespace PawnMind.Bridge
             }
 
             return rows;
+        }
+
+        private static List<ItemRecord> CollectAll()
+        {
+            var records = new List<ItemRecord>();
+            Collect("front", records);
+            Collect("back", records);
+            return records;
         }
 
         private static void Collect(string container, List<ItemRecord> records)

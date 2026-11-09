@@ -27,7 +27,7 @@
 
 | 16 | `end_day` 在部分店态返回 `cannot_end_day` | day2 开店后直接 end_day 失败，sleep 仍可推进 | 补店态判断或文档说明 |
 | 17 | 补给站购买缺代币来源 | `redeemed_credit=0` | 接回收/兑换或标注需玩家操作 |
-| 18 | 批发整包购买已实现，成功路径未验 | `buy_wholesale` 按游戏 OnWholesaleClick 复刻；测试档未遇到批发客户 | 遇到 `isOfferWholesale` 时真机验证 |
+| 18 | 批发成功路径未验 | 真机遇到 `wholesale_offer=true`、折扣 -17%，但该单没有未拥有货物 -> `no_items`；目录已过滤 owned | 遇到有货的批发单再验扣款 |
 
 ### 已解决
 
@@ -51,7 +51,7 @@
 - [ ] 问题：现象 / 证据 / 下一步
 #| 16 | `end_day` 在部分店态返回 `cannot_end_day` | day2 开店后直接 end_day 失败，sleep 仍可推进 | 补店态判断或文档说明 |
 | 17 | 补给站购买缺代币来源 | `redeemed_credit=0` | 接回收/兑换或标注需玩家操作 |
-| 18 | 批发整包购买已实现，成功路径未验 | `buy_wholesale` 按游戏 OnWholesaleClick 复刻；测试档未遇到批发客户 | 遇到 `isOfferWholesale` 时真机验证 |
+| 18 | 批发成功路径未验 | 真机遇到 `wholesale_offer=true`、折扣 -17%，但该单没有未拥有货物 -> `no_items`；目录已过滤 owned | 遇到有货的批发单再验扣款 |
 
 ### 已解决
 - [x] 问题 -> 解决方式 / 测试
