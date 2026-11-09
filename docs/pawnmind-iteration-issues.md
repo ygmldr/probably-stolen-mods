@@ -10,7 +10,7 @@
 | # | 问题 | 证据/现象 | 下一步 |
 |---|---|---|---|
 | 1 | ~~旋转只支持 90°~~ 已解决 | `turns=0..3`，真机 180/270 通过 | — |
-| 2 | 自动摆放失败不会重排 | `TryAcceptAll` 返回 null 直接 `no_space` | 方案待定：内置简化 repack（避免跨 mod 反射/能力）或显式依赖 CompactSort |
+| 2 | 自动摆放失败的重排已实现，未真机强制触发 | `RepackSolver` + `TryRepack` 回滚；单测覆盖碎片/满/阻挡/旋转 | 下一轮构造碎片容器真机验证 |
 | 3 | 异形物品“右下角”按包围盒算，可能有空角 | `PlacementMath.BottomRight` 用 width/height | 形状感知锚点；或文档标注 |
 | 4 | `get_layout.rows` 只保留每格最上层 id | 完整层在 `cells` | 文档已标注；如需 3D 再加 `layer_rows` |
 | 5 | 机器内部容器（熔炉/水培/打印机等）不在 `list_containers` | 目前只列 8 个玩家容器 | P2/P3 之后按需补 |

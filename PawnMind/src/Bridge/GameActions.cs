@@ -165,9 +165,12 @@ namespace PawnMind.Bridge
                 if (sameContainer) return ActionResult.Failure("move_item", "same_container");
 
                 GameInventory result = target.TryAcceptAll(item);
-                return result == null
-                    ? ActionResult.Failure("move_item", "no_space")
-                    : ActionResult.Success("move_item");
+                if (result != null) return ActionResult.Success("move_item");
+
+                var targetGrid = target as GameGridInventory;
+                if (targetGrid != null && TryRepack(targetGrid, item)) return ActionResult.Success("move_item");
+
+                return ActionResult.Failure("move_item", "no_space");
             }
 
             GameGridInventory grid = target as GameGridInventory;
@@ -211,6 +214,168 @@ namespace PawnMind.Bridge
 
             item.ValidateShapeState();
             return ActionResult.Success("move_item");
+        }
+
+        private sealed class RepackSnapshot
+        {
+            public GameItem Item;
+            public GameInventory Parent;
+            public GridShape Shape;
+        }
+
+        private static bool TryRepack(GameGridInventory grid, GameItem incoming)
+        {
+            int width = grid.inventoryShape.width;
+            int height = grid.inventoryShape.height;
+            List<GameItem> targetItems = grid.childItems;
+
+            var blocked = new bool[width * height];
+            var movables = new List<GameItem>();
+            for (int i = 0; i < targetItems.Count; i++)
+            {
+                GameItem item = targetItems[i];
+                if (item == null || item == incoming) continue;
+
+                if (ItemPinHelper.IsPinned(item))
+                {
+                    MarkShape(blocked, width, height, item.modifiedShape);
+                }
+                else
+                {
+                    movables.Add(item);
+                }
+            }
+
+            var solverItems = new List<RepackItem>();
+            for (int i = 0; i < movables.Count; i++)
+            {
+                RepackItem model = ToModel(movables[i]);
+                if (model != null) solverItems.Add(model);
+            }
+
+            bool incomingInside = incoming.parentInventory == grid;
+            RepackItem incomingModel = ToModel(incoming);
+            if (incomingModel == null) return false;
+            if (!incomingInside) solverItems.Add(incomingModel);
+
+            RepackResult solved = RepackSolver.Solve(width, height, blocked, solverItems);
+            if (!solved.Success) return false;
+
+            var snapshots = new List<RepackSnapshot>();
+            for (int i = 0; i < movables.Count; i++) snapshots.Add(Snapshot(movables[i]));
+            if (!incomingInside) snapshots.Add(Snapshot(incoming));
+
+            try
+            {
+                for (int i = 0; i < movables.Count; i++)
+                {
+                    GameInventory parent = movables[i].parentInventory;
+                    if (parent != null && !parent.Expel(movables[i]))
+                        throw new InvalidOperationException("detach failed");
+                }
+
+                if (!incomingInside && incoming.parentInventory != null
+                    && !incoming.parentInventory.Expel(incoming))
+                    throw new InvalidOperationException("incoming detach failed");
+
+                for (int i = 0; i < solved.Placements.Count; i++)
+                {
+                    RepackPlacement placement = solved.Placements[i];
+                    GameItem item = FindById(movables, incoming, placement.Id);
+                    if (item == null) throw new InvalidOperationException("item missing");
+
+                    GridShape shape = new GridShapeBuilder(item.modifiedShape)
+                        .SetOrientation(placement.Turns)
+                        .SetPosition(placement.X, placement.Y)
+                        .Build();
+                    item.modifiedShape = new GridShapeBuilder(item.modifiedShape).SetTransform(shape);
+                    if (!grid.UncheckedAccept(item)) throw new InvalidOperationException("accept failed");
+                }
+
+                grid.Validate();
+                return true;
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning("[PawnMind] repack failed, rolling back: " + e.Message);
+                for (int i = 0; i < snapshots.Count; i++)
+                {
+                    RepackSnapshot snapshot = snapshots[i];
+                    if (snapshot.Item.parentInventory != null)
+                    {
+                        snapshot.Item.parentInventory.Expel(snapshot.Item);
+                    }
+                }
+
+                for (int i = 0; i < snapshots.Count; i++)
+                {
+                    RepackSnapshot snapshot = snapshots[i];
+                    snapshot.Item.modifiedShape = snapshot.Shape;
+                    if (snapshot.Parent != null) snapshot.Parent.UncheckedAccept(snapshot.Item);
+                }
+
+                grid.Validate();
+                return false;
+            }
+        }
+
+        private static RepackSnapshot Snapshot(GameItem item)
+        {
+            return new RepackSnapshot
+            {
+                Item = item,
+                Parent = item.parentInventory,
+                Shape = item.modifiedShape == null ? null : item.modifiedShape.Clone()
+            };
+        }
+
+        private static RepackItem ToModel(GameItem item)
+        {
+            if (item == null || item.modifiedShape == null) return null;
+
+            GridShape shape = item.modifiedShape;
+            int width = shape.maxX - shape.minX + 1;
+            int height = shape.maxY - shape.minY + 1;
+            if (width <= 0 || height <= 0) return null;
+
+            var cells = new int[width * height];
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    if (shape.Get(shape.minX + x, shape.minY + y) != 0) cells[y * width + x] = 1;
+                }
+            }
+
+            return new RepackItem
+            {
+                Id = item.GetUniqueID(), Width = width, Height = height, Cells = cells
+            };
+        }
+
+        private static GameItem FindById(List<GameItem> items, GameItem incoming, int id)
+        {
+            if (incoming != null && incoming.GetUniqueID() == id) return incoming;
+            for (int i = 0; i < items.Count; i++)
+            {
+                if (items[i] != null && items[i].GetUniqueID() == id) return items[i];
+            }
+
+            return null;
+        }
+
+        private static void MarkShape(bool[] grid, int width, int height, GridShape shape)
+        {
+            if (shape == null) return;
+            for (int y = shape.minY; y <= shape.maxY; y++)
+            {
+                if (y < 0 || y >= height) continue;
+                for (int x = shape.minX; x <= shape.maxX; x++)
+                {
+                    if (x < 0 || x >= width) continue;
+                    if (shape.Get(x, y) != 0) grid[y * width + x] = true;
+                }
+            }
         }
 
         private static string ErrorCode(MoveCheck check)
