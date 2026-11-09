@@ -199,11 +199,6 @@ namespace CompactSort
                 return false;
             }
             if (inventory == null || incoming == null || incoming.Count == 0) return false;
-            if (IsAutoSortBlocked(inventory))
-            {
-                ModLog.I("[CompactSort] drag-fit skipped: showcase/trashcan/desktop is manual-sort only.");
-                return false;
-            }
             if (inventory.IsInsertLocked()) return false;
             if (!IsHiddenStash(inventory) && !GeneralHelper.MayPlayerInsertInto(inventory)) return false;
 
@@ -229,8 +224,14 @@ namespace CompactSort
                 var item = incoming[i];
                 if (item == null) continue;
                 if (item is GameItemElement element && element.IsDestroyed()) continue;
+                if (item.parentInventory == null)
+                {
+                    // Purchase/plant overflow items can be spawned without a parent.
+                    // Never repack the target for an item we cannot detach safely.
+                    ModLog.I("[CompactSort] drag-fit skipped: incoming overflow item has no parent.");
+                    return false;
+                }
                 if (item.parentInventory == inventory) continue;
-                if (item.parentInventory == null) continue;
                 if (!item.MayRemove() || item.MaxNumRemove() < item.unitCount)
                     return false;
                 if (!inventory.MayHaveValidInventorySlot(item))
@@ -240,6 +241,11 @@ namespace CompactSort
                 incomingAdded++;
             }
 
+            if (incomingAdded == 0)
+            {
+                ModLog.I("[CompactSort] drag-fit skipped: no incoming item outside the target.");
+                return false;
+            }
             if (moving.Count == 0) return false;
 
             var grid = BuildGrid(inventory, anchored);

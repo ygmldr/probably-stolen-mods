@@ -93,6 +93,64 @@ namespace CompactSort.AdapterTests
         }
 
         [Test]
+        public static void TryPackIncoming_OrphanOverflowItem_DoesNotRepackTarget()
+        {
+            BeginLog();
+            var target = FakeGridInventory.Create(4, 4);
+            var existing = new FakeItem("existing_box", 2, 2);
+            target.Place(existing, 0, 0);
+            int beforeX = existing.modifiedShape.minX;
+            int beforeY = existing.modifiedShape.minY;
+
+            // A purchase/plant overflow item that is not in any inventory yet.
+            var orphan = new FakeItem("spawned_overflow", 1, 1);
+            bool ok = CompactSorter.TryPackIncoming(target, new List<GameItem> { orphan });
+
+            Assert.False(ok, "orphan overflow must not trigger a target repack; logs=" + Logs());
+            Assert.Equal(1, target.childItems.Count, "target must be untouched");
+            Assert.Equal(beforeX, existing.modifiedShape.minX, "existing item moved on x");
+            Assert.Equal(beforeY, existing.modifiedShape.minY, "existing item moved on y");
+        }
+
+        [Test]
+        public static void TryPackIncoming_AlreadyInsideItem_DoesNotRepackTarget()
+        {
+            BeginLog();
+            var target = FakeGridInventory.Create(4, 4);
+            var existing = new FakeItem("existing_box", 2, 2);
+            target.Place(existing, 0, 0);
+            int beforeX = existing.modifiedShape.minX;
+            int beforeY = existing.modifiedShape.minY;
+
+            bool ok = CompactSorter.TryPackIncoming(target, new List<GameItem> { existing });
+
+            Assert.False(ok, "an item already in the target must not trigger a repack; logs=" + Logs());
+            Assert.Equal(beforeX, existing.modifiedShape.minX, "existing item moved on x");
+            Assert.Equal(beforeY, existing.modifiedShape.minY, "existing item moved on y");
+        }
+
+        [Test]
+        public static void TryPackIncoming_PartialStack_PreservesUnitCount()
+        {
+            BeginLog();
+            var target = FakeGridInventory.Create(4, 4);
+            var source = FakeGridInventory.Create(4, 4);
+            var existing = new FakeItem("existing_box", 2, 2);
+            target.Place(existing, 0, 0);
+
+            var incoming = new FakeItem("incoming_stack", 1, 1);
+            incoming.unitCount = 3;
+            source.Place(incoming, 0, 0);
+
+            bool ok = CompactSorter.TryPackIncoming(target, new List<GameItem> { incoming });
+
+            Assert.True(ok, "drag-fit failed; logs=" + Logs());
+            Assert.Equal(3, incoming.unitCount, "partial stack unit count changed");
+            Assert.Same(target, incoming.parentInventory, "incoming item has wrong parent");
+            Assert.Equal(2, target.childItems.Count, "target item count changed");
+        }
+
+        [Test]
         public static void TrySort_CommitFailure_RollsBackAndReturnsFalse()
         {
             BeginLog();
