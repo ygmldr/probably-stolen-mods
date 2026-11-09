@@ -37,6 +37,28 @@ confirm_trade(id=111, side=buy)
 - 待验证：`choose_dialogue`（选项）、`bargain`、`sell`、`end_day`
 - 已确认的坑：`PlayerStore.OpenShutter()` 只改状态，必须走 `StoreShutterButton.OpenShutter()` 才会生成当日顾客；顾客货物由对话 `endAction` 摆到前台
 
+## 整包二维布局（2026-11-10）
+
+`get_layout(container)` 现在返回：
+
+- `width/height`：格子尺寸
+- `rows`：每格最上层 item id（0 为空）
+- `display`：每格一个符号的二维图，`.` 为空（LLM 直接看）
+- `symbols`：`id -> 符号`
+- `cells`：`[{x,y,id,layer}]`，保留叠层
+- `items`：物品列表（含 `mask`/`cells`）
+
+实测 24x10 背包：
+
+```
+ 0 AAABBCCDDEEEFFFGGHHIIJJK
+ 1 AAABBCCDDLLLMM.GGHHIIJJK
+ 2 AAANNN.DDLLLMM..........
+ 3 ...NNN...LLLMM..........
+ 4 ........................
+ ...
+```
+
 ## 形状表示：不是矩形（2026-11-10）
 
 - **位置**：`modifiedShape.minX/minY`（包围盒左上角）

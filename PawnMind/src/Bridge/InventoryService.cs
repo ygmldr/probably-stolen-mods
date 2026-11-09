@@ -154,29 +154,59 @@ namespace PawnMind.Bridge
 
             int width = grid.inventoryShape.width;
             int height = grid.inventoryShape.height;
-            var cells = new int[height][];
-            for (int y = 0; y < height; y++)
-            {
-                cells[y] = new int[width];
-            }
-
             List<GameItem> items = grid.childItems;
+
+            var shapes = new List<LayoutShape>();
+            var legend = new Dictionary<string, string>();
             for (int i = 0; i < items.Count; i++)
             {
                 GameItem item = items[i];
                 if (item == null || item.modifiedShape == null) continue;
 
                 GridShape shape = item.modifiedShape;
-                int uniqueId = item.GetUniqueID();
-                for (int y = shape.minY; y <= shape.maxY; y++)
+                int w = shape.maxX - shape.minX + 1;
+                int h = shape.maxY - shape.minY + 1;
+                var layers = new int[w * h];
+                for (int y = 0; y < h; y++)
                 {
-                    if (y < 0 || y >= height) continue;
-                    for (int x = shape.minX; x <= shape.maxX; x++)
+                    for (int x = 0; x < w; x++)
                     {
-                        if (x < 0 || x >= width) continue;
-                        if (shape.Get(x, y) != 0) cells[y][x] = uniqueId;
+                        layers[y * w + x] = shape.Get(shape.minX + x, shape.minY + y);
                     }
                 }
+
+                int uniqueId = item.GetUniqueID();
+                shapes.Add(new LayoutShape
+                {
+                    Id = uniqueId,
+                    MinX = shape.minX,
+                    MinY = shape.minY,
+                    Width = w,
+                    Height = h,
+                    Layers = layers
+                });
+                legend[uniqueId.ToString()] = item.name;
+            }
+
+            LayoutResult layout = LayoutBuilder.Build(width, height, shapes);
+
+            var ids = new List<int>();
+            for (int i = 0; i < shapes.Count; i++) ids.Add(shapes[i].Id);
+            Dictionary<int, char> symbols = LayoutDisplay.Symbols(ids);
+            var symbolMap = new Dictionary<string, string>();
+            foreach (KeyValuePair<int, char> pair in symbols) symbolMap[pair.Key.ToString()] = pair.Value.ToString();
+
+            var cells = new List<Dictionary<string, object>>();
+            for (int i = 0; i < layout.Cells.Count; i++)
+            {
+                LayoutCell cell = layout.Cells[i];
+                cells.Add(new Dictionary<string, object>
+                {
+                    { "x", cell.X },
+                    { "y", cell.Y },
+                    { "id", cell.Id },
+                    { "layer", cell.Layer }
+                });
             }
 
             return JsonConvert.SerializeObject(new Dictionary<string, object>
@@ -185,7 +215,11 @@ namespace PawnMind.Bridge
                 { "container", id },
                 { "width", width },
                 { "height", height },
-                { "rows", cells },
+                { "rows", layout.Rows },
+                { "display", LayoutDisplay.Rows(layout.Rows, symbols) },
+                { "symbols", symbolMap },
+                { "cells", cells },
+                { "legend", legend },
                 { "items", DescribeAll(id, items) }
             });
         }

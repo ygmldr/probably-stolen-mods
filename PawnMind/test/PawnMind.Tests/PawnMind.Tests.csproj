@@ -21,6 +21,8 @@
     <Compile Include="HotkeyLatchTests.cs" />
     <Compile Include="PlacementMathTests.cs" />
     <Compile Include="ShapeMaskTests.cs" />
+    <Compile Include="LayoutBuilderTests.cs" />
+    <Compile Include="LayoutDisplayTests.cs" />
     <Compile Include="BridgeServerTests.cs" />
     <Compile Include="../../src/Core/*.cs" />
     <Compile Include="../../src/Bridge/BridgeServer.cs" />
