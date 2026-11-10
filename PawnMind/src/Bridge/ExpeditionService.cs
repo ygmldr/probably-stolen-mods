@@ -96,7 +96,8 @@ namespace PawnMind.Bridge
             }
             catch (Exception e)
             {
-                return "{\"ok\":false,\"error\":\"advance_failed\",\"detail\":\"" + Escape(e.Message) + "\"}";
+                try { expedition.EndExpedition(); } catch { }
+                return "{\"ok\":false,\"error\":\"advance_failed\",\"ended\":true,\"detail\":\"" + Escape(e.Message) + "\"}";
             }
         }
 

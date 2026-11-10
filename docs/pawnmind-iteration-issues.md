@@ -91,7 +91,7 @@
 
 | # | 问题 | 证据 | 下一步 |
 |---|---|---|---|
-| 45 | `advance_expedition` 偶发 NRE | 第二次 advance `Object reference`；首次 ok | 包 try/catch 已有，需定位 POI 空引用 |
+| 45 | `advance_expedition` 偶发 NRE | 第二次 advance `Object reference`；已 catch 并 `EndExpedition` 收尾 | 需定位 POI 空引用 |
 | 46 | `Expedition.id` 初始为空 | ongoing id=null | 已分配 `exp_<ticks>` |
 
 ### 已解决
@@ -188,7 +188,7 @@
 
 | # | 问题 | 证据 | 下一步 |
 |---|---|---|---|
-| 45 | `advance_expedition` 偶发 NRE | 第二次 advance `Object reference`；首次 ok | 包 try/catch 已有，需定位 POI 空引用 |
+| 45 | `advance_expedition` 偶发 NRE | 第二次 advance `Object reference`；已 catch 并 `EndExpedition` 收尾 | 需定位 POI 空引用 |
 | 46 | `Expedition.id` 初始为空 | ongoing id=null | 已分配 `exp_<ticks>` |
 
 ### 已解决

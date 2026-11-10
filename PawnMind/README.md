@@ -378,6 +378,11 @@ machine_collect(slot4) -> 回背包
 - 机器在**日结/睡觉**时 tick，不是实时；背包里也会处理
 - `junk` 需要垃圾处理模块，普通废金属不需要
 
+## 养殖快照（2026-11-10）
+
+- `husbandry_status`：动物/鱼 + 健康/死亡
+- 真机：注入老鼠，health=81.6，animal=true，dead=false
+
 ## 远征（2026-11-10）
 
 - `debug_unlock_expedition`（test-only）：解锁并生成 Juan
