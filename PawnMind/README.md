@@ -348,8 +348,9 @@ curl -H "Authorization: Bearer <token>" http://127.0.0.1:15528/state
 - `machine_status`：槽位与内容
 - `machine_insert` / `machine_collect`：槽位放入/取回
 - 真机：熔炉 5 槽、水培 6 槽（STATE_READY）
-- 熔炉放入 `energy_credit` + `scrap_metal` 成功（slot0/2）；`junk` 被拒（需要垃圾模块）
-- 机器在背包里不会 tick；需要放到店内地面/家具位后才会处理
+- 熔炉实机全链路：slot0 电池 + slot2 两份废金属 → 睡一觉 → slot3 金属锭 → `machine_collect` 回背包
+- 机器在**日结/睡觉**时 tick，不是实时；背包里也会处理
+- `junk` 需要垃圾处理模块，普通废金属不需要
 
 ## P6/P7 扩展（2026-11-10）
 
