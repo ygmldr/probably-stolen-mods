@@ -156,6 +156,21 @@ def build_server(client):
         return client.action("use_tool", tool_id=tool_id, target_id=target_id, rev=rev)
 
     @server.tool()
+    def expedition_status() -> dict:
+        """Expedition unlock, locations, hirelings and ongoing runs."""
+        return client.action("expedition_status")
+
+    @server.tool()
+    def events_status() -> dict:
+        """Active and queued store events."""
+        return client.action("events_status")
+
+    @server.tool()
+    def list_signs() -> dict:
+        """Owned marketing signs."""
+        return client.action("list_signs")
+
+    @server.tool()
     def deliver_request(id: str, rev: int) -> dict:
         """Deliver a fillable StoreRequest and claim rewards."""
         return client.action("deliver_request", id=id, rev=rev)

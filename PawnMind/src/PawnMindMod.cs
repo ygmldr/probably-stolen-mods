@@ -164,6 +164,15 @@ public sealed class PawnMindMod : IMod
                     (string)request["identifier"],
                     ReadInt(request, "count", 1)));
 
+            case "expedition_status":
+                return ActionResult.SuccessRaw("expedition_status", WorldStatusService.ExpeditionJson());
+
+            case "events_status":
+                return ActionResult.SuccessRaw("events_status", WorldStatusService.EventsJson());
+
+            case "list_signs":
+                return ActionResult.SuccessRaw("list_signs", WorldStatusService.SignsJson());
+
             case "deliver_request":
                 return ActionResult.SuccessRaw("deliver_request", P9ActionService.DeliverRequestJson(
                     (string)request["id"]));

@@ -378,6 +378,13 @@ machine_collect(slot4) -> 回背包
 - 机器在**日结/睡觉**时 tick，不是实时；背包里也会处理
 - `junk` 需要垃圾处理模块，普通废金属不需要
 
+## P10 世界快照（2026-11-10）
+
+- `expedition_status`：unlocked、地点、雇佣兵、进行中远征
+- `events_status`：活跃事件/未来事件数
+- `list_signs`：自有营销招牌
+- 真机：第 15 天 expedition 未解锁、1 个地点；2 个活跃事件；2 块招牌
+
 ## P9 快照/动作（2026-11-10）
 
 - `list_factions` / `health_status` / `list_requests` / `wanted_status` / `barter_status`

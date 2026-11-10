@@ -42,6 +42,7 @@
     <Compile Include="WineMathTests.cs" />
     <Compile Include="HealthRulesTests.cs" />
     <Compile Include="P9ValidatorTests.cs" />
+    <Compile Include="ExpeditionRulesTests.cs" />
     <Compile Include="BridgeServerTests.cs" />
     <Compile Include="../../src/Core/*.cs" />
     <Compile Include="../../src/Bridge/BridgeServer.cs" />
