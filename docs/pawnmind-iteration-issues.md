@@ -49,6 +49,13 @@
 | 27 | Wild 网络浏览未接 | 选项 0 打开 WildNetworkUI | 加 `wild_network_list/buy` |
 | 28 | `phone_advance` 在 goodbye 会直接清 currentPhoneClient | 行为正确但返回 in_call=false | 文档说明 |
 
+### P7 彩票
+
+| # | 问题 | 证据 | 下一步 |
+|---|---|---|---|
+| 29 | 测试档第 1 天未解锁彩票 | `lottery_status.unlocked=false`，edition 1405 | 需要第 14 天后或注入开奖号测兑奖 |
+| 30 | 无中奖号时兑奖正确拒绝 | `cannot_redeem` | 到期/中奖票再验 |
+
 ### 已解决
 
 | # | 问题 | 解决 |
@@ -92,6 +99,13 @@
 | 26 | 供应商未测试订货 | 联系人初始 NotResponding；Wild 已通 | 先打 Introduction 再订货 |
 | 27 | Wild 网络浏览未接 | 选项 0 打开 WildNetworkUI | 加 `wild_network_list/buy` |
 | 28 | `phone_advance` 在 goodbye 会直接清 currentPhoneClient | 行为正确但返回 in_call=false | 文档说明 |
+
+### P7 彩票
+
+| # | 问题 | 证据 | 下一步 |
+|---|---|---|---|
+| 29 | 测试档第 1 天未解锁彩票 | `lottery_status.unlocked=false`，edition 1405 | 需要第 14 天后或注入开奖号测兑奖 |
+| 30 | 无中奖号时兑奖正确拒绝 | `cannot_redeem` | 到期/中奖票再验 |
 
 ### 已解决
 - [x] 问题 -> 解决方式 / 测试

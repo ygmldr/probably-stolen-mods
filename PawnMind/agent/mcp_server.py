@@ -156,6 +156,26 @@ def build_server(client):
         return client.action("use_tool", tool_id=tool_id, target_id=target_id, rev=rev)
 
     @server.tool()
+    def lottery_status() -> dict:
+        """Lottery unlock state, edition, day and prize table."""
+        return client.action("lottery_status")
+
+    @server.tool()
+    def list_tickets() -> dict:
+        """List owned lottery tickets with number/edition/matches/prize."""
+        return client.action("list_tickets")
+
+    @server.tool()
+    def inspect_ticket(item_id: int) -> dict:
+        """Inspect one lottery ticket."""
+        return client.action("inspect_ticket", item_id=item_id)
+
+    @server.tool()
+    def redeem_ticket(item_id: int, rev: int) -> dict:
+        """Redeem a winning lottery ticket."""
+        return client.action("redeem_ticket", item_id=item_id, rev=rev)
+
+    @server.tool()
     def list_contacts(include_hidden: bool = False) -> dict:
         """List phone contacts, state, cooldown and spend."""
         return client.action("list_contacts", include_hidden=include_hidden)

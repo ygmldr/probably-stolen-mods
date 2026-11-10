@@ -122,6 +122,10 @@ namespace PawnMind.AdapterTests
             CheckProperty(assembly, "MapUIManager", "Current");
             CheckField(assembly, "PlayerStore", "commissaryData");
             CheckMethod(assembly, "CommissaryUIManager", "CanBuy");
+            CheckMethod(assembly, "LotteryHelper", "IsLotteryUnlocked");
+            CheckMethod(assembly, "LotteryHelper", "GetCurrentEdition");
+            CheckMethod(assembly, "LotteryHelper", "CanRedeemPrize");
+            CheckMethod(assembly, "LotteryHelper", "TryRedeemPrize");
             CheckMethod(assembly, "DialoguePhoneUIManager", "SelectChoice");
             CheckMethod(assembly, "DialoguePhoneUIManager", "OnAdvancePressed");
             CheckMethod(assembly, "PhoneUIManager", "AutoCall");

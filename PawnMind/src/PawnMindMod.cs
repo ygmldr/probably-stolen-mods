@@ -159,6 +159,20 @@ public sealed class PawnMindMod : IMod
                     (string)request["identifier"],
                     ReadInt(request, "count", 1)));
 
+            case "lottery_status":
+                return ActionResult.SuccessRaw("lottery_status", LotteryService.StatusJson());
+
+            case "list_tickets":
+                return ActionResult.SuccessRaw("list_tickets", LotteryService.TicketsJson());
+
+            case "inspect_ticket":
+                return ActionResult.SuccessRaw("inspect_ticket", LotteryService.InspectJson(
+                    ReadInt(request, "item_id", -1)));
+
+            case "redeem_ticket":
+                return ActionResult.SuccessRaw("redeem_ticket", LotteryService.RedeemJson(
+                    ReadInt(request, "item_id", -1)));
+
             case "list_contacts":
                 return ActionResult.SuccessRaw("list_contacts", PhoneService.ListJson(
                     request["include_hidden"] != null && (bool)request["include_hidden"]));
