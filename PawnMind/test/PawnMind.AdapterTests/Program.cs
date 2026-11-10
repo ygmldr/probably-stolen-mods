@@ -105,6 +105,12 @@ namespace PawnMind.AdapterTests
             CheckMethod(assembly, "PaperBookRegistry", "Resolve");
             CheckProperty(assembly, "PaperBookRegistry", "All");
             CheckMethod(assembly, "GameItem", "IsTag");
+            CheckMethod(assembly, "GameItem", "CanActivateSlotItem");
+            CheckMethod(assembly, "GameItem", "ActivateSlotItem");
+            CheckMethod(assembly, "GameItem", "CanToggleSlotItem");
+            CheckMethod(assembly, "GameItem", "ToggleSlotItem");
+            CheckMethod(assembly, "GameItem", "CanTarget");
+            CheckMethod(assembly, "GameItem", "Target");
             CheckMethod(assembly, "AfterhourLocation", "Get");
             CheckMethod(assembly, "AfterhourLocation", "GetDiscovered");
             CheckMethod(assembly, "MapUIManager", "OpenUI");

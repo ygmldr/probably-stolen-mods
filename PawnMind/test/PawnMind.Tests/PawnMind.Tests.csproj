@@ -31,6 +31,7 @@
     <Compile Include="BookIndexTests.cs" />
     <Compile Include="WholesaleMathTests.cs" />
     <Compile Include="EventQueryTests.cs" />
+    <Compile Include="InteractionCatalogTests.cs" />
     <Compile Include="BridgeServerTests.cs" />
     <Compile Include="../../src/Core/*.cs" />
     <Compile Include="../../src/Bridge/BridgeServer.cs" />

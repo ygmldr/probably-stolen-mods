@@ -151,6 +151,21 @@ public sealed class PawnMindMod : IMod
             case "list_goods":
                 return ActionResult.SuccessRaw("list_goods", GoodsService.ListJson((string)request["scope"]));
 
+            case "list_interactions":
+                return ActionResult.SuccessRaw("list_interactions", InteractionService.ListJson(
+                    ReadInt(request, "item_id", -1)));
+
+            case "activate_item":
+                return InteractionService.Activate(ReadInt(request, "item_id", -1));
+
+            case "toggle_item":
+                return InteractionService.Toggle(ReadInt(request, "item_id", -1));
+
+            case "use_tool":
+                return InteractionService.Use(
+                    ReadInt(request, "tool_id", -1),
+                    ReadInt(request, "target_id", -1));
+
             case "list_containers":
                 return ActionResult.SuccessRaw("list_containers", InventoryService.ListContainersJson());
 

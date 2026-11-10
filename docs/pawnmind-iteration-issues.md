@@ -29,6 +29,14 @@
 | 17 | 补给站购买缺代币来源 | `redeemed_credit=0` | 接回收/兑换或标注需玩家操作 |
 | 18 | 批发成功路径未验 | 真机遇到 `wholesale_offer=true`、折扣 -17%，但该单没有未拥有货物 -> `no_items`；目录已过滤 owned | 遇到有货的批发单再验扣款 |
 
+### P6 新发现
+
+| # | 问题 | 证据 | 下一步 |
+|---|---|---|---|
+| 19 | `toggle_item` 后 UI 快照为空 | 储藏区 toggle 成功但 `get_ui_snapshot` 无元素 | 补 content window/容器快照 |
+| 20 | 标签机目标判定严格 | `use_tool(labeler, 代糖果汁)` -> `cannot_target` | 用带可编辑标签的水/液体测 |
+| 21 | 分析仪结果尚无结构化接口 | 只有 UI | P6 下一步 |
+
 ### 已解决
 
 | # | 问题 | 解决 |
@@ -52,6 +60,14 @@
 #| 16 | `end_day` 在部分店态返回 `cannot_end_day` | day2 开店后直接 end_day 失败，sleep 仍可推进 | 补店态判断或文档说明 |
 | 17 | 补给站购买缺代币来源 | `redeemed_credit=0` | 接回收/兑换或标注需玩家操作 |
 | 18 | 批发成功路径未验 | 真机遇到 `wholesale_offer=true`、折扣 -17%，但该单没有未拥有货物 -> `no_items`；目录已过滤 owned | 遇到有货的批发单再验扣款 |
+
+### P6 新发现
+
+| # | 问题 | 证据 | 下一步 |
+|---|---|---|---|
+| 19 | `toggle_item` 后 UI 快照为空 | 储藏区 toggle 成功但 `get_ui_snapshot` 无元素 | 补 content window/容器快照 |
+| 20 | 标签机目标判定严格 | `use_tool(labeler, 代糖果汁)` -> `cannot_target` | 用带可编辑标签的水/液体测 |
+| 21 | 分析仪结果尚无结构化接口 | 只有 UI | P6 下一步 |
 
 ### 已解决
 - [x] 问题 -> 解决方式 / 测试

@@ -136,6 +136,26 @@ def build_server(client):
         return client.action("read_item", item_id=item_id)
 
     @server.tool()
+    def list_interactions(item_id: int) -> dict:
+        """List available interactions for one item: activate/toggle/target."""
+        return client.action("list_interactions", item_id=item_id)
+
+    @server.tool()
+    def activate_item(item_id: int, rev: int) -> dict:
+        """Activate an owned item (books, lottery tickets, scanners)."""
+        return client.action("activate_item", item_id=item_id, rev=rev)
+
+    @server.tool()
+    def toggle_item(item_id: int, rev: int) -> dict:
+        """Toggle an owned item (gene scanner, machine switches)."""
+        return client.action("toggle_item", item_id=item_id, rev=rev)
+
+    @server.tool()
+    def use_tool(tool_id: int, target_id: int, rev: int) -> dict:
+        """Use an owned tool on a target item (screwdriver, UV, scanner, marking pen)."""
+        return client.action("use_tool", tool_id=tool_id, target_id=target_id, rev=rev)
+
+    @server.tool()
     def list_containers() -> dict:
         """List player containers (main/front/back/showcase/hidden/afterhour/trash/sold) with counts."""
         return client.action("list_containers")
