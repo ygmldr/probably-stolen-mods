@@ -441,3 +441,9 @@ machine_collect(slot4) -> 回背包
 - M2：agent loop、记忆、护栏、对账
 - M3：视觉鉴定
 - M4：打包/工坊
+
+
+## 扩展能力矩阵
+
+- [P6–P10 能力矩阵](../docs/pawnmind-capability-matrix.zh-CN.md)
+- 测试：C# 141 + 适配器契约 + Python 8
