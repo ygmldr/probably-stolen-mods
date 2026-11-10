@@ -46,6 +46,7 @@
     <Compile Include="ServiceValidatorTests.cs" />
     <Compile Include="SecurityRulesTests.cs" />
     <Compile Include="ContrabandRulesTests.cs" />
+    <Compile Include="ReportRulesTests.cs" />
     <Compile Include="BridgeServerTests.cs" />
     <Compile Include="../../src/Core/*.cs" />
     <Compile Include="../../src/Bridge/BridgeServer.cs" />

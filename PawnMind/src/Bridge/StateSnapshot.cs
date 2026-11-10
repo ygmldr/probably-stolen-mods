@@ -229,10 +229,21 @@ namespace PawnMind.Bridge
             description["cash"] = client.clientCash;
             description["uses_budget"] = client.useClientBudget;
             description["impatience"] = client.clientImpatience;
+            description["is_wanted"] = client.isWanted;
+            description["report_reward"] = client.reportReward;
+            description["stealth_wanted"] = client.isStealthWanted;
+            description["reported"] = client.reported;
+            description["can_report"] = SafeCanReport(client);
+            description["wanted_poster_id"] = client.wantedPosterId;
             description["bargain_available"] = client.isBargainAvailable;
             description["faction"] = client.clientFaction;
             description["budget"] = GameState.GetClientBudget(client);
             return description;
+        }
+
+        private static bool SafeCanReport(StoreClient client)
+        {
+            try { return client.CanReport(); } catch { return false; }
         }
 
         private static Dictionary<string, object> DescribeItem(GameItem item)

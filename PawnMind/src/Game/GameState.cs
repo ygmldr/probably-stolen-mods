@@ -578,6 +578,12 @@ namespace PawnMind.Game
                 snapshot["ended"] = ui.IsCurrentDialogEnd();
                 Dialogue current = ui.GetCurrentDialog();
                 snapshot["typing"] = current != null && ui.IsLineStillDisplaying(current);
+                if (current != null)
+                {
+                    snapshot["speaker"] = current.title;
+                    snapshot["text"] = current.plainText;
+                }
+
                 return snapshot;
             }
             catch

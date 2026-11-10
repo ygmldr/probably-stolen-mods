@@ -211,6 +211,11 @@ def build_server(client):
         return client.action("deliver_request", id=id, rev=rev)
 
     @server.tool()
+    def report_client(rev: int) -> dict:
+        """Report the current customer (any reportable client; is_wanted tells the risk)."""
+        return client.action("report_client", rev=rev)
+
+    @server.tool()
     def barter_accept(rev: int) -> dict:
         """Accept the current client's barter offer when acceptable."""
         return client.action("barter_accept", rev=rev)

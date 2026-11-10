@@ -206,6 +206,9 @@ public sealed class PawnMindMod : IMod
                 return ActionResult.SuccessRaw("deliver_request", P9ActionService.DeliverRequestJson(
                     (string)request["id"]));
 
+            case "report_client":
+                return ActionResult.SuccessRaw("report_client", P9ActionService.ReportClientJson());
+
             case "barter_accept":
                 return ActionResult.SuccessRaw("barter_accept", P9ActionService.BarterAcceptJson());
 

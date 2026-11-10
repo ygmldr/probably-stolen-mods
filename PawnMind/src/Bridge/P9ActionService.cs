@@ -39,6 +39,41 @@ namespace PawnMind.Bridge
             }
         }
 
+        public static string ReportClientJson()
+        {
+            StoreClient client = GameState.GetCurrentClient();
+            bool canReport = false;
+            bool reported = false;
+            try
+            {
+                if (client != null)
+                {
+                    canReport = client.CanReport();
+                    reported = client.reported;
+                }
+            }
+            catch { }
+
+            ReportCheck check = ReportRules.Validate(client != null, canReport, reported);
+            if (check != ReportCheck.Ok)
+            {
+                string error = check == ReportCheck.NoClient ? "no_client"
+                    : check == ReportCheck.AlreadyReported ? "already_reported" : "cannot_report";
+                return "{\"ok\":false,\"error\":\"" + error + "\"}";
+            }
+
+            try
+            {
+                PlayerStore.Instance.OnCustomerReported();
+                return "{\"ok\":true,\"is_wanted\":" + (client.isWanted ? "true" : "false")
+                    + ",\"report_reward\":" + client.reportReward + "}";
+            }
+            catch (Exception e)
+            {
+                return "{\"ok\":false,\"error\":\"report_failed\",\"detail\":\"" + Escape(e.Message) + "\"}";
+            }
+        }
+
         public static string BarterAcceptJson()
         {
             StoreClient client = GameState.GetCurrentClient();

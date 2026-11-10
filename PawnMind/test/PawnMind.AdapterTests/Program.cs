@@ -140,6 +140,8 @@ namespace PawnMind.AdapterTests
             CheckMethod(assembly, "Hireling", "IsInjured");
             CheckMethod(assembly, "StoreEventManager", "GetActiveEvents");
             CheckField(assembly, "PlayerStore", "expeditionData");
+            CheckMethod(assembly, "StoreClient", "CanReport");
+            CheckMethod(assembly, "PlayerStore", "OnCustomerReported");
             CheckMethod(assembly, "StoreRequest", "FillRequest");
             CheckMethod(assembly, "BarterOffer", "OnBarterAccepted");
             CheckMethod(assembly, "WantedUIManager", "OnArrested");
