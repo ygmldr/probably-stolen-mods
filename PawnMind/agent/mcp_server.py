@@ -156,6 +156,21 @@ def build_server(client):
         return client.action("use_tool", tool_id=tool_id, target_id=target_id, rev=rev)
 
     @server.tool()
+    def list_wine() -> dict:
+        """List owned wine containers/bottles and finished state."""
+        return client.action("list_wine")
+
+    @server.tool()
+    def wine_status(item_id: int) -> dict:
+        """Wine bottle fermentation/quality details."""
+        return client.action("wine_status", item_id=item_id)
+
+    @server.tool()
+    def start_fermentation(item_id: int, rev: int) -> dict:
+        """Try to start fermentation on a wine bottle."""
+        return client.action("start_fermentation", item_id=item_id, rev=rev)
+
+    @server.tool()
     def list_machines() -> dict:
         """List owned standard machines with state, progress and slots."""
         return client.action("list_machines")

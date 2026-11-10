@@ -125,6 +125,9 @@ namespace PawnMind.AdapterTests
             CheckMethod(assembly, "MachineHelper", "GetBodyStorage");
             CheckMethod(assembly, "MachineHelper", "GetSlot");
             CheckMethod(assembly, "MachineProgressHelper", "GetMachineState");
+            CheckMethod(assembly, "WineHelper", "TryStartFermentation");
+            CheckMethod(assembly, "WineHelper", "IsFermentingOrFinished");
+            CheckMethod(assembly, "WineHelper", "GetWineQualityTier");
             CheckMethod(assembly, "MachineHydroponic", "GetGrowStatus");
             CheckMethod(assembly, "MachineHydroponic", "GetWaterSlot");
             CheckMethod(assembly, "MachineHydroponic", "GetInputSlot");

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Newtonsoft.Json;
+using PawnMind.Game;
 
 namespace PawnMind.Bridge
 {
@@ -38,6 +39,22 @@ namespace PawnMind.Bridge
                 { "granted", granted.Count },
                 { "requested", count }
             });
+        }
+
+        public static string FillWaterJson(bool allow, int itemId)
+        {
+            if (!allow) return "{\"ok\":false,\"error\":\"test_items_disabled\"}";
+            GameItem item = GameState.FindItemAnywhere(itemId);
+            if (item == null) return "{\"ok\":false,\"error\":\"item_not_found\"}";
+            try
+            {
+                WaterHelper.FillWithPureWater(item);
+                return "{\"ok\":true,\"ml\":" + WaterHelper.GetCurrentCapacityML(item) + "}";
+            }
+            catch (Exception e)
+            {
+                return "{\"ok\":false,\"error\":\"fill_failed\",\"detail\":\"" + Escape(e.Message) + "\"}";
+            }
         }
 
         private static GameItem Create(string identifier)

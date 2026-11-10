@@ -153,11 +153,27 @@ public sealed class PawnMindMod : IMod
             case "list_goods":
                 return ActionResult.SuccessRaw("list_goods", GoodsService.ListJson((string)request["scope"]));
 
+            case "debug_fill_water":
+                return ActionResult.SuccessRaw("debug_fill_water", DebugService.FillWaterJson(
+                    _allowTestItems,
+                    ReadInt(request, "item_id", -1)));
+
             case "debug_grant":
                 return ActionResult.SuccessRaw("debug_grant", DebugService.GrantJson(
                     _allowTestItems,
                     (string)request["identifier"],
                     ReadInt(request, "count", 1)));
+
+            case "list_wine":
+                return ActionResult.SuccessRaw("list_wine", WineService.ListJson());
+
+            case "wine_status":
+                return ActionResult.SuccessRaw("wine_status", WineService.StatusJson(
+                    ReadInt(request, "item_id", -1)));
+
+            case "start_fermentation":
+                return ActionResult.SuccessRaw("start_fermentation", WineService.StartJson(
+                    ReadInt(request, "item_id", -1)));
 
             case "list_machines":
                 return ActionResult.SuccessRaw("list_machines", MachineService.ListJson());
