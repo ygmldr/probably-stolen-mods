@@ -156,6 +156,36 @@ def build_server(client):
         return client.action("use_tool", tool_id=tool_id, target_id=target_id, rev=rev)
 
     @server.tool()
+    def list_contacts(include_hidden: bool = False) -> dict:
+        """List phone contacts, state, cooldown and spend."""
+        return client.action("list_contacts", include_hidden=include_hidden)
+
+    @server.tool()
+    def call(number: int, rev: int) -> dict:
+        """Open the phone and dial a contact."""
+        return client.action("call", number=number, rev=rev)
+
+    @server.tool()
+    def phone_state() -> dict:
+        """Current phone call state and dialogue."""
+        return client.action("phone_state")
+
+    @server.tool()
+    def phone_advance(rev: int) -> dict:
+        """Advance the phone dialogue by one step."""
+        return client.action("phone_advance", rev=rev)
+
+    @server.tool()
+    def phone_choose(index: int, rev: int) -> dict:
+        """Choose a phone dialogue option by index."""
+        return client.action("phone_choose", index=index, rev=rev)
+
+    @server.tool()
+    def end_call(rev: int) -> dict:
+        """End the current phone call."""
+        return client.action("end_call", rev=rev)
+
+    @server.tool()
     def list_labels(item_id: int) -> dict:
         """List editable label categories and conditions for an item."""
         return client.action("list_labels", item_id=item_id)

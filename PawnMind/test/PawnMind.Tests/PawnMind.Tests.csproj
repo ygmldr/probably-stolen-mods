@@ -35,6 +35,7 @@
     <Compile Include="MarkingPenModeTests.cs" />
     <Compile Include="AnalyzerKindTests.cs" />
     <Compile Include="LabelValidatorTests.cs" />
+    <Compile Include="PhoneDirectoryTests.cs" />
     <Compile Include="BridgeServerTests.cs" />
     <Compile Include="../../src/Core/*.cs" />
     <Compile Include="../../src/Bridge/BridgeServer.cs" />

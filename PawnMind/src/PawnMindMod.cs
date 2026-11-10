@@ -159,6 +159,27 @@ public sealed class PawnMindMod : IMod
                     (string)request["identifier"],
                     ReadInt(request, "count", 1)));
 
+            case "list_contacts":
+                return ActionResult.SuccessRaw("list_contacts", PhoneService.ListJson(
+                    request["include_hidden"] != null && (bool)request["include_hidden"]));
+
+            case "call":
+                return ActionResult.SuccessRaw("call", PhoneService.CallJson(
+                    (long)request["number"]));
+
+            case "phone_state":
+                return ActionResult.SuccessRaw("phone_state", PhoneService.StateJson());
+
+            case "phone_advance":
+                return ActionResult.SuccessRaw("phone_advance", PhoneService.AdvanceJson());
+
+            case "phone_choose":
+                return ActionResult.SuccessRaw("phone_choose", PhoneService.ChooseJson(
+                    ReadInt(request, "index", -1)));
+
+            case "end_call":
+                return ActionResult.SuccessRaw("end_call", PhoneService.EndJson());
+
             case "list_labels":
                 return ActionResult.SuccessRaw("list_labels", LabelService.ListJson(
                     ReadInt(request, "item_id", -1)));

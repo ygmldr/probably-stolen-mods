@@ -41,6 +41,14 @@
 | 24 | 标签条件 ID 是本地化显示串 | `CATEGORY_WATER_PURITY` 的 id 为“纯水/沟渠水” | 换语言/版本会变；需按索引/常量映射 |
 | 25 | `debug_grant fish_tilapia` 重复调用 NRE | 鱼无 identifier、初始 owned=false | 修 fish 创建/去重 |
 
+### P7 电话
+
+| # | 问题 | 证据 | 下一步 |
+|---|---|---|---|
+| 26 | 供应商未测试订货 | 联系人初始 NotResponding；Wild 已通 | 先打 Introduction 再订货 |
+| 27 | Wild 网络浏览未接 | 选项 0 打开 WildNetworkUI | 加 `wild_network_list/buy` |
+| 28 | `phone_advance` 在 goodbye 会直接清 currentPhoneClient | 行为正确但返回 in_call=false | 文档说明 |
+
 ### 已解决
 
 | # | 问题 | 解决 |
@@ -76,6 +84,14 @@
 | 23 | ~~标记笔只有默认色~~ 已解决 | `set_pen_mode` 绿色，`list_marks` 返回 color_id=green | — |
 | 24 | 标签条件 ID 是本地化显示串 | `CATEGORY_WATER_PURITY` 的 id 为“纯水/沟渠水” | 换语言/版本会变；需按索引/常量映射 |
 | 25 | `debug_grant fish_tilapia` 重复调用 NRE | 鱼无 identifier、初始 owned=false | 修 fish 创建/去重 |
+
+### P7 电话
+
+| # | 问题 | 证据 | 下一步 |
+|---|---|---|---|
+| 26 | 供应商未测试订货 | 联系人初始 NotResponding；Wild 已通 | 先打 Introduction 再订货 |
+| 27 | Wild 网络浏览未接 | 选项 0 打开 WildNetworkUI | 加 `wild_network_list/buy` |
+| 28 | `phone_advance` 在 goodbye 会直接清 currentPhoneClient | 行为正确但返回 in_call=false | 文档说明 |
 
 ### 已解决
 - [x] 问题 -> 解决方式 / 测试
