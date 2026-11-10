@@ -114,6 +114,11 @@ namespace PawnMind.Bridge
         private static void AddChem(Dictionary<string, object> payload)
         {
             ChemScannerUIManager ui = ChemScannerUIManager.Instance;
+            if (ui != null)
+            {
+                try { ui.RefreshUI(); } catch { }
+                try { ui.RefreshChemMode(); } catch { }
+            }
             payload["tested"] = Text(ui == null ? null : ui.testedTMP);
             payload["labeled"] = Text(ui == null ? null : ui.labelTMP);
             payload["contaminant"] = Text(ui == null ? null : ui.contaminantTMP);

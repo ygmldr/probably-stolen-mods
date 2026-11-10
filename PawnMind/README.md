@@ -403,6 +403,13 @@ machine_collect(slot4) -> 回背包
 - `deliver_request(id)` / `barter_accept()` / `arrest_wanted(id)`
 - 真机：第 15 天 5 派系、健康正常、请求/通缉为空；错误路径 `request_not_found`/`no_barter_offer`/`unknown_wanted`
 
+## 化扫真机（2026-11-10）
+
+- `analyze_item(chem_scanner, dream_dust)`：
+   tested=75.20% 街头标准；污染物/总体积 2.00mL
+- `caffeine_pill`：68.06% 街头标准
+- 空瓶/药品瓶没有化扫数据，字段为空属正常
+
 ## P6/P7 扩展（2026-11-10）
 
 - 通用交互：`list_interactions` / `activate_item` / `toggle_item` / `use_tool`

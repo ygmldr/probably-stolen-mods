@@ -94,6 +94,12 @@
 | 45 | `advance_expedition` 偶发 NRE | 第二次 advance `Object reference`；已 catch 并 `EndExpedition` 收尾 | 需定位 POI 空引用 |
 | 46 | `Expedition.id` 初始为空 | ongoing id=null | 已分配 `exp_<ticks>` |
 
+### 化扫
+
+| # | 问题 | 证据 | 下一步 |
+|---|---|---|---|
+| 47 | 化扫对空瓶/药瓶字段为空 | 梦尘/咖啡因片正常 | 目标需有化学数据，非接口问题 |
+
 ### 已解决
 
 | # | 问题 | 解决 |
@@ -190,6 +196,12 @@
 |---|---|---|---|
 | 45 | `advance_expedition` 偶发 NRE | 第二次 advance `Object reference`；已 catch 并 `EndExpedition` 收尾 | 需定位 POI 空引用 |
 | 46 | `Expedition.id` 初始为空 | ongoing id=null | 已分配 `exp_<ticks>` |
+
+### 化扫
+
+| # | 问题 | 证据 | 下一步 |
+|---|---|---|---|
+| 47 | 化扫对空瓶/药瓶字段为空 | 梦尘/咖啡因片正常 | 目标需有化学数据，非接口问题 |
 
 ### 已解决
 - [x] 问题 -> 解决方式 / 测试
