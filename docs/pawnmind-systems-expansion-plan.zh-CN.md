@@ -1,19 +1,18 @@
-# PawnMind 系统扩展计划（P6+）
+# PawnMind 系统扩展计划（P6–P11）
 
-> 目标：在现有“背包 / 交易 / 夜间 / 阅读”之上，补齐彩票、电话、标签、分析仪/工具、机器与酿酒。
-> 原则：优先做**语义接口**，不靠截图；能用游戏公开 hook 就不重复实现；TDD；真机统一用槽 17。
-> 版本：0.46D / 100-REV6。
+> 目标：在现有“背包 / 交易 / 夜间 / 阅读”之上，补齐彩票、电话、标签、分析仪/工具、机器、酿酒，以及用户确认要做的补漏项。
+> 原则：优先语义接口，不靠截图；能用公开 hook 就不重复实现；TDD；真机统一用**槽 17**，不再 `new_game`。
+> 游戏版本：0.46D / 100-REV6。
 
-## 0. 现有基础（可直接复用）
+## 0. 现有基础
 
 - `get_item` / `list_inventory` / `get_layout`：物品、容器、二维布局、形状 mask。
-- `move_item`：指定格/旋转/重排，能把物品放进机器槽。
-- `GameItem` 的公开 hook：
+- `move_item`：指定格/旋转/重排，可把物品放进机器槽。
+- 通用物品 hook（P6 的核心）：
   - `CanActivateSlotItem()` / `ActivateSlotItem()`
   - `CanToggleSlotItem()` / `ToggleSlotItem()`
   - `CanTarget(target)` / `Target(target)`
-  - `onActivateSlotItemFunc` / `onToggleSlotItemFunc` / `onThisTargetItemFunc`
-- 结论：**分析仪、工具、书、彩票、基因扫描仪、部分机器都可以先走一套通用交互层**，不必每个物品写死。
+- 动作历史、rev、长轮询 `/events` 已可用。
 
 ## 1. 通用物品交互层（P6 地基）
 
@@ -21,239 +20,213 @@
 
 | 工具 | 作用 |
 |---|---|
-| `list_interactions(item_id)` | 返回 `can_activate / can_toggle / can_target` 和可用目标提示 |
-| `activate_item(item_id)` | 调用 `ActivateSlotItem()`（书、彩票、扫描仪等） |
-| `toggle_item(item_id)` | 调用 `ToggleSlotItem()`（基因扫描仪、部分机器开关） |
-| `use_tool(tool_id, target_id)` | `CanTarget` → `Target`（螺丝刀、焊枪、剪线钳、UV、菜刀等） |
+| `list_interactions(item_id)` | `can_activate / can_toggle / can_target` + 可用目标提示 |
+| `activate_item(item_id)` | 书、彩票、扫描仪等 |
+| `toggle_item(item_id)` | 基因扫描仪、部分机器开关 |
+| `use_tool(tool_id, target_id)` | 螺丝刀、焊枪、剪线钳、UV、菜刀、标记笔等 |
 
 ### 约束
 
 - 只对 `GeneralHelper.IsItemOwned` 的物品执行。
-- `Target` 可能消耗工具/目标，执行前记录物品快照，失败/异常回滚不了的部分要明确返回 `partial`。
-- 隐藏字段（鉴定真伪、基因隐藏值）不读；只返回游戏 UI 本来就展示的内容。
-
-### TDD
-
-- 纯逻辑：`InteractionCatalog`（选择 activate/toggle/target、优先级）。
-- 适配器：`GameItem` 四个 hook 的契约检查。
-- 真机：螺丝刀修 `system_module_ruined`、UV 照水、基因扫描仪开关。
+- `Target` 可能消耗工具/目标；执行前快照，异常返回 `partial`。
+- 不读隐藏字段（鉴定真伪、隐藏基因值）。
+- 目标校验走 `CanTarget`，不自己猜规则。
 
 ## 2. 分析仪（P6）
 
-| 分析仪 | 游戏入口 | 结构化结果 |
+| 分析仪 | 入口 | 结构化结果 |
 |---|---|---|
-| 水质检测试纸 / AquaScan | `WaterScannerUIManager.Open(scanner, water)`；`GetTestedString` / `GetLabeledString` / `CanConfront` / `CanMatch` | 测试值、标签值、污染物、是否可对质/贴标 |
+| 水质试纸 / AquaScan | `WaterScannerUIManager.Open(scanner, water)`；`GetTestedString` / `GetLabeledString` / `CanConfront` / `CanMatch` | 测试值、标签值、污染物、可对质/可贴标 |
 | 化学品扫描仪 | `ChemScannerUIManager.Open`；`CanConfrontChem` / `CanMatchChem`；TMP 字段 | 成分、毒性、欣快、总容量 |
-| 植物分析仪 | `PlantAnalyserUIManager.OpenUI(seed)`；`Refresh`；TMP 字段 / `GetContaminantSentitivity` | 营养范围、耗水、污染敏感度、生长评分 |
-| 基因扫描仪 | `gene_scanner` 的 `onToggleSlotItemFunc` → `PlayerStore.isGeneScannerScanning` | 开关状态；基因信息仍只给文本可见部分 |
+| 植物分析仪 | `PlantAnalyserUIManager.OpenUI(seed)`；`Refresh`；`GetContaminantSentitivity` / TMP | 营养范围、耗水、污染敏感度、生长评分 |
+| 基因扫描仪 | `gene_scanner` 的 `onToggleSlotItemFunc` → `PlayerStore.isGeneScannerScanning` | 开关状态；基因信息只给游戏可见文本 |
 
 ### 工具
 
-- `list_analyzers()`：拥有的分析仪 + 可用目标类型。
-- `analyze_item(analyzer_id, target_id)`：统一返回 `{analyzer, target, fields, warnings}`。
-- `read_analyzer(analyzer_id)`：读当前 UI 结果（UI 已打开时）。
+- `list_analyzers()`
+- `analyze_item(analyzer_id, target_id)` → `{analyzer, target, fields, warnings}`
+- `read_analyzer(analyzer_id)`（UI 已打开时读当前结果）
 
-### 实现策略
+### 策略
 
-- 优先走 `use_tool` 打开游戏 UI，再读 `currentItem/currentWaterContainer/currentScannedItem` + 公开静态 getter。
-- 没有静态 getter 的（植物分析仪）读 TMP 文本，解析成字段；解析失败返回原文，不猜。
-- 不做视觉：不读 sprite、不读颜色、不读隐藏真伪。
+- 优先走 `use_tool` 打开游戏 UI，再读 `currentItem/currentWaterContainer/currentScannedItem` + 公开 getter。
+- 植物分析仪没有静态 getter，读 TMP 并解析；解析失败返回原文。
+- 不做视觉：不读 sprite/颜色/隐藏真伪。
 
-### TDD
+## 3. 标签打印机 + 标记笔（P6）
 
-- `AnalyzerResult` 模型 + JSON 序列化测试。
-- 文本解析器（植物分析仪）纯测试：正常/缺字段/本地化文本。
-- 真机：水质试纸测一瓶水；植物分析仪测种子；化扫测药品。
+### 3.1 标签打印机
 
-## 3. 标签打印机 / 标记笔（P6）
+- 物品：`labeler` / `labeler_blue`。
+- `LabelerUIManager.OpenUI(item)`；可编辑 `ItemFeature.fakeCondition`。
+- 选项来自 `ItemConditionList.conditionLookup[category]`。
+- `LabelerHelper.IsEditableLabelFeature` / `GetEditableLabelCount` / `CanEditLabel`。
 
-### 现状
+工具：
 
-- 0.46D 里**没有找到独立“标记笔”物品**；标签编辑来自 `labeler` / `labeler_blue`（`LabelerUIManager`）。
-- 可编辑的是 `ItemFeature` 的 `fakeCondition`，选项来自 `ItemConditionList.conditionLookup[category]`。
-- `LabelerHelper.IsEditableLabelFeature`、`GetEditableLabelCount`、`CanEditLabel` 是公开判断。
+- `list_labels(item_id)`：类别、当前条件、可选条件 id/显示值。
+- `set_label(item_id, category, condition_id)`：设置 `fakeCondition`、`SetExposed(false)`、`WaterFeatureHelper.OnWaterLabelUpdated`。
+- `repeat_label(item_id)`：复用 `LabelerUIManager.Repeat()`。
 
-### 工具
+约束：
 
-- `list_labels(item_id)`：返回可编辑类别、当前条件、可选条件（id + 显示值）。
-- `set_label(item_id, category, condition_id)`：设置 `fakeCondition`，`SetExposed(false)`，调用 `WaterFeatureHelper.OnWaterLabelUpdated`。
-- `repeat_label(item_id)`：复用 `LabelerUIManager.Repeat()` 的上一次标签。
-- `list_labelers()`：拥有的标签机。
+- 只改可编辑标签，不碰真实成分。
+- 改标签影响交易/安检，必须幂等 + 历史。
+- 蓝标签机范围按 `IsEditableLabelFeature` 实际判断。
 
-### 约束
+### 3.2 标记笔（给鱼/动物做标记）
 
-- 只改“可编辑标签”，不碰真实成分。
-- 改标签会影响交易/安检，动作要幂等并记录历史。
-- 蓝标签机（`labeler_blue`）与普通标签机的可编辑范围可能不同，按 `IsEditableLabelFeature` 实际判断。
+- 物品：`marking_pen`；`MARKING_PEN_TAG`。
+- 模式：`MARKING_PEN_MODE_INT`，0–4 = 红/紫/绿/蓝/橙，5 = 橡皮擦（`AnimalMarkHelper.ERASER_MODE`）。
+- 可标记：`AnimalMarkHelper.IsMarkable(item)`（`ANIMAL_ITEM_TAG` 或 `AquacultureHelper.IsFish`）。
+- 标记：`SetMark(item, colorIndex)`；擦除：`ClearMark(item)`；读取：`GetColorIndex(item)` / `IsMarked`。
 
-### TDD
+工具：
 
-- `LabelEdit` 纯校验：类别不存在/条件不存在/不可编辑 → 错误码。
-- 真机：给一瓶水贴“纯净水”标签，读回 `list_labels`。
+- `list_marking_pens()`：笔、当前颜色、模式。
+- `set_pen_mode(pen_id, mode)`：0–5。
+- `mark_item(pen_id, target_id)`：按当前模式标记/擦除（走 `use_tool` 的 `Target` 即可）。
+- `list_marks()`：已标记的鱼/动物 + 颜色。
+
+验收：真机标记一条鱼，读回颜色；再擦除。
 
 ## 4. 电话（P7）
 
-### 游戏入口
+### 联系人（`StorePhoneClient.InitPhoneClientDict`）
 
-- `StorePhoneClient.InitPhoneClientDict()`：号码 → 联系人。
-- `PhoneUIManager.AutoCall(number)` / `StartCalling()` / `HandleCall()`。
-- `StorePhoneClient.WillAnswerCall(number)`、`ShownInPhoneBook()`、`currentCooldown`、`dialedBefore`。
-- 电话对话走 `DialogUIManager`，状态可复用现有 `dialogue`。
+| 号码 | 联系人 | 类型 | 剧情/服务 |
+|---|---|---|---|
+| 8376 | Joe Wild 助手 | Wild | 选择浏览 `WildNetworkUI` 或挂断 |
+| 8815 | Red Imp 代表 | Supplier | 初次送免费快递客户；之后订货/冷却 |
+| 56371 | 矿业 | Supplier | 初次免费快递；之后矿物订单 |
+| 4615 | Dale（制药） | Supplier | 初次免费快递；之后药品订单 |
+| 3319 | Ashish（化学） | Supplier | 初次免费快递；订单分档，`amountSpent >= 400` 解锁大单 |
+| 51189 | 革命商人 | Supplier | 稀有货订单 |
+
+### 状态/分支
+
+- `PhoneState`：`NotResponding / Responding / Introduction / Regular / Cooldown`。
+- `dialedBefore`、`currentCooldown`、`cooldownDuration`、`amountSpent`、`stockType`。
+- 初次通话 `Introduction` → 结束送 `courrierXFree`，`UseService()` 进入冷却。
+- 常规 `Regular` → 选择订货档位 → `QueueFuturClient("courrierX", n)` → 冷却。
+- `Cooldown` → 只报剩余天数。
+- Wild 分支：`WildNetworkUI.Open()`，关闭电话。
+- 联系人 alias 命中当前在店顾客时，`IsPhoneClientAtStore` 为真（不能在店打）。
+- 电话对话走 `DialogUIManager`，现有 `dialogue`/`choose_dialogue` 可复用。
 
 ### 工具
 
-- `list_contacts()`：号码、名字、类型、是否显示、冷却、是否打过。
-- `call(number)`：`AutoCall`；返回是否接通/无人接听。
-- `phone_state()`：当前通话对象、状态、是否在对话。
-- `end_call()`：关闭电话 UI/结束对话。
+- `list_contacts()`：号码、名字、状态、冷却、是否拨过、消费额、alias。
+- `call(number)`：`AutoCall`；返回接通/无人接听。
+- `phone_state()`：当前联系人/状态/是否在对话。
+- `choose_dialogue(choice)`：现有工具即可选订单/挂断。
+- `order_service(number, tier)`：语义化“订货”，内部走电话对话选择。
+- `wild_network_list()` / `wild_network_buy(item_id)`：Wild 网络浏览/购买（P7 后段）。
+- `end_call()`。
 
-### 约束
+### 分支结论
 
-- 不猜测隐藏号码；只列 `ShownInPhoneBook` 或已解锁的联系人。
-- 电话服务可能扣钱/触发剧情，动作前返回预览（号码、对象、已知费用）。
-
-### TDD
-
-- `PhoneDirectory` 纯过滤：未解锁/冷却/已拨。
-- 真机：打 `8376`（Wild）或已知联系人，读对话。
+电话没有多结局剧情；分支是**状态机 + 消费阈值 + 免费首单 + 送货客户**。Wild 是独立网络 UI，供应商是订单/冷却循环。
 
 ## 5. 彩票（P7）
 
-### 游戏入口
+### 范围
 
-- `LotteryHelper`：`IsLotteryUnlocked()`、`GetCurrentEdition()`、`GenerateLotteryTicket()`、`CountMatches`、`GetPrizeForMatches`、`CanRedeemPrize` / `TryRedeemPrize`。
-- 彩票物品：`lottery_ticket`（`LOTTERY_TICKET_TAG`、`LOTTERY_NUMBER_TAG`、`LOTTERY_EDITION_TAG`、`LOTTERY_WINNING_NUMBER_TAG`、`LOTTERY_MATCH_COUNT_TAG`）。
-- 刮刮卡：`ScratcherUIManager`，需要手动刮开。
+用户确认：**只读 + 兑奖，不做自动刮卡**。
+
+### 入口
+
+- `LotteryHelper.IsLotteryUnlocked()`（第 14 天解锁）、`GetCurrentEdition()`。
+- 票：`lottery_ticket`，tag `LOTTERY_TICKET_TAG` / `LOTTERY_NUMBER_TAG` / `LOTTERY_EDITION_TAG` / `LOTTERY_WINNING_NUMBER_TAG` / `LOTTERY_MATCH_COUNT_TAG`。
+- `CountMatches(ticket, winning)`、`GetPrizeForMatches`、`CanRedeemPrize` / `TryRedeemPrize`。
+- 刮刮卡：`ScratcherUIManager` 只读状态，不自动刮。
 
 ### 工具
 
-- `lottery_status()`：是否解锁、当前期号、开奖日、奖级表。
-- `list_tickets()`：号码、期号、匹配数、奖金、是否可兑。
-- `inspect_ticket(item_id)`：号码/期号/匹配/奖金。
-- `redeem_ticket(item_id)`：`TryRedeemPrize`。
-- `scratch_card(item_id)`：只读当前刮卡状态；自动刮开需要模拟 UI，先不做或单独开关。
+- `lottery_status()`：解锁、期号、开奖日、奖级表。
+- `list_tickets()`：号码、期号、匹配、奖金、可兑。
+- `inspect_ticket(item_id)`。
+- `redeem_ticket(item_id)`。
+- `scratch_card_status(item_id)`：只读，不刮。
 
-### 约束
-
-- 不预测开奖号；`DrawWinningNumberWithLuck` 依赖玩家彩票和幸运，不能用来“算号”。
-- 兑奖前确认 `CanRedeemPrize`；兑奖会改现金/物品，记录历史。
-
-### TDD
-
-- `LotteryMath`：奖级表、匹配数、奖金、期号显示。
-- 真机：买/捡一张票，读号码；到期兑奖（若测试档有）。
+约束：不预测开奖号；兑奖前 `CanRedeemPrize`；记录历史。
 
 ## 6. 机器（P8）
 
-### 通用模型
+### 通用
 
 - 枚举：`EmporiumEntry.GetAllOwnedItemsByTag("STANDARD_MACHINE_TAG")`。
-- 状态：`MachineProgressHelper.GetMachineState(machine)`、`MACHINE_PROGRESS_CURRENT/TARGET`、`STATE_WORKING/READY`。
-- 槽位：`MachineHelper.GetSlot(machine, i)`、`GetBodyStorage`、`GetBatterySlot`、`GetModuleInv`、`GetModules`。
-- 电力：`MachineHelper.HasBattery/CanPower`。
-- 启动：`MachineProgressHelper.StartProgressTypeMachine(machine, sourceItem)`；部分机器用按钮/`ActivateSlotItem`/`ToggleSlotItem`。
+- 状态：`MachineProgressHelper.GetMachineState`、`MACHINE_PROGRESS_CURRENT/TARGET`、`STATE_WORKING/READY`。
+- 槽位：`MachineHelper.GetSlot` / `GetBodyStorage` / `GetBatterySlot` / `GetModuleInv` / `GetModules`。
+- 电力：`HasBattery` / `CanPower`。
 
 ### 工具
 
 - `list_machines()`：id、名称、类型、state、进度、电力、槽位摘要。
-- `machine_status(machine_id)`：详细槽位/内容/模块/电池/产物。
-- `machine_insert(machine_id, slot, item_id)`：把物品移入指定槽。
-- `machine_start(machine_id)` / `machine_stop(machine_id)` / `machine_collect(machine_id)`。
-- `machine_slots(machine_id)`：槽位 id/类型/容量。
+- `machine_status(machine_id)`：槽位/内容/模块/电池/产物。
+- `machine_insert(machine_id, slot, item_id)`。
+- `machine_start(machine_id)` / `machine_stop` / `machine_collect`。
+- `machine_slots(machine_id)`。
 
-### 分机器适配
+### 适配
 
-- 熔炉（`MachineFurnace`）：垃圾处理、模块。
-- 水培（`MachineHydroponic`）：水槽/种子/产出、`GetGrowStatus`。
-- 打印机（`MachinePrinter`）：塑料/图纸。
-- 净化器（`MachinePurifier`）：水罐/滤芯。
-- 酿酒架（`MachineWineRack`）：陈酿、`GetAgingDays`。
-- 搅拌机/化学（`MachineBlender`）：配方/损失。
-- DNA 操纵器/解序器：后期。
+- 熔炉、水培（`GetGrowStatus`）、打印机、净化器、酒架、搅拌机、DNA 操纵器/解序器。
+- 机器模块/维修：`MachineHelper` / `MachineBrokenHelper`（P9 顺带）。
 
-### TDD
+## 7. 酿酒（P8）
 
-- `MachineState` 模型 + 槽位解析测试。
-- 真机：水培放种子+水，读 `GetGrowStatus`；熔炉放垃圾，启动，收产物。
+- `WineHelper.TryStartFermentation` / `StartFermentation` / `FinishFermentation`。
+- `IsFermentingOrFinished` / `IsFinishedWine` / `GetWineQualityTier` / `GetWaterQualityScore` / `GetWineExtractPerMille` / `GetWineContaminantPerMille`。
+- `WineHelper.OnAgeWine`、`MachineWineRack.CanAgeWine` / `GetAgingDays`。
 
-## 7. 酿酒（P8，独立小系统）
-
-### 游戏入口
-
-- `WineHelper.TryStartFermentation(item)` / `StartFermentation` / `FinishFermentation`。
-- `WineHelper.IsFermentingOrFinished` / `IsFinishedWine` / `GetWineQualityTier` / `GetWaterQualityScore` / `GetWineExtractPerMille` / `GetWineContaminantPerMille`。
-- `WineHelper.OnAgeWine`（酒架每日陈酿）。
-- `MachineWineRack.CanAgeWine` / `GetAgingDays`。
-
-### 工具
+工具：
 
 - `list_wine()`：瓶子、发酵状态、品质、提取率、污染物、陈酿天数。
 - `start_fermentation(item_id)` / `wine_status(item_id)` / `age_wine(item_id)`。
 - `pour_wine(source_id, target_id)`。
 
-### 约束
+约束：发酵/陈酿跨天；只触发，状态读回。
 
-- 发酵/陈酿会跨天；工具只触发，结果靠状态读回。
-- 不暴露隐藏配方；只显示游戏 UI 可见数值。
+## 8. 补漏项（全部要做）
 
-## 8. 你列表之外的遗漏（建议排期）
-
-| 系统 | 入口 | 价值 | 建议 |
-|---|---|---|---|
-| 以物易物 | `BarterOffer` / `ExchangeBarter` / `BarterHelper` | 高 | P9 |
-| 顾客需求/悬赏 | `StoreRequestList` / `WantedUIManager` | 高 | P9 |
-| 声望/派系/Perk | `StoreReputation` | 高 | P9 |
-| 违禁品/安检/突袭 | `ContrabandHelper` / `InspectionUIManager` / `RaidManager` | 高 | P9 |
-| 店铺升级/网络 | `NetworkUpgradeList` | 中 | P9 |
-| 健康/伤口/成瘾 | `HealthData` | 中 | P9 |
-| 远征/雇佣兵 | `ExpeditionHelper` / `ExpeditionLocationList` | 中 | P10 |
-| 水培/养殖/宠物 | `HydroponicHelper` / `AquacultureHelper` / `HusbandryHelper` | 中 | P10 |
-| 营销/招牌 | `sign_*` 物品 | 低 | P10 |
-| 保险/贷款/赎回 | `Repo` / foreclosure | 低 | P10 |
-| 事件/天气/节日 | `StoreEventManager` | 低 | P10 |
-| 机器模块/维修 | `MachineHelper` / `MachineBrokenHelper` | 中 | P8 顺带 |
+| 系统 | 入口 | 计划 |
+|---|---|---|
+| 以物易物 | `BarterOffer` / `ExchangeBarter` / `BarterHelper` | P9：报价/条件/接受判定/交换 |
+| 顾客需求/悬赏 | `StoreRequestList` / `WantedUIManager` | P9：列表/接取/交付 |
+| 声望/派系/Perk | `StoreReputation` | P9：快照/事件增量/Perk |
+| 违禁品/安检/突袭 | `ContrabandHelper` / `InspectionUIManager` / `RaidManager` | P9：风险扫描/安检/突击只读+应对 |
+| 店铺升级/网络 | `NetworkUpgradeList` | P9：可购升级/价格/效果 |
+| 健康/伤口/成瘾 | `HealthData` | P9：状态/治疗/风险 |
+| 机器模块/维修 | `MachineHelper` / `MachineBrokenHelper` | P9：模块/损坏/修理 |
+| 远征/雇佣兵 | `ExpeditionHelper` / `ExpeditionLocationList` | P10：地点/装备/派遣/结算 |
+| 水培/养殖/宠物 | `HydroponicHelper` / `AquacultureHelper` / `HusbandryHelper` | P10：种植/喂食/收获/鱼群 |
+| 营销/招牌 | `sign_*` 物品 | P10：招牌/营销位 |
+| 保险/贷款/赎回 | `Repo` / foreclosure | P10：债务/赎回 |
+| 事件/天气/节日 | `StoreEventManager` | P10：事件列表/影响 |
 
 ## 9. 分期与验收
 
-### P6：通用交互 + 分析仪 + 标签（优先）
-
-- `list_interactions` / `activate_item` / `toggle_item` / `use_tool`
-- `list_analyzers` / `analyze_item`
-- `list_labels` / `set_label` / `repeat_label`
-- 验收：真机修一个坏模块、测一瓶水、贴一次标签
-
-### P7：电话 + 彩票
-
-- `list_contacts` / `call` / `phone_state`
-- `lottery_status` / `list_tickets` / `inspect_ticket` / `redeem_ticket`
-- 验收：打一次电话、读一张票、兑一次奖（若到期）
-
-### P8：机器 + 酿酒
-
-- `list_machines` / `machine_status` / `machine_insert/start/collect`
-- `list_wine` / `start_fermentation` / `wine_status`
-- 验收：水培种一株、熔炉处理一次、酒瓶发酵/陈酿
-
-### P9：经济/社交/风险
-
-- barter、wanted、reputation、contraband/inspection、upgrades
-
-### P10：世界/农场/远征
-
-- expedition、hydroponic/aquaculture、health、marketing
+| 阶段 | 内容 | 验收 |
+|---|---|---|
+| P6 | 通用交互 + 分析仪 + 标签 + 标记笔 | 修坏模块、测水、贴标、标记鱼 |
+| P7 | 电话 + 彩票（只读/兑奖） | 打一次电话订货、读票、兑奖 |
+| P8 | 机器 + 酿酒 | 水培种一株、熔炉处理、酒瓶发酵/陈酿 |
+| P9 | barter/wanted/声望/安检/升级/健康/机器模块 | 各一次真机 |
+| P10 | 远征/农场/营销/保险/事件 | 各一次真机 |
+| P11 | 回归、文档、tag | 全量测试 + 3 天回归 |
 
 ## 10. TDD 与真机约定
 
-- 每个阶段先写失败测试：纯模型（无 Unity）+ 适配器契约。
-- 真机统一 **槽 17**，不 `new_game`。
-- 每个动作返回 `{ok, data, warnings, partial}`；失败给明确错误码。
-- 所有动作写入 `ActionHistory`，便于回滚/复盘。
-- 扫描器约束：不加 Thread/Task/协程；UI 读取只在主线程。
+- 先失败测试：纯模型（无 Unity）+ 适配器契约。
+- 真机统一槽 17；不 `new_game`。
+- 动作返回 `{ok, data, warnings, partial}`；失败给错误码。
+- 所有动作进 `ActionHistory`；扫描器约束：无 Thread/Task/协程。
 
 ## 11. 风险
 
-1. 分析仪结果多为本地化 UI 文本，解析可能随语言/版本变；需要原文兜底。
-2. 标签编辑会改变交易/安检结果，必须幂等 + 历史。
-3. 机器启动/收取可能有动画/延迟，动作后要轮询状态，不假设立即完成。
-4. 彩票/电话有随机性和剧情分支，不能承诺固定收益。
-5. `GameItem.Target` 可能消耗物品，失败回滚不完整；需要逐工具验收。
+1. 分析仪/植物结果多为本地化 UI 文本，解析需原文兜底。
+2. 标签会改变交易/安检，必须幂等 + 历史。
+3. 机器启动/收取有动画/延迟，动作后轮询状态。
+4. 彩票/电话有随机与冷却，不能承诺固定收益。
+5. `Target` 可能消耗物品，失败回滚不完整。
+6. 补漏项（barter/raid/expedition）状态复杂，先做只读再做动作。
