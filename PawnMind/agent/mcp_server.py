@@ -156,6 +156,46 @@ def build_server(client):
         return client.action("use_tool", tool_id=tool_id, target_id=target_id, rev=rev)
 
     @server.tool()
+    def deliver_request(id: str, rev: int) -> dict:
+        """Deliver a fillable StoreRequest and claim rewards."""
+        return client.action("deliver_request", id=id, rev=rev)
+
+    @server.tool()
+    def barter_accept(rev: int) -> dict:
+        """Accept the current client's barter offer when acceptable."""
+        return client.action("barter_accept", rev=rev)
+
+    @server.tool()
+    def arrest_wanted(id: str, rev: int) -> dict:
+        """Report/arrest a wanted person by id."""
+        return client.action("arrest_wanted", id=id, rev=rev)
+
+    @server.tool()
+    def list_factions() -> dict:
+        """Faction reputation amounts, perks and influence."""
+        return client.action("list_factions")
+
+    @server.tool()
+    def health_status() -> dict:
+        """Player wounds, luck, addiction timers."""
+        return client.action("health_status")
+
+    @server.tool()
+    def list_requests() -> dict:
+        """Active customer/faction requests and rewards."""
+        return client.action("list_requests")
+
+    @server.tool()
+    def wanted_status() -> dict:
+        """Wanted-person visit state and wanted list."""
+        return client.action("wanted_status")
+
+    @server.tool()
+    def barter_status() -> dict:
+        """Current client's barter offer and conditions."""
+        return client.action("barter_status")
+
+    @server.tool()
     def list_wine() -> dict:
         """List owned wine containers/bottles and finished state."""
         return client.action("list_wine")

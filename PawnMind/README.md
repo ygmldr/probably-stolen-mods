@@ -378,6 +378,12 @@ machine_collect(slot4) -> 回背包
 - 机器在**日结/睡觉**时 tick，不是实时；背包里也会处理
 - `junk` 需要垃圾处理模块，普通废金属不需要
 
+## P9 快照/动作（2026-11-10）
+
+- `list_factions` / `health_status` / `list_requests` / `wanted_status` / `barter_status`
+- `deliver_request(id)` / `barter_accept()` / `arrest_wanted(id)`
+- 真机：第 15 天 5 派系、健康正常、请求/通缉为空；错误路径 `request_not_found`/`no_barter_offer`/`unknown_wanted`
+
 ## P6/P7 扩展（2026-11-10）
 
 - 通用交互：`list_interactions` / `activate_item` / `toggle_item` / `use_tool`

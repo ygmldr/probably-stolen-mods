@@ -164,6 +164,32 @@ public sealed class PawnMindMod : IMod
                     (string)request["identifier"],
                     ReadInt(request, "count", 1)));
 
+            case "deliver_request":
+                return ActionResult.SuccessRaw("deliver_request", P9ActionService.DeliverRequestJson(
+                    (string)request["id"]));
+
+            case "barter_accept":
+                return ActionResult.SuccessRaw("barter_accept", P9ActionService.BarterAcceptJson());
+
+            case "arrest_wanted":
+                return ActionResult.SuccessRaw("arrest_wanted", P9ActionService.ArrestWantedJson(
+                    (string)request["id"]));
+
+            case "list_factions":
+                return ActionResult.SuccessRaw("list_factions", PlayerStatusService.FactionsJson());
+
+            case "health_status":
+                return ActionResult.SuccessRaw("health_status", PlayerStatusService.HealthJson());
+
+            case "list_requests":
+                return ActionResult.SuccessRaw("list_requests", PlayerStatusService.RequestsJson());
+
+            case "wanted_status":
+                return ActionResult.SuccessRaw("wanted_status", PlayerStatusService.WantedJson());
+
+            case "barter_status":
+                return ActionResult.SuccessRaw("barter_status", PlayerStatusService.BarterJson());
+
             case "list_wine":
                 return ActionResult.SuccessRaw("list_wine", WineService.ListJson());
 

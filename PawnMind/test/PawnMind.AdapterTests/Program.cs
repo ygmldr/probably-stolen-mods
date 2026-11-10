@@ -125,6 +125,14 @@ namespace PawnMind.AdapterTests
             CheckMethod(assembly, "MachineHelper", "GetBodyStorage");
             CheckMethod(assembly, "MachineHelper", "GetSlot");
             CheckMethod(assembly, "MachineProgressHelper", "GetMachineState");
+            CheckMethod(assembly, "StoreRequest", "FillRequest");
+            CheckMethod(assembly, "BarterOffer", "OnBarterAccepted");
+            CheckMethod(assembly, "WantedUIManager", "OnArrested");
+            CheckMethod(assembly, "StoreReputation", "GetReputationExact");
+            CheckMethod(assembly, "HealthData", "IsSeriouslyWounded");
+            CheckField(assembly, "PlayerStore", "storeRequests");
+            CheckField(assembly, "PlayerStore", "wantedStatus");
+            CheckField(assembly, "StoreClient", "barterOffer");
             CheckMethod(assembly, "WaterHelper", "AddPureWater");
             CheckMethod(assembly, "WaterHelper", "GetCurrentCapacityML");
             CheckMethod(assembly, "WineHelper", "TryStartFermentation");

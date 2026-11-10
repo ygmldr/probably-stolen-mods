@@ -1,0 +1,84 @@
+using System;
+using System.Collections.Generic;
+using Newtonsoft.Json;
+using PawnMind.Core;
+using PawnMind.Game;
+
+namespace PawnMind.Bridge
+{
+    internal static class P9ActionService
+    {
+        public static string DeliverRequestJson(string id)
+        {
+            if (string.IsNullOrEmpty(id)) return "{\"ok\":false,\"error\":\"missing_id\"}";
+
+            StoreRequest request = null;
+            try
+            {
+                List<StoreRequest> requests = PlayerStore.Instance.storeRequests;
+                for (int i = 0; i < requests.Count; i++)
+                {
+                    if (requests[i] != null && requests[i].id == id) { request = requests[i]; break; }
+                }
+            }
+            catch { }
+
+            bool fillable = false;
+            try { fillable = request != null && request.CanFillRequest(); } catch { }
+            RequestCheck check = RequestValidator.Validate(request != null, fillable);
+            if (check != RequestCheck.Ok) return "{\"ok\":false,\"error\":\"" + (check == RequestCheck.NotFound ? "request_not_found" : "not_fillable") + "\"}";
+
+            try
+            {
+                request.FillRequest();
+                return "{\"ok\":true,\"cash\":" + GameState.GetCash() + "}";
+            }
+            catch (Exception e)
+            {
+                return "{\"ok\":false,\"error\":\"deliver_failed\",\"detail\":\"" + Escape(e.Message) + "\"}";
+            }
+        }
+
+        public static string BarterAcceptJson()
+        {
+            StoreClient client = GameState.GetCurrentClient();
+            BarterOffer offer = client == null ? null : client.barterOffer;
+            bool acceptable = false;
+            try { acceptable = offer != null && offer.IsBarterAcceptable(); } catch { }
+
+            BarterCheck check = BarterValidator.Validate(offer != null, acceptable);
+            if (check != BarterCheck.Ok) return "{\"ok\":false,\"error\":\"" + (check == BarterCheck.NoOffer ? "no_barter_offer" : "not_acceptable") + "\"}";
+
+            try
+            {
+                offer.OnBarterAccepted();
+                return "{\"ok\":true}";
+            }
+            catch (Exception e)
+            {
+                return "{\"ok\":false,\"error\":\"barter_failed\",\"detail\":\"" + Escape(e.Message) + "\"}";
+            }
+        }
+
+        public static string ArrestWantedJson(string id)
+        {
+            if (string.IsNullOrEmpty(id)) return "{\"ok\":false,\"error\":\"missing_id\"}";
+            try
+            {
+                if (!PlayerStore.Instance.wantedStatus.ContainsKey(id))
+                    return "{\"ok\":false,\"error\":\"unknown_wanted\"}";
+                WantedUIManager.Instance.OnArrested(id);
+                return "{\"ok\":true}";
+            }
+            catch (Exception e)
+            {
+                return "{\"ok\":false,\"error\":\"arrest_failed\",\"detail\":\"" + Escape(e.Message) + "\"}";
+            }
+        }
+
+        private static string Escape(string text)
+        {
+            return (text ?? string.Empty).Replace("\\", "\\\\").Replace("\"", "\\\"");
+        }
+    }
+}
