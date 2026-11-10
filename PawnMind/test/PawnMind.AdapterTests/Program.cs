@@ -122,6 +122,9 @@ namespace PawnMind.AdapterTests
             CheckProperty(assembly, "MapUIManager", "Current");
             CheckField(assembly, "PlayerStore", "commissaryData");
             CheckMethod(assembly, "CommissaryUIManager", "CanBuy");
+            CheckMethod(assembly, "NetworkUpgrade", "Unlock");
+            CheckMethod(assembly, "NetworkUpgrade", "IsUnlocked");
+            CheckField(assembly, "PlayerStore", "networkUpgrade");
             CheckMethod(assembly, "LotteryHelper", "IsLotteryUnlocked");
             CheckMethod(assembly, "LotteryHelper", "GetCurrentEdition");
             CheckMethod(assembly, "LotteryHelper", "CanRedeemPrize");

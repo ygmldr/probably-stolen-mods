@@ -159,6 +159,13 @@ public sealed class PawnMindMod : IMod
                     (string)request["identifier"],
                     ReadInt(request, "count", 1)));
 
+            case "list_upgrades":
+                return ActionResult.SuccessRaw("list_upgrades", UpgradeService.ListJson());
+
+            case "buy_upgrade":
+                return ActionResult.SuccessRaw("buy_upgrade", UpgradeService.BuyJson(
+                    (string)request["id"]));
+
             case "lottery_status":
                 return ActionResult.SuccessRaw("lottery_status", LotteryService.StatusJson());
 

@@ -37,6 +37,7 @@
     <Compile Include="LabelValidatorTests.cs" />
     <Compile Include="PhoneDirectoryTests.cs" />
     <Compile Include="LotteryPrizeTableTests.cs" />
+    <Compile Include="UpgradeValidatorTests.cs" />
     <Compile Include="BridgeServerTests.cs" />
     <Compile Include="../../src/Core/*.cs" />
     <Compile Include="../../src/Bridge/BridgeServer.cs" />

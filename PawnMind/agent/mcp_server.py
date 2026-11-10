@@ -156,6 +156,16 @@ def build_server(client):
         return client.action("use_tool", tool_id=tool_id, target_id=target_id, rev=rev)
 
     @server.tool()
+    def list_upgrades() -> dict:
+        """List network/store upgrades with cost/unlock/prerequisite state."""
+        return client.action("list_upgrades")
+
+    @server.tool()
+    def buy_upgrade(id: str, rev: int) -> dict:
+        """Buy a network upgrade by id (also unlocks supplier phone contacts)."""
+        return client.action("buy_upgrade", id=id, rev=rev)
+
+    @server.tool()
     def lottery_status() -> dict:
         """Lottery unlock state, edition, day and prize table."""
         return client.action("lottery_status")
