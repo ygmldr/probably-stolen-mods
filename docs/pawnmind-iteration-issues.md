@@ -70,6 +70,14 @@
 | G | F7 全局按键打到浏览器 | 不再注入系统键鼠；调试走 HTTP |
 | H | `TryAcceptAll` 非 null 不代表真的移动 | 3x3 移 2x2 暗格曾误报 ok；现在以 `item.parentInventory == target` 判定 |
 
+### P7 完成（2026-11-10）
+
+| # | 项 | 结果 |
+|---|---|---|
+| 31 | 供应商订货 | 睡到 day5，8815 订 8 份啤酒，Cooldown 4 |
+| 32 | Wild 网络 | 用 `list_upgrades/buy_upgrade` 购买；UI 本体未打开 |
+| 33 | 彩票 | 只读/兑奖接口完成；测试档未解锁、无中奖号 |
+
 ## 模板（每轮新增）
 
 ```markdown

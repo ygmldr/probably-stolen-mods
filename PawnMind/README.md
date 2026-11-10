@@ -342,6 +342,17 @@ curl http://127.0.0.1:15528/health
 curl -H "Authorization: Bearer <token>" http://127.0.0.1:15528/state
 ```
 
+## P6/P7 扩展（2026-11-10）
+
+- 通用交互：`list_interactions` / `activate_item` / `toggle_item` / `use_tool`
+- 分析仪：`list_analyzers` / `analyze_item`（水/化/植物/基因）
+- 标签：`list_labels` / `set_label`（瓶装水 沟渠水→纯水 真机）
+- 标记笔：`set_pen_mode` / `list_marks`（罗非鱼绿色）
+- 电话：`list_contacts` / `call` / `phone_state` / `phone_advance` / `phone_choose` / `end_call`
+- 供应商：买 `BREWER` 后 8815 进入 Introduction；睡 4 天后可订 8 份啤酒（次日送达）
+- 彩票：`lottery_status` / `list_tickets` / `inspect_ticket` / `redeem_ticket`
+- 网络升级：`list_upgrades` / `buy_upgrade`
+
 ## 安全边界
 
 - 只绑定 `127.0.0.1`，拒绝非本机 `Host`
