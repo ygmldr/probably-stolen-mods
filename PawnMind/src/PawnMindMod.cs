@@ -162,6 +162,10 @@ public sealed class PawnMindMod : IMod
             case "list_machines":
                 return ActionResult.SuccessRaw("list_machines", MachineService.ListJson());
 
+            case "machine_grow_status":
+                return ActionResult.SuccessRaw("machine_grow_status", MachineService.GrowStatusJson(
+                    ReadInt(request, "machine_id", -1)));
+
             case "machine_status":
                 return ActionResult.SuccessRaw("machine_status", MachineService.StatusJson(
                     ReadInt(request, "machine_id", -1)));

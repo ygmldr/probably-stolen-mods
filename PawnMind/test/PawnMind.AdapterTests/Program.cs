@@ -125,6 +125,9 @@ namespace PawnMind.AdapterTests
             CheckMethod(assembly, "MachineHelper", "GetBodyStorage");
             CheckMethod(assembly, "MachineHelper", "GetSlot");
             CheckMethod(assembly, "MachineProgressHelper", "GetMachineState");
+            CheckMethod(assembly, "MachineHydroponic", "GetGrowStatus");
+            CheckMethod(assembly, "MachineHydroponic", "GetWaterSlot");
+            CheckMethod(assembly, "MachineHydroponic", "GetInputSlot");
             CheckMethod(assembly, "EmporiumEntry", "GetAllOwnedItemsByTag");
             CheckMethod(assembly, "NetworkUpgrade", "Unlock");
             CheckMethod(assembly, "NetworkUpgrade", "IsUnlocked");

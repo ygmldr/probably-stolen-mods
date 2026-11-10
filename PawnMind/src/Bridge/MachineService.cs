@@ -51,6 +51,40 @@ namespace PawnMind.Bridge
             });
         }
 
+        public static string GrowStatusJson(int machineId)
+        {
+            GameItem machine = GameState.FindItemAnywhere(machineId);
+            if (machine == null) return "{\"ok\":false,\"error\":\"machine_not_found\"}";
+
+            string growStatus = "";
+            string water = "";
+            string seed = "";
+            try { growStatus = MachineHydroponic.GetGrowStatus(machine); } catch { }
+            try
+            {
+                GameItem waterItem = MachineHydroponic.GetWaterSlotItem(machine);
+                if (waterItem != null) water = waterItem.name;
+            }
+            catch { }
+            try
+            {
+                GameItem seedItem = MachineHydroponic.GetInputSlot(machine).childItem;
+                if (seedItem != null) seed = seedItem.name;
+            }
+            catch { }
+
+            return JsonConvert.SerializeObject(new Dictionary<string, object>
+            {
+                { "ok", true },
+                { "id", machineId },
+                { "state", SafeState(machine) },
+                { "progress", Progress(machine) },
+                { "grow_status", growStatus },
+                { "water", water },
+                { "seed", seed }
+            });
+        }
+
         public static string StatusJson(int machineId)
         {
             GameItem machine = GameState.FindItemAnywhere(machineId);

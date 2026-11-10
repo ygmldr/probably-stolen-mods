@@ -342,6 +342,12 @@ curl http://127.0.0.1:15528/health
 curl -H "Authorization: Bearer <token>" http://127.0.0.1:15528/state
 ```
 
+## 水培（2026-11-10）
+
+- `machine_grow_status`：state/progress/grow_status/water/seed
+- 真机：水培 249 放电池/水/种子，返回 `水量不足`（瓶装水/空储水罐都不够）
+- 槽位 0 电池、2 水、3 种子、4 产出
+
 ## 机器（2026-11-10）
 
 - `list_machines`：按 `STANDARD_MACHINE_TAG` 枚举；返回 state/progress/slots

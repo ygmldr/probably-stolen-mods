@@ -161,6 +161,11 @@ def build_server(client):
         return client.action("list_machines")
 
     @server.tool()
+    def machine_grow_status(machine_id: int) -> dict:
+        """Hydroponic grow status: power/water/seed/progress."""
+        return client.action("machine_grow_status", machine_id=machine_id)
+
+    @server.tool()
     def machine_status(machine_id: int) -> dict:
         """Show one machine's slots and contents."""
         return client.action("machine_status", machine_id=machine_id)
