@@ -19,6 +19,7 @@ namespace PawnMind.Core
 
         public int Port { get; set; }
         public string Token { get; set; }
+        public bool AllowTestItems { get; set; }
 
         public BridgeConfig()
         {
@@ -79,6 +80,7 @@ namespace PawnMind.Core
 
             int port = DefaultPort;
             string token = string.Empty;
+            bool allowTestItems = false;
 
             string[] lines = text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
             for (int i = 0; i < lines.Length; i++)
@@ -108,9 +110,15 @@ namespace PawnMind.Core
                 {
                     token = value;
                 }
+                else if (key == "allow_test_items")
+                {
+                    allowTestItems = string.Equals(value, "true", StringComparison.OrdinalIgnoreCase)
+                        || value == "1";
+                }
             }
 
             BridgeConfig parsed = Create(port, token);
+            parsed.AllowTestItems = allowTestItems;
             if (!parsed.TryValidate(out error)) return false;
 
             config = parsed;

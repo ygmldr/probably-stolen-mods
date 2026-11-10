@@ -106,6 +106,9 @@ namespace PawnMind.Bridge
                     row["owned"] = GameState.IsOwned(item);
                     row["locked"] = ItemPinHelper.IsPinned(item);
                     row["sellable"] = GameState.IsOwned(item) && !ItemPinHelper.IsPinned(item);
+                    int markColor = AnimalMarkHelper.GetColorIndex(item);
+                    row["marked"] = markColor >= 0;
+                    row["mark_color_index"] = markColor;
                     row["short_description"] = item.shortDescription;
                     row["long_description"] = item.longDescription;
                     row["flavor_text"] = item.flavorText;

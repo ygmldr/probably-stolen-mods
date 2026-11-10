@@ -50,6 +50,25 @@ namespace PawnMind.Tests
         }
 
         [Test]
+        public static void Parse_Reads_Test_Items_Flag()
+        {
+            string text = "# config\nport=16000\ntoken=" + Token(40) + "\nallow_test_items=true\n";
+            BridgeConfig parsed;
+            string error;
+            Assert.True(BridgeConfig.TryParse(text, out parsed, out error), "parse: " + error);
+            Assert.True(parsed.AllowTestItems, "flag enabled");
+        }
+
+        [Test]
+        public static void Parse_Defaults_Test_Items_Off()
+        {
+            BridgeConfig parsed;
+            string error;
+            Assert.True(BridgeConfig.TryParse("port=16000\ntoken=" + Token(40) + "\n", out parsed, out error), "parse");
+            Assert.False(parsed.AllowTestItems, "flag defaults off");
+        }
+
+        [Test]
         public static void Config_Parse_Rejects_Malformed_Line()
         {
             BridgeConfig parsed;

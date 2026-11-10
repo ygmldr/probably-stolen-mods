@@ -36,6 +36,8 @@
 | 19 | `toggle_item` 后 UI 快照为空 | 储藏区 toggle 成功但 `get_ui_snapshot` 无元素 | 补 content window/容器快照 |
 | 20 | 标签机目标判定严格 | `use_tool(labeler, 代糖果汁)` -> `cannot_target` | 用带可编辑标签的水/液体测 |
 | 21 | 分析仪结果尚无结构化接口 | 只有 UI | P6 下一步 |
+| 22 | `debug_grant fish_tilapia` 第二次 NRE | 首次可生成；鱼无 identifier、初始 owned=false | 修 fish 创建/去重；已能标记 |
+| 23 | 标记笔只有默认色，未接 `set_pen_mode` | 标记成功 color=0 | P6 下一步 |
 
 ### 已解决
 
@@ -68,6 +70,8 @@
 | 19 | `toggle_item` 后 UI 快照为空 | 储藏区 toggle 成功但 `get_ui_snapshot` 无元素 | 补 content window/容器快照 |
 | 20 | 标签机目标判定严格 | `use_tool(labeler, 代糖果汁)` -> `cannot_target` | 用带可编辑标签的水/液体测 |
 | 21 | 分析仪结果尚无结构化接口 | 只有 UI | P6 下一步 |
+| 22 | `debug_grant fish_tilapia` 第二次 NRE | 首次可生成；鱼无 identifier、初始 owned=false | 修 fish 创建/去重；已能标记 |
+| 23 | 标记笔只有默认色，未接 `set_pen_mode` | 标记成功 color=0 | P6 下一步 |
 
 ### 已解决
 - [x] 问题 -> 解决方式 / 测试

@@ -14,6 +14,7 @@ public sealed class PawnMindMod : IMod
     private const string ConfigFile = "bridge.conf";
 
     private static ModManifest _manifest;
+    private static bool _allowTestItems;
     private BridgeServer _server;
     private ActionRouter _router;
     private GameObject _pumpObject;
@@ -29,6 +30,7 @@ public sealed class PawnMindMod : IMod
         try
         {
             BridgeConfig config = LoadOrCreateConfig();
+            _allowTestItems = config.AllowTestItems;
 
             _pumpObject = new GameObject("PawnMind.Pump");
             _pumpObject.hideFlags = HideFlags.HideAndDontSave;
@@ -150,6 +152,12 @@ public sealed class PawnMindMod : IMod
 
             case "list_goods":
                 return ActionResult.SuccessRaw("list_goods", GoodsService.ListJson((string)request["scope"]));
+
+            case "debug_grant":
+                return ActionResult.SuccessRaw("debug_grant", DebugService.GrantJson(
+                    _allowTestItems,
+                    (string)request["identifier"],
+                    ReadInt(request, "count", 1)));
 
             case "list_interactions":
                 return ActionResult.SuccessRaw("list_interactions", InteractionService.ListJson(
