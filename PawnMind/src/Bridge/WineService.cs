@@ -27,6 +27,41 @@ namespace PawnMind.Bridge
             return JsonConvert.SerializeObject(payload);
         }
 
+        public static string AddWaterJson(int itemId, int ml)
+        {
+            GameItem item = GameState.FindItemAnywhere(itemId);
+            if (item == null) return "{\"ok\":false,\"error\":\"item_not_found\"}";
+            if (!SafeTag(item, "WINE_CONTAINER_TAG")) return "{\"ok\":false,\"error\":\"not_wine_bottle\"}";
+            if (ml <= 0) ml = 750;
+
+            try
+            {
+                WaterHelper.AddPureWater(item, ml <= 0 ? -1 : ml * 1000);
+                return "{\"ok\":true,\"ml\":" + WaterHelper.GetCurrentCapacityML(item) + "}";
+            }
+            catch (Exception e)
+            {
+                return "{\"ok\":false,\"error\":\"add_water_failed\",\"detail\":\"" + Escape(e.Message) + "\"}";
+            }
+        }
+
+        public static string AddIngredientJson(int bottleId, int itemId)
+        {
+            GameItem bottle = GameState.FindItemAnywhere(bottleId);
+            GameItem item = GameState.FindItemAnywhere(itemId);
+            if (bottle == null) return "{\"ok\":false,\"error\":\"bottle_not_found\"}";
+            if (item == null) return "{\"ok\":false,\"error\":\"item_not_found\"}";
+
+            GameGridInventory grid = GraphUtils.FindChildType<GameGridInventory>(bottle);
+            if (grid == null) return "{\"ok\":false,\"error\":\"no_ingredient_grid\"}";
+
+            GameInventory moved = grid.TryAcceptAll(item);
+            if (moved == null || item.parentInventory != grid)
+                return "{\"ok\":false,\"error\":\"cannot_add_ingredient\"}";
+
+            return "{\"ok\":true,\"bottle\":" + bottleId + ",\"item\":" + itemId + "}";
+        }
+
         public static string StartJson(int itemId)
         {
             GameItem item = GameState.FindItemAnywhere(itemId);

@@ -167,6 +167,16 @@ public sealed class PawnMindMod : IMod
             case "list_wine":
                 return ActionResult.SuccessRaw("list_wine", WineService.ListJson());
 
+            case "wine_add_water":
+                return ActionResult.SuccessRaw("wine_add_water", WineService.AddWaterJson(
+                    ReadInt(request, "item_id", -1),
+                    ReadInt(request, "ml", 750)));
+
+            case "wine_add_ingredient":
+                return ActionResult.SuccessRaw("wine_add_ingredient", WineService.AddIngredientJson(
+                    ReadInt(request, "bottle_id", -1),
+                    ReadInt(request, "item_id", -1)));
+
             case "wine_status":
                 return ActionResult.SuccessRaw("wine_status", WineService.StatusJson(
                     ReadInt(request, "item_id", -1)));

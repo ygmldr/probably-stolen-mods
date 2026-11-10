@@ -342,6 +342,16 @@ curl http://127.0.0.1:15528/health
 curl -H "Authorization: Bearer <token>" http://127.0.0.1:15528/state
 ```
 
+## 酿酒全流程（2026-11-10）
+
+```
+grant wine_bottle + wine_berry + wine_yeast
+wine_add_water(750ml) -> ml=750
+wine_add_ingredient(berry) / (yeast) -> ok
+start_fermentation -> started
+sleep x2 -> 荧光莓果酿, finished=true, quality_tier=2, extract=8‰
+```
+
 ## 水培全流程（2026-11-10）
 
 ```

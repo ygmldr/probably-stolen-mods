@@ -166,6 +166,16 @@ def build_server(client):
         return client.action("wine_status", item_id=item_id)
 
     @server.tool()
+    def wine_add_water(item_id: int, ml: int = 750, rev: int = None) -> dict:
+        """Add water to a wine bottle (test/gameplay helper)."""
+        return client.action("wine_add_water", item_id=item_id, ml=ml, rev=rev)
+
+    @server.tool()
+    def wine_add_ingredient(bottle_id: int, item_id: int, rev: int) -> dict:
+        """Move a berry/yeast into a wine bottle's ingredient grid."""
+        return client.action("wine_add_ingredient", bottle_id=bottle_id, item_id=item_id, rev=rev)
+
+    @server.tool()
     def start_fermentation(item_id: int, rev: int) -> dict:
         """Try to start fermentation on a wine bottle."""
         return client.action("start_fermentation", item_id=item_id, rev=rev)
