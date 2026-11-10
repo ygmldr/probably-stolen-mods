@@ -228,6 +228,11 @@ def build_server(client):
         return client.action("confirm_trade", item_id=item_id, side=side, rev=rev)
 
     @server.tool()
+    def wait_for_events(since_rev: int = -1, timeout_ms: int = 25000) -> dict:
+        """Block until the game revision changes; returns the fresh state (long-poll, no busy loop)."""
+        return client.wait_events(since_rev, timeout_ms)
+
+    @server.tool()
     def wait_for_change(since_rev: int, timeout_s: float = 20.0) -> dict:
         """Block until the shop revision changes (customer arrives, dialogue advances)."""
         deadline = time.time() + max(1.0, min(timeout_s, 60.0))

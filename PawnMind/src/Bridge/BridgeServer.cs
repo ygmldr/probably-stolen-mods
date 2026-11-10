@@ -4,6 +4,7 @@ using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using Newtonsoft.Json.Linq;
 using PawnMind.Core;
 
 namespace PawnMind.Bridge
@@ -20,6 +21,10 @@ namespace PawnMind.Bridge
             public Socket Socket;
             public MemoryStream Buffer;
             public DateTime Deadline;
+            public bool WaitingEvents;
+            public long EventSince;
+            public DateTime EventDeadline;
+            public DateTime NextEventCheck;
         }
 
         private readonly BridgeConfig _config;
@@ -27,6 +32,7 @@ namespace PawnMind.Bridge
         private readonly Func<string, string> _actionHandler;
         private readonly Action<string> _log;
         private readonly string _version;
+        private readonly Func<long> _revision;
         private readonly List<Client> _clients = new List<Client>();
 
         private TcpListener _listener;
@@ -37,7 +43,8 @@ namespace PawnMind.Bridge
             Func<string> stateProvider,
             Func<string, string> actionHandler,
             Action<string> log,
-            string version = "unknown")
+            string version = "unknown",
+            Func<long> revisionProvider = null)
         {
             if (config == null) throw new ArgumentNullException("config");
             if (stateProvider == null) throw new ArgumentNullException("stateProvider");
@@ -48,6 +55,7 @@ namespace PawnMind.Bridge
             _actionHandler = actionHandler;
             _log = log ?? delegate { };
             _version = string.IsNullOrEmpty(version) ? "unknown" : version;
+            _revision = revisionProvider;
         }
 
         public void Start()
@@ -106,6 +114,12 @@ namespace PawnMind.Bridge
                         continue;
                     }
 
+                    if (client.WaitingEvents)
+                    {
+                        TickEvents(client);
+                        continue;
+                    }
+
                     if (!ReadAvailable(client))
                     {
                         Close(client);
@@ -115,8 +129,9 @@ namespace PawnMind.Bridge
                     string raw;
                     if (!TryComplete(client, out raw)) continue;
 
-                    HandleRaw(client.Socket, raw);
-                    Close(client);
+                    HandleRaw(client, raw);
+                    client.Buffer.SetLength(0);
+                    if (!client.WaitingEvents) Close(client);
                 }
                 catch (Exception e)
                 {
@@ -222,8 +237,9 @@ namespace PawnMind.Bridge
             return true;
         }
 
-        private void HandleRaw(Socket socket, string raw)
+        private void HandleRaw(Client client, string raw)
         {
+            Socket socket = client.Socket;
             HttpRequest request;
             string parseError;
             if (!HttpRequestParser.TryParse(raw, out request, out parseError))
@@ -265,6 +281,16 @@ namespace PawnMind.Bridge
                     Respond(socket, 200, "OK", _actionHandler(request.Body));
                     return;
 
+                case RouteKind.Events:
+                    if (!Authorized(request))
+                    {
+                        Respond(socket, 401, "Unauthorized", ErrorJson("unauthorized"));
+                        return;
+                    }
+
+                    HandleEvents(client, request);
+                    return;
+
                 case RouteKind.MethodNotAllowed:
                     Respond(socket, 405, "Method Not Allowed", ErrorJson("method_not_allowed"));
                     return;
@@ -272,6 +298,67 @@ namespace PawnMind.Bridge
                 default:
                     Respond(socket, 404, "Not Found", ErrorJson("not_found"));
                     return;
+            }
+        }
+
+        private void HandleEvents(Client client, HttpRequest request)
+        {
+            EventQuery query = EventQueryParser.Parse(request.Query);
+            long current = _revision == null ? 0 : _revision();
+            if (query.Since < 0 || current != query.Since)
+            {
+                string state = _stateProvider();
+                long rev = _revision == null ? ExtractRev(state) : _revision();
+                Respond(client.Socket, 200, "OK", ChangedJson(rev, state));
+                return;
+            }
+
+            client.WaitingEvents = true;
+            client.EventSince = query.Since;
+            client.EventDeadline = DateTime.UtcNow.AddMilliseconds(query.TimeoutMs);
+            client.NextEventCheck = DateTime.UtcNow;
+            client.Deadline = client.EventDeadline.AddSeconds(5);
+        }
+
+        private void TickEvents(Client client)
+        {
+            DateTime now = DateTime.UtcNow;
+            if (now >= client.EventDeadline)
+            {
+                long rev = _revision == null ? 0 : _revision();
+                Respond(client.Socket, 200, "OK",
+                    "{\"ok\":true,\"rev\":" + rev + ",\"changed\":false,\"timeout\":true}");
+                Close(client);
+                return;
+            }
+
+            if (now < client.NextEventCheck) return;
+            client.NextEventCheck = now.AddMilliseconds(200);
+
+            string state = _stateProvider();
+            long current = _revision == null ? ExtractRev(state) : _revision();
+            if (current == client.EventSince) return;
+
+            Respond(client.Socket, 200, "OK", ChangedJson(current, state));
+            Close(client);
+        }
+
+        private static string ChangedJson(long rev, string state)
+        {
+            return "{\"ok\":true,\"rev\":" + rev + ",\"changed\":true,\"state\":" + (state ?? "{}") + "}";
+        }
+
+        private static long ExtractRev(string state)
+        {
+            try
+            {
+                JObject json = JObject.Parse(state);
+                JToken rev = json["rev"];
+                return rev == null ? 0 : (long)rev;
+            }
+            catch
+            {
+                return 0;
             }
         }
 

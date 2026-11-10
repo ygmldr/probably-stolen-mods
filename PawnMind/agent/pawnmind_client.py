@@ -57,7 +57,7 @@ class BridgeClient:
         # Never let a local bridge follow a redirect and forward the bearer token.
         self.opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
-    def request(self, method, path, payload=None, auth=True):
+    def request(self, method, path, payload=None, auth=True, timeout=None):
         url = "http://127.0.0.1:%d%s" % (self.port, path)
         headers = {"Content-Type": "application/json"}
         if auth:
@@ -67,7 +67,7 @@ class BridgeClient:
         request = urllib.request.Request(url, data=data, method=method, headers=headers)
 
         try:
-            with self.opener.open(request, timeout=self.timeout) as response:
+            with self.opener.open(request, timeout=self.timeout if timeout is None else timeout) as response:
                 return json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as error:
             body = error.read().decode("utf-8", "replace")
@@ -80,6 +80,10 @@ class BridgeClient:
 
     def get_state(self):
         return self.request("GET", "/state")
+
+    def wait_events(self, since_rev=-1, timeout_ms=25000):
+        path = "/events?since=%d&timeout_ms=%d" % (int(since_rev), int(timeout_ms))
+        return self.request("GET", path, timeout=timeout_ms / 1000.0 + 5.0)
 
     def action(self, op, **args):
         payload = {"op": op, "action_id": args.pop("action_id", str(uuid.uuid4()))}

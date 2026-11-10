@@ -45,7 +45,8 @@ public sealed class PawnMindMod : IMod
                 StateSnapshot.BuildJson,
                 _router.Handle,
                 delegate(string message) { Debug.LogWarning(message); },
-                _manifest == null ? "unknown" : _manifest.ModVersion);
+                _manifest == null ? "unknown" : _manifest.ModVersion,
+                delegate { return StateSnapshot.CurrentRevision; });
 
             MainThreadPump pump = _pumpObject.AddComponent<MainThreadPump>();
             pump.Initialize(_server);

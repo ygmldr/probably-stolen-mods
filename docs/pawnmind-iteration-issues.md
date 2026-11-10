@@ -22,7 +22,7 @@
 | 11 | F7 / `debug_pulse` 日志行未出现在 `Player.log` | dump 文件正常，pulse 无日志 | 切 ModLog 或写文件确认 |
 | 12 | 测试档槽位会累积（每次 `new_game` 新建） | 内存/存档列表变长 | 提供测试档清理或复用 |
 | 13 | UI 快照只覆盖 `TabletButton` + 标准 `Button` | 开关/输入框/拖拽未纳入 | P2/P3 遇到再补 |
-| 14 | 事件推送未做（仍轮询） | `wait_until` 是 polling | P5 后评估 |
+| 14 | ~~事件推送未做~~ 已解决 | `/events` 长轮询 + `wait_for_events`；真机 change/timeout 均通过 | `wait_for_change` 条件仍轮询 |
 | 15 | 启动物品全是矩形，异形 mask 未真机验证 | 起始背包 mask 都是全 1 | 遇到枪/工具时补样本 |
 
 | 16 | `end_day` 在部分店态返回 `cannot_end_day` | day2 开店后直接 end_day 失败，sleep 仍可推进 | 补店态判断或文档说明 |

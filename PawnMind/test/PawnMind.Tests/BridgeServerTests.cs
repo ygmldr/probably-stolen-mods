@@ -165,6 +165,39 @@ namespace PawnMind.Tests
         }
 
         [Test]
+        public static void Http_Events_Times_Out()
+        {
+            WithServer(delegate { return "{\"rev\":0}"; }, delegate(string body) { return "{}"; }, delegate(int port)
+            {
+                string response = Get(port, "/events?since=0&timeout_ms=300", Token);
+                Assert.Contains(response, "200 OK", "event status");
+                Assert.Contains(response, "\"timeout\":true", "timeout body");
+            });
+        }
+
+        [Test]
+        public static void Http_Events_Returns_On_Revision_Change()
+        {
+            int rev = 0;
+            WithServer(delegate { return "{\"rev\":" + rev + "}"; }, delegate(string body) { return "{}"; }, delegate(int port)
+            {
+                var bump = new System.Threading.Thread(delegate()
+                {
+                    System.Threading.Thread.Sleep(150);
+                    rev = 1;
+                });
+                bump.IsBackground = true;
+                bump.Start();
+
+                string response = Get(port, "/events?since=0&timeout_ms=3000", Token);
+                Assert.Contains(response, "200 OK", "event status");
+                Assert.Contains(response, "\"changed\":true", "changed body");
+                Assert.Contains(response, "\"rev\":1", "new revision");
+                bump.Join(1000);
+            });
+        }
+
+        [Test]
         public static void Http_Action_Ping_Roundtrip()
         {
             WithServer(delegate { return "{}"; }, delegate(string body) { return "{\"ok\":true,\"pong\":true}"; }, delegate(int port)

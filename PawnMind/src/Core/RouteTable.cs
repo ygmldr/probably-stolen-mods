@@ -7,6 +7,7 @@ namespace PawnMind.Core
         Health,
         State,
         Action,
+        Events,
         NotFound,
         MethodNotAllowed
     }
@@ -26,6 +27,9 @@ namespace PawnMind.Core
 
             if (normalizedPath == "/action")
                 return normalizedMethod == "POST" ? RouteKind.Action : RouteKind.MethodNotAllowed;
+
+            if (normalizedPath == "/events")
+                return normalizedMethod == "GET" ? RouteKind.Events : RouteKind.MethodNotAllowed;
 
             return RouteKind.NotFound;
         }
