@@ -378,6 +378,13 @@ machine_collect(slot4) -> 回背包
 - 机器在**日结/睡觉**时 tick，不是实时；背包里也会处理
 - `junk` 需要垃圾处理模块，普通废金属不需要
 
+## 远征（2026-11-10）
+
+- `debug_unlock_expedition`（test-only）：解锁并生成 Juan
+- `dispatch_expedition(hireling_id, location_id)`：派遣到 dumping_grounds
+- `advance_expedition(expedition_id)`：推进一步
+- 真机：解锁→Juan→派遣→turn=12→首次 advance ok；第二次 advance 偶发 NRE（游戏 POI 逻辑）
+
 ## P10 世界快照（2026-11-10）
 
 - `expedition_status`：unlocked、地点、雇佣兵、进行中远征

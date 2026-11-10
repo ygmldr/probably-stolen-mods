@@ -164,6 +164,29 @@ public sealed class PawnMindMod : IMod
                     (string)request["identifier"],
                     ReadInt(request, "count", 1)));
 
+            case "list_services":
+                return ActionResult.SuccessRaw("list_services", ServiceStatusService.ListServicesJson());
+
+            case "toggle_service":
+                return ActionResult.SuccessRaw("toggle_service", ServiceStatusService.ToggleServiceJson(
+                    (string)request["id"],
+                    request["on"] == null || (bool)request["on"]));
+
+            case "husbandry_status":
+                return ActionResult.SuccessRaw("husbandry_status", ServiceStatusService.HusbandryJson());
+
+            case "debug_unlock_expedition":
+                return ActionResult.SuccessRaw("debug_unlock_expedition", ExpeditionService.UnlockJson(_allowTestItems));
+
+            case "dispatch_expedition":
+                return ActionResult.SuccessRaw("dispatch_expedition", ExpeditionService.DispatchJson(
+                    (string)request["hireling_id"],
+                    (string)request["location_id"]));
+
+            case "advance_expedition":
+                return ActionResult.SuccessRaw("advance_expedition", ExpeditionService.AdvanceJson(
+                    (string)request["expedition_id"]));
+
             case "expedition_status":
                 return ActionResult.SuccessRaw("expedition_status", WorldStatusService.ExpeditionJson());
 

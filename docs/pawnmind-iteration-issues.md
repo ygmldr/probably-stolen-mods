@@ -87,6 +87,13 @@
 | 43 | 养殖/保险/天气未接 | 只有远征/事件/招牌 | P10 后段 |
 | 44 | 启动时偶发 AdvCalendar 崩溃 | `AudioSource.Play` on CloseUI | 与本 Mod 无关，重启可恢复 |
 
+### 远征动作
+
+| # | 问题 | 证据 | 下一步 |
+|---|---|---|---|
+| 45 | `advance_expedition` 偶发 NRE | 第二次 advance `Object reference`；首次 ok | 包 try/catch 已有，需定位 POI 空引用 |
+| 46 | `Expedition.id` 初始为空 | ongoing id=null | 已分配 `exp_<ticks>` |
+
 ### 已解决
 
 | # | 问题 | 解决 |
@@ -176,6 +183,13 @@
 | 42 | 远征未解锁/无雇佣兵 | `unlocked=false`, hirelings=[] | 需要解锁流程/雇佣动作 |
 | 43 | 养殖/保险/天气未接 | 只有远征/事件/招牌 | P10 后段 |
 | 44 | 启动时偶发 AdvCalendar 崩溃 | `AudioSource.Play` on CloseUI | 与本 Mod 无关，重启可恢复 |
+
+### 远征动作
+
+| # | 问题 | 证据 | 下一步 |
+|---|---|---|---|
+| 45 | `advance_expedition` 偶发 NRE | 第二次 advance `Object reference`；首次 ok | 包 try/catch 已有，需定位 POI 空引用 |
+| 46 | `Expedition.id` 初始为空 | ongoing id=null | 已分配 `exp_<ticks>` |
 
 ### 已解决
 - [x] 问题 -> 解决方式 / 测试

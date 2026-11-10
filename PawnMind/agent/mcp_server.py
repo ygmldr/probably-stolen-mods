@@ -156,6 +156,31 @@ def build_server(client):
         return client.action("use_tool", tool_id=tool_id, target_id=target_id, rev=rev)
 
     @server.tool()
+    def list_services() -> dict:
+        """Nightly services (insurance, janitorial, power, informant) and toggles."""
+        return client.action("list_services")
+
+    @server.tool()
+    def toggle_service(id: str, on: bool, rev: int) -> dict:
+        """Toggle a nightly service on/off."""
+        return client.action("toggle_service", id=id, on=on, rev=rev)
+
+    @server.tool()
+    def husbandry_status() -> dict:
+        """Owned animals/fish with health/dead state."""
+        return client.action("husbandry_status")
+
+    @server.tool()
+    def dispatch_expedition(hireling_id: str, location_id: str, rev: int) -> dict:
+        """Send a hireling to an unlocked expedition location."""
+        return client.action("dispatch_expedition", hireling_id=hireling_id, location_id=location_id, rev=rev)
+
+    @server.tool()
+    def advance_expedition(expedition_id: str, rev: int) -> dict:
+        """Advance an ongoing expedition one step."""
+        return client.action("advance_expedition", expedition_id=expedition_id, rev=rev)
+
+    @server.tool()
     def expedition_status() -> dict:
         """Expedition unlock, locations, hirelings and ongoing runs."""
         return client.action("expedition_status")
