@@ -156,6 +156,36 @@ def build_server(client):
         return client.action("use_tool", tool_id=tool_id, target_id=target_id, rev=rev)
 
     @server.tool()
+    def list_labels(item_id: int) -> dict:
+        """List editable label categories and conditions for an item."""
+        return client.action("list_labels", item_id=item_id)
+
+    @server.tool()
+    def set_label(item_id: int, category: str, condition_id: str, rev: int) -> dict:
+        """Set one editable label condition on an item."""
+        return client.action("set_label", item_id=item_id, category=category, condition_id=condition_id, rev=rev)
+
+    @server.tool()
+    def list_analyzers() -> dict:
+        """List owned analyzers (water strip/aquascan, chem scanner, plant analyzer, gene scanner)."""
+        return client.action("list_analyzers")
+
+    @server.tool()
+    def analyze_item(analyzer_id: int, target_id: int, rev: int) -> dict:
+        """Run an analyzer on a target and return its visible result fields."""
+        return client.action("analyze_item", analyzer_id=analyzer_id, target_id=target_id, rev=rev)
+
+    @server.tool()
+    def set_pen_mode(pen_id: int, mode: int, rev: int) -> dict:
+        """Set marking pen mode: 0 red, 1 purple, 2 green, 3 blue, 4 orange, 5 eraser."""
+        return client.action("set_pen_mode", pen_id=pen_id, mode=mode, rev=rev)
+
+    @server.tool()
+    def list_marks() -> dict:
+        """List marked fish/animals with their color."""
+        return client.action("list_marks")
+
+    @server.tool()
     def list_containers() -> dict:
         """List player containers (main/front/back/showcase/hidden/afterhour/trash/sold) with counts."""
         return client.action("list_containers")

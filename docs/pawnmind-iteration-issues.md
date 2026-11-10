@@ -37,7 +37,9 @@
 | 20 | 标签机目标判定严格 | `use_tool(labeler, 代糖果汁)` -> `cannot_target` | 用带可编辑标签的水/液体测 |
 | 21 | 分析仪结果尚无结构化接口 | 只有 UI | P6 下一步 |
 | 22 | `debug_grant fish_tilapia` 第二次 NRE | 首次可生成；鱼无 identifier、初始 owned=false | 修 fish 创建/去重；已能标记 |
-| 23 | 标记笔只有默认色，未接 `set_pen_mode` | 标记成功 color=0 | P6 下一步 |
+| 23 | ~~标记笔只有默认色~~ 已解决 | `set_pen_mode` 绿色，`list_marks` 返回 color_id=green | — |
+| 24 | 标签条件 ID 是本地化显示串 | `CATEGORY_WATER_PURITY` 的 id 为“纯水/沟渠水” | 换语言/版本会变；需按索引/常量映射 |
+| 25 | `debug_grant fish_tilapia` 重复调用 NRE | 鱼无 identifier、初始 owned=false | 修 fish 创建/去重 |
 
 ### 已解决
 
@@ -71,7 +73,9 @@
 | 20 | 标签机目标判定严格 | `use_tool(labeler, 代糖果汁)` -> `cannot_target` | 用带可编辑标签的水/液体测 |
 | 21 | 分析仪结果尚无结构化接口 | 只有 UI | P6 下一步 |
 | 22 | `debug_grant fish_tilapia` 第二次 NRE | 首次可生成；鱼无 identifier、初始 owned=false | 修 fish 创建/去重；已能标记 |
-| 23 | 标记笔只有默认色，未接 `set_pen_mode` | 标记成功 color=0 | P6 下一步 |
+| 23 | ~~标记笔只有默认色~~ 已解决 | `set_pen_mode` 绿色，`list_marks` 返回 color_id=green | — |
+| 24 | 标签条件 ID 是本地化显示串 | `CATEGORY_WATER_PURITY` 的 id 为“纯水/沟渠水” | 换语言/版本会变；需按索引/常量映射 |
+| 25 | `debug_grant fish_tilapia` 重复调用 NRE | 鱼无 identifier、初始 owned=false | 修 fish 创建/去重 |
 
 ### 已解决
 - [x] 问题 -> 解决方式 / 测试

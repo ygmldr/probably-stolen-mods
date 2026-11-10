@@ -159,6 +159,32 @@ public sealed class PawnMindMod : IMod
                     (string)request["identifier"],
                     ReadInt(request, "count", 1)));
 
+            case "list_labels":
+                return ActionResult.SuccessRaw("list_labels", LabelService.ListJson(
+                    ReadInt(request, "item_id", -1)));
+
+            case "set_label":
+                return ActionResult.SuccessRaw("set_label", LabelService.SetJson(
+                    ReadInt(request, "item_id", -1),
+                    (string)request["category"],
+                    (string)request["condition_id"]));
+
+            case "list_analyzers":
+                return ActionResult.SuccessRaw("list_analyzers", AnalyzerService.ListJson());
+
+            case "analyze_item":
+                return ActionResult.SuccessRaw("analyze_item", AnalyzerService.AnalyzeJson(
+                    ReadInt(request, "analyzer_id", -1),
+                    ReadInt(request, "target_id", -1)));
+
+            case "set_pen_mode":
+                return ActionResult.SuccessRaw("set_pen_mode", MarkingPenService.SetModeJson(
+                    ReadInt(request, "pen_id", -1),
+                    ReadInt(request, "mode", -1)));
+
+            case "list_marks":
+                return ActionResult.SuccessRaw("list_marks", MarkingPenService.ListMarksJson());
+
             case "list_interactions":
                 return ActionResult.SuccessRaw("list_interactions", InteractionService.ListJson(
                     ReadInt(request, "item_id", -1)));
