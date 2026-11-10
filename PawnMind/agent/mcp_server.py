@@ -156,6 +156,11 @@ def build_server(client):
         return client.action("use_tool", tool_id=tool_id, target_id=target_id, rev=rev)
 
     @server.tool()
+    def security_status() -> dict:
+        """Security evidence, crimes, case officer and current inspection item."""
+        return client.action("security_status")
+
+    @server.tool()
     def list_services() -> dict:
         """Nightly services (insurance, janitorial, power, informant) and toggles."""
         return client.action("list_services")

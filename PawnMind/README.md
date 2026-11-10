@@ -342,6 +342,12 @@ curl http://127.0.0.1:15528/health
 curl -H "Authorization: Bearer <token>" http://127.0.0.1:15528/state
 ```
 
+## 陈酿（2026-11-10）
+
+- 催陈器 4 槽；slot2 放成品酒
+- `wine_status` 现在能在机器槽里找到酒（`FindItemAnywhere` 已扫机器）
+- 真机：荧光莓果酿入槽，睡 1 天 quality_tier 仍=2（陈酿效果需多日/进一步验证）
+
 ## 酿酒全流程（2026-11-10）
 
 ```

@@ -164,6 +164,9 @@ public sealed class PawnMindMod : IMod
                     (string)request["identifier"],
                     ReadInt(request, "count", 1)));
 
+            case "security_status":
+                return ActionResult.SuccessRaw("security_status", SecurityService.StatusJson());
+
             case "list_services":
                 return ActionResult.SuccessRaw("list_services", ServiceStatusService.ListServicesJson());
 

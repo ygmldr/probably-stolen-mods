@@ -125,6 +125,9 @@ namespace PawnMind.AdapterTests
             CheckMethod(assembly, "MachineHelper", "GetBodyStorage");
             CheckMethod(assembly, "MachineHelper", "GetSlot");
             CheckMethod(assembly, "MachineProgressHelper", "GetMachineState");
+            CheckField(assembly, "PlayerStore", "secData");
+            CheckField(assembly, "SecData", "evidenceLevel");
+            CheckField(assembly, "SecData", "crimeTypes");
             CheckMethod(assembly, "StoreService", "FindServiceByID");
             CheckField(assembly, "PlayerStore", "storeService");
             CheckMethod(assembly, "ExpeditionData", "UnlockExpedition");

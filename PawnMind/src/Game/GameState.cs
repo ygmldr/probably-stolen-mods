@@ -428,6 +428,36 @@ namespace PawnMind.Game
                 }
             }
 
+            GameItem machineItem = FindInMachines(uniqueId);
+            if (machineItem != null) return machineItem;
+
+            return null;
+        }
+
+        private static GameItem FindInMachines(int uniqueId)
+        {
+            try
+            {
+                List<GameItem> machines = EmporiumEntry.Instance.GetAllOwnedItemsByTag("STANDARD_MACHINE_TAG");
+                for (int i = 0; i < machines.Count; i++)
+                {
+                    for (int slot = 0; slot < 24; slot++)
+                    {
+                        GraphNodeStorage storage = null;
+                        try { storage = MachineHelper.GetBodyStorage(machines[i], slot); } catch { }
+                        var inventory = storage as GameInventory;
+                        if (inventory == null) continue;
+
+                        List<GameItem> items = inventory.childItems;
+                        for (int j = 0; j < items.Count; j++)
+                        {
+                            if (items[j] != null && items[j].GetUniqueID() == uniqueId) return items[j];
+                        }
+                    }
+                }
+            }
+            catch { }
+
             return null;
         }
 
