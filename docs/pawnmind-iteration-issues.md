@@ -56,6 +56,14 @@
 | 29 | 测试档第 1 天未解锁彩票 | `lottery_status.unlocked=false`，edition 1405 | 需要第 14 天后或注入开奖号测兑奖 |
 | 30 | 无中奖号时兑奖正确拒绝 | `cannot_redeem` | 到期/中奖票再验 |
 
+### P8 机器
+
+| # | 问题 | 证据 | 下一步 |
+|---|---|---|---|
+| 34 | 机器槽位放入被拒 | 熔炉 5 槽全部 `cannot_insert`，水培 READY | 查供电/槽位过滤/电池 |
+| 35 | 启动/收取未实现 | 只有 list/status | 接 `StartProgressTypeMachine` + 产物槽 |
+| 36 | 酿酒未接 | `WineHelper` 已定位 | P8 后段 |
+
 ### 已解决
 
 | # | 问题 | 解决 |
@@ -114,6 +122,14 @@
 |---|---|---|---|
 | 29 | 测试档第 1 天未解锁彩票 | `lottery_status.unlocked=false`，edition 1405 | 需要第 14 天后或注入开奖号测兑奖 |
 | 30 | 无中奖号时兑奖正确拒绝 | `cannot_redeem` | 到期/中奖票再验 |
+
+### P8 机器
+
+| # | 问题 | 证据 | 下一步 |
+|---|---|---|---|
+| 34 | 机器槽位放入被拒 | 熔炉 5 槽全部 `cannot_insert`，水培 READY | 查供电/槽位过滤/电池 |
+| 35 | 启动/收取未实现 | 只有 list/status | 接 `StartProgressTypeMachine` + 产物槽 |
+| 36 | 酿酒未接 | `WineHelper` 已定位 | P8 后段 |
 
 ### 已解决
 - [x] 问题 -> 解决方式 / 测试

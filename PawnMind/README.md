@@ -342,6 +342,14 @@ curl http://127.0.0.1:15528/health
 curl -H "Authorization: Bearer <token>" http://127.0.0.1:15528/state
 ```
 
+## 机器（2026-11-10）
+
+- `list_machines`：按 `STANDARD_MACHINE_TAG` 枚举；返回 state/progress/slots
+- `machine_status`：槽位与内容
+- `machine_insert` / `machine_collect`：槽位放入/取回
+- 真机：熔炉 5 槽、水培 6 槽（STATE_READY）；放入垃圾被拒（未供电/槽位过滤）
+- 启动/收取/供电下一步
+
 ## P6/P7 扩展（2026-11-10）
 
 - 通用交互：`list_interactions` / `activate_item` / `toggle_item` / `use_tool`

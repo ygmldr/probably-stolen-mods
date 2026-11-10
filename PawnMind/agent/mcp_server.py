@@ -156,6 +156,26 @@ def build_server(client):
         return client.action("use_tool", tool_id=tool_id, target_id=target_id, rev=rev)
 
     @server.tool()
+    def list_machines() -> dict:
+        """List owned standard machines with state, progress and slots."""
+        return client.action("list_machines")
+
+    @server.tool()
+    def machine_status(machine_id: int) -> dict:
+        """Show one machine's slots and contents."""
+        return client.action("machine_status", machine_id=machine_id)
+
+    @server.tool()
+    def machine_insert(machine_id: int, slot: int, item_id: int, rev: int) -> dict:
+        """Insert an inventory item into a machine slot."""
+        return client.action("machine_insert", machine_id=machine_id, slot=slot, item_id=item_id, rev=rev)
+
+    @server.tool()
+    def machine_collect(machine_id: int, slot: int, rev: int) -> dict:
+        """Move items from a machine slot back to the backpack."""
+        return client.action("machine_collect", machine_id=machine_id, slot=slot, rev=rev)
+
+    @server.tool()
     def list_upgrades() -> dict:
         """List network/store upgrades with cost/unlock/prerequisite state."""
         return client.action("list_upgrades")

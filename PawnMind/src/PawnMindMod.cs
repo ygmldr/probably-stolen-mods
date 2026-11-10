@@ -159,6 +159,24 @@ public sealed class PawnMindMod : IMod
                     (string)request["identifier"],
                     ReadInt(request, "count", 1)));
 
+            case "list_machines":
+                return ActionResult.SuccessRaw("list_machines", MachineService.ListJson());
+
+            case "machine_status":
+                return ActionResult.SuccessRaw("machine_status", MachineService.StatusJson(
+                    ReadInt(request, "machine_id", -1)));
+
+            case "machine_insert":
+                return ActionResult.SuccessRaw("machine_insert", MachineService.InsertJson(
+                    ReadInt(request, "machine_id", -1),
+                    ReadInt(request, "slot", -1),
+                    ReadInt(request, "item_id", -1)));
+
+            case "machine_collect":
+                return ActionResult.SuccessRaw("machine_collect", MachineService.CollectJson(
+                    ReadInt(request, "machine_id", -1),
+                    ReadInt(request, "slot", -1)));
+
             case "list_upgrades":
                 return ActionResult.SuccessRaw("list_upgrades", UpgradeService.ListJson());
 
