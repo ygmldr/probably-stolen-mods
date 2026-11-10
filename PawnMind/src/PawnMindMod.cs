@@ -164,6 +164,9 @@ public sealed class PawnMindMod : IMod
                     (string)request["identifier"],
                     ReadInt(request, "count", 1)));
 
+            case "contraband_status":
+                return ActionResult.SuccessRaw("contraband_status", ContrabandService.StatusJson());
+
             case "security_status":
                 return ActionResult.SuccessRaw("security_status", SecurityService.StatusJson());
 

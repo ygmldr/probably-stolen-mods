@@ -156,6 +156,11 @@ def build_server(client):
         return client.action("use_tool", tool_id=tool_id, target_id=target_id, rev=rev)
 
     @server.tool()
+    def contraband_status() -> dict:
+        """Owned contraband/stolen items with levels and risk flags."""
+        return client.action("contraband_status")
+
+    @server.tool()
     def security_status() -> dict:
         """Security evidence, crimes, case officer and current inspection item."""
         return client.action("security_status")

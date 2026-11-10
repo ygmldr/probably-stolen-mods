@@ -65,3 +65,6 @@
 - 远征第二次 `advance_expedition` 触发游戏 POI NRE，已 `EndExpedition` 收尾。
 - 安检/突袭、天气、陈酿架、养殖投喂未接。
 - 需求/通缉/Barter 成功路径未遇到样本。
+
+- 突袭战斗未接（RaidManager 需要 RaidScene，未暴露只读入口）。
+- 陈酿 1 天无品质变化，需多日验证。

@@ -125,6 +125,9 @@ namespace PawnMind.AdapterTests
             CheckMethod(assembly, "MachineHelper", "GetBodyStorage");
             CheckMethod(assembly, "MachineHelper", "GetSlot");
             CheckMethod(assembly, "MachineProgressHelper", "GetMachineState");
+            CheckMethod(assembly, "ContrabandHelper", "GetContrabandLevelInInt");
+            CheckMethod(assembly, "ContrabandHelper", "IsContraband");
+            CheckMethod(assembly, "StolenHelper", "IsStolenItem");
             CheckField(assembly, "PlayerStore", "secData");
             CheckField(assembly, "SecData", "evidenceLevel");
             CheckField(assembly, "SecData", "crimeTypes");

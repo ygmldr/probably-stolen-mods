@@ -416,6 +416,12 @@ machine_collect(slot4) -> 回背包
 - `caffeine_pill`：68.06% 街头标准
 - 空瓶/药品瓶没有化扫数据，字段为空属正常
 
+## 安检/违禁品（2026-11-10）
+
+- `security_status`：证据等级/犯罪/案卷/脏水/错标/坏化学品/贿赂
+- `contraband_status`：自有违禁品/赃物 + level/high_risk
+- 真机：当前均为空/0
+
 ## P6/P7 扩展（2026-11-10）
 
 - 通用交互：`list_interactions` / `activate_item` / `toggle_item` / `use_tool`
