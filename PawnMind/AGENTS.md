@@ -46,3 +46,48 @@
 - revision 不匹配的动作一律拒绝
 - 写操作失败不得留下半状态
 - 日志与错误响应不得包含 token
+
+## 当前版本与架构（2026-11-11）
+
+- Git tag：`v1.0.1`；`manifest.xml` 仍是 0.2.1（发版前同步）。
+- 测试：C# 144 项 + 适配器契约 + Python 8 项。
+- 89 个 MCP 工具；入口 `agent/mcp_server.py`，HTTP 客户端 `agent/pawnmind_client.py`。
+- `agent/orchestrator.py` 只有确定性 `RulePolicy`，还不是 LLM agent。
+
+```
+src/Core/   纯逻辑，禁止 UnityEngine
+src/Bridge/ HTTP + 鉴权 + rev + 快照 + 动作
+src/Game/   唯一允许反射/直连游戏类型；主线程
+test/PawnMind.Tests/        纯逻辑
+test/PawnMind.AdapterTests/ 对 Assembly-CSharp.dll 的契约
+agent/mcp_server.py         stdio MCP
+```
+
+## MCP / Agent 层约定
+
+- MCP 工具必须**单步**：做一件事，回读状态；不要在一个工具里偷偷做多步。
+- 所有写动作要 `rev`；HTTP 层同时支持 `action_id` 幂等。
+- 错误码要稳定、可判断：`stale_rev`、`no_client`、`cannot_report`、`not_fillable` 等。
+- 不把隐藏字段（鉴定答案、隐藏身份、真实水质）暴露给 MCP。
+- 不提供任意代码执行、任意文件读写、`AddCredit`、生成物品。
+- 新增 MCP 工具时，先在 `agent/tests/` 加工具注册/参数测试；C# 侧若新增游戏成员，先补适配器契约。
+- `new_game` 只用于新档，不得在自动化/真机测试中调用；测试统一槽 17。
+
+## 审查入口
+
+1. 先读仓库根 `README.md` 和本文件。
+2. 对照 `docs/pawnmind-capability-matrix.zh-CN.md` 检查每个“真机/代码/未接”的声明。
+3. 重点看 `src/Bridge/`（rev/token/主线程/回滚）和 `src/Game/`（隐藏字段/反射边界）。
+4. 跑 `./test.sh` 和 `.venv/bin/python -m unittest discover -s agent/tests`。
+5. 不要动用户存档；只允许槽 17。
+
+## 已知“不是 bug 但别误判”
+
+- 远征（Expedition）是 debug-only/未上线内容；正常 Perk 不启用，`debug_unlock_expedition` 只测试。
+- 突袭（RaidScene）是独立飞船/站点战斗脚手架，正常开店流程不可达。
+- 需求/通缉/Barter 只验了错误路径，成功路径缺样本。
+- WildNetworkUI 未接，用 `list_upgrades`/`buy_upgrade` 替代。
+- 陈酿只验了入槽；1 天品质未变化，需多日验证。
+- 标签条件 ID 是本地化显示串（如“纯水”）。
+- 彩票兑奖成功路径未验（测试档未解锁/无中奖号）。
+- 没有视觉鉴定，没有 LLM agent loop。

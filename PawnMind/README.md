@@ -1,24 +1,124 @@
 # PawnMind · 深空当铺 AI 接口
 
-给《深空当铺：可能是偷的》(Probably Stolen 0.46D) 做的本地 MCP 桥。
-当前是 **M0**：只读状态 + 本机 HTTP，不含任何经营动作。
+给《深空当铺：可能是偷的》(Probably Stolen 0.46D) 做的本地桥：
+游戏内 Mod 暴露 HTTP，Python 再包一层 stdio MCP，供 DSH/脚本/AI 调用。
 
-> 另有一个第三方实验项目 `probably-stolen-mcp-releases`（端口 15527）。
-> 本项目默认端口 **15528**，两者可以共存，但不要同时启用。
+> **当前状态：v1.0.1（2026-11-11）**
+> MCP 工具 89 个；C# 144 项 + 适配器契约 + Python 8 项全绿。
+> 还没有视觉鉴定，也没有 LLM agent loop；`agent/orchestrator.py` 只有规则基线。
+> 下方保留的是按时间追加的历史验证记录；**最新能力/限制以本段、根 README 和 docs 为准。**
 
-## 现在能做什么
+## 这是什么
 
-- 游戏内 Mod 启动一个只监听 `127.0.0.1` 的 HTTP 服务
-- `GET /health`：存活检查（无需 token）
-- `GET /state`：当前可见状态快照（需要 token）
-  - 现金、房租倒计时、开局日、顾客是否到场
-  - 当前顾客：名字、意图、现金、耐心、是否可砍价、阵营
-  - 当前议价物品：名字、identifier、数量、当前估值
-- `POST /action`：目前只支持 `{"op":"ping"}`，用于验证往返
+- **Mod 侧**：`PawnMind.dll` 在 Unity 主线程上读写游戏状态，监听 `127.0.0.1:15528`
+- **HTTP 侧**：`/health`、`/state`、`/action`、`/events`；Bearer token + `rev` + `action_id`
+- **MCP 侧**：`agent/mcp_server.py` 把动作包成 89 个 MCP 工具
+- **Agent 侧**：`agent/orchestrator.py` 提供 observe→decide→act 骨架；`RulePolicy` 只用于验证管线
 
-M1（v0.2.0）新增动作：`open_shop`、`call_next_customer`、`advance_dialogue`、`choose_dialogue`、`end_day`、`bargain`，全部带 `rev` 校验和 `action_id` 幂等。
+## 架构
 
-仍然**不读**隐藏字段（鉴定答案、隐藏身份），也还没有实现买卖成交（`confirm_trade` 在 M1.1）。
+```
+Unity Game (main thread)
+   │ 反射/强类型适配
+   ▼
+PawnMind.dll ── HTTP 127.0.0.1:15528 ── Python MCP stdio ── DSH / 脚本
+   │ Bearer / rev / action_id              │
+   │ MainThreadPump                         ▼
+   └──────────────────────────────────  AI
+```
+
+| 层 | 路径 | 规则 |
+|---|---|---|
+| 纯逻辑 | `src/Core/` | 禁止 `UnityEngine` / 游戏类型 |
+| 桥接 | `src/Bridge/` | HTTP、鉴权、rev、快照、动作路由 |
+| 游戏适配 | `src/Game/` | 唯一允许反射/直连游戏类型；主线程 |
+| 测试 | `test/PawnMind.Tests/` | 纯逻辑，最快 |
+| 契约 | `test/PawnMind.AdapterTests/` | 对 `Assembly-CSharp.dll` 断言成员存在 |
+| MCP | `agent/mcp_server.py` | 工具参数/错误码对 AI 友好 |
+| 客户端 | `agent/pawnmind_client.py` | HTTP + `/events` 长轮询 |
+
+## 文档导航
+
+- [仓库总览](../README.md)
+- [能力矩阵](../docs/pawnmind-capability-matrix.zh-CN.md)
+- [已知限制](../docs/pawnmind-known-limitations.zh-CN.md)
+- [迭代问题](../docs/pawnmind-iteration-issues.md)
+- [系统扩展计划](../docs/pawnmind-systems-expansion-plan.zh-CN.md)
+- [测试档说明](../docs/pawnmind-test-save.md)
+
+## 当前能力（按系统）
+
+| 系统 | 已接 |
+|---|---|
+| 观察 | 日期/现金/店态/顾客/意图/预算/是否通缉、对话正文+选项、议价物、背包/布局、合法动作、run summary |
+| 经营 | 开店、叫客、对话/选项、买卖、砍价、关店/睡觉、存读档 |
+| 物品 | 背包分页、精确形状/旋转、二维布局、自动重排、阅读/书籍 |
+| 夜间 | 垃圾场、配给站、杰克逊博士、搜刮、补给站代币、批发 |
+| 机器 | 枚举/状态/槽位/放入/收取、熔炉、水培、酿酒、催陈器入酒 |
+| 交互 | activate/toggle/target、水质/植物/化扫/基因分析仪、标签、鱼类标记笔 |
+| 电话/网络 | 联系人/拨号/选项/挂断、供应商订货、网络升级、彩票只读+兑奖 |
+| 社交/风险 | 派系、健康、需求、通缉、Barter、举报任意顾客、保险/夜间服务、安检/违禁品 |
+| 世界 | 远征快照/派遣、养殖快照、招牌、事件 |
+
+## 快速开始
+
+```bash
+cd PawnMind
+./test.sh                 # C# 纯逻辑 + 适配器契约
+./build.sh                # 先测试，再生成 dist/PawnMind
+```
+
+安装：退出游戏，把 `dist/PawnMind/` 复制到 `.../Probably Stolen/Mods/PawnMind/`。
+
+MCP：
+
+```bash
+python -m venv .venv
+.venv/Scripts/python.exe -m pip install mcp
+.venv/Scripts/python.exe agent/mcp_server.py --config "<...>/ModData/pawnmind/bridge.conf"
+```
+
+配置路径：
+
+```
+%USERPROFILE%\AppData\LocalLow\Questing Goose Studio\Probably Stolen\ModData\pawnmind\bridge.conf
+```
+
+**不要公开 token。**
+
+基线循环：
+
+```bash
+.venv/Scripts/python.exe agent/orchestrator.py --config "<...>" --dry-run
+.venv/Scripts/python.exe agent/orchestrator.py --config "<...>" --steps 8
+```
+
+## 安全边界
+
+- 只绑 `127.0.0.1`，拒绝非本机 Host
+- 除 `/health` 外都要 Bearer token
+- `rev` 不匹配一律拒绝；`action_id` 幂等
+- 不读隐藏字段、不改钱、不造物、不执行任意代码
+- 游戏对象只在 Unity 主线程访问
+- 真机测试只用槽 17，不 `new_game`，不动用户主档
+
+## 当前限制（详见 docs）
+
+1. **无视觉鉴定**：不读鉴定答案，也不返回截图。
+2. **无 LLM 策略**：orchestrator 仍是 `RulePolicy`。
+3. **远征是 debug-only**：正常 Perk 不启用；`debug_unlock_expedition` 只测试。
+4. **突袭 RaidScene 正常不可达**：独立飞船/站点战斗脚手架。
+5. **需求/通缉/Barter 成功路径未验**：只验了错误路径。
+6. **WildNetworkUI 未接**：用 `list_upgrades`/`buy_upgrade` 替代。
+7. **陈酿 1 天品质未变**：只验入槽/槽内查找。
+8. **标签条件 ID 是本地化串**（如“纯水”）。
+9. **彩票兑奖成功路径未验**。
+10. **manifest 0.2.1 vs tag v1.0.1**。
+11. **测试开关**：`allow_test_items=true` 只应存在于本地测试档。
+
+---
+
+以下为历史记录（按时间追加，可能包含已过时的状态描述）。
 
 ## 真机验证（2026-11-04，0.46D）
 
@@ -244,13 +344,13 @@ sleep              → day=2 MORNING, cash 530, rent_days_left 5, inventory 15
 - 测试：C# 47 项 + 适配器契约全绿；Python 8 项全绿
 - 构建产物在 `dist/PawnMind/`，**没有复制到游戏目录**（你在玩，等退出后再装）
 
-## 后续计划
+## 后续计划（历史，2026-11-04）
 
 - `load_game` / `new_game` 接入：已确认两者都是无参方法（`PlayerStore.LoadGame()` / `StartNewGame()`），依赖当前槽位/开局上下文，必须先做二次确认与存档备份，等你不玩时再实机验证
 - `choose_dialogue` 索引映射、`bargain` 实际成功率
 - 视觉鉴定
 
-## M0 验证状态（2026-11-04）
+## M0 验证状态（历史，2026-11-04）
 
 - 游戏内加载成功，`ModLoader` 记录 `trust=Match caps=network`
 - `GET /health` → `{"ok":true,"name":"pawnmind","version":"0.1.0"}`
@@ -453,7 +553,7 @@ machine_collect(slot4) -> 回背包
 - `test/PawnMind.Tests/`：纯逻辑测试
 - `test/PawnMind.AdapterTests/`：对 `Assembly-CSharp.dll` 的契约测试
 
-## 路线
+## 路线（历史）
 
 - M0（当前）：只读状态 + ping
 - M1：14 个动作（交易、砍价、对话、叫客/送客、开关店、睡觉）+ revision
