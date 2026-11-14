@@ -55,7 +55,10 @@
           # new_game），理由写在 mcp_server.py 的 RECORDING_TOOL_NAMES 上方。
           - '--tools'
           - 'recording'
-          - '--config'
+          # P1 事件记录：把每次工具调用写进本地 SQLite 历史（play/memory/memory.db）。
+          # 关掉用 --memory off。历史写不进去时写动作会被拒绝（fail closed）。
+          - '--memory'
+          - 'on'
           # bridge.conf 由游戏内 Mod 写盘、含 token：路径只从本机环境变量来。
           # 未设置时用占位路径，让 MCP 进程启动即报错退出（工具不出现），而不是
           # 静默连到别的端口。占位符不是可用路径，别照抄。

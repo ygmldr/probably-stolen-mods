@@ -18,6 +18,7 @@ import argparse
 import os
 import sys
 import time
+import uuid
 from typing import Annotated
 
 from pydantic import Field, StrictInt, StrictStr
@@ -404,7 +405,7 @@ def build_server(client, tool_set=TOOL_SET_FULL):
         return client.action("wine_status", item_id=item_id)
 
     @tool()
-    def wine_add_water(item_id: int, ml: int = 750, rev: int = None) -> dict:
+    def wine_add_water(item_id: int, rev: StrictInt, ml: int = 750) -> dict:
         """Add water to a wine bottle (test/gameplay helper)."""
         return client.action("wine_add_water", item_id=item_id, ml=ml, rev=rev)
 
@@ -785,6 +786,17 @@ def main():
         ),
     )
     parser.add_argument("--probe", action="store_true", help="check the bridge and exit")
+    parser.add_argument(
+        "--memory",
+        choices=("off", "on"),
+        default=os.environ.get("PAWNMIND_MEMORY", "off"),
+        help="record every tool call into the local event store (P1)",
+    )
+    parser.add_argument(
+        "--memory-db",
+        default=os.environ.get("PAWNMIND_MEMORY_DB", None),
+        help="path to memory.db (default: <PawnMind>/play/memory/memory.db)",
+    )
     args = parser.parse_args()
 
     try:
@@ -797,8 +809,44 @@ def main():
         probe(client)
         return 0
 
-    build_server(client, args.tools).run()
+    recorder = None
+    if args.memory == "on":
+        from .memory.recorder import RecordingClient
+        from .memory.store import EventStore, MemoryUnavailable
+
+        db_path = args.memory_db or _default_memory_db()
+        try:
+            store = EventStore(db_path)
+            version = "unknown"
+            try:
+                version = str(client.health().get("game_version") or "unknown")
+            except Exception:
+                pass
+            session = store.start_session(
+                agent_session_id=str(uuid.uuid4()),
+                game_version=version,
+                game_mvid=None,
+                instance_id=os.environ.get("PAWNMIND_INSTANCE_ID", "local-01"),
+            )
+            recorder = RecordingClient(client, store, session)
+            client = recorder
+            print("pawnmind: recording history to %s" % db_path, file=sys.stderr)
+        except MemoryUnavailable as error:
+            print("pawnmind: memory unavailable, refusing to run: %s" % error,
+                  file=sys.stderr)
+            return 4
+
+    try:
+        build_server(client, args.tools).run()
+    finally:
+        if recorder is not None:
+            recorder.store.close()
     return 0
+
+
+def _default_memory_db():
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(root, "play", "memory", "memory.db")
 
 
 if __name__ == "__main__":

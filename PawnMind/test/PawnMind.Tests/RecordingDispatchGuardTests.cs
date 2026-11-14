@@ -46,6 +46,54 @@ namespace PawnMind.Tests
             Assert.Equal(0, h.NativePort.StartCalls, "wrong phase never starts");
         }
 
+        private static readonly string[] DebugOps =
+        {
+            "debug_grant", "debug_fill_water", "debug_unlock_expedition",
+            "debug_pulse", "debug_dump"
+        };
+
+        [Test]
+        public static void Guard_Act_Cannot_Reach_Debug_Ops()
+        {
+            RecordingHarness h = RecordingHarness.Create(RecordingTestData.Off());
+            RecordingDispatchGuard guard = new RecordingDispatchGuard(h.Service);
+
+            for (int i = 0; i < DebugOps.Length; i++)
+            {
+                AssertDenied(guard, "act",
+                    JObject.Parse("{\"action\":\"" + DebugOps[i] + "\"}"),
+                    RecordingSaveErrors.ActWrapperForbidden);
+            }
+        }
+
+        [Test]
+        public static void Guard_Denies_Direct_Debug_Ops_While_Recording()
+        {
+            RecordingHarness h = RecordingHarness.Create();
+            RecordingDispatchGuard guard = new RecordingDispatchGuard(h.Service);
+
+            for (int i = 0; i < DebugOps.Length; i++)
+            {
+                AssertDenied(guard, DebugOps[i], new JObject(),
+                    RecordingSaveErrors.DebugForbidden);
+            }
+        }
+
+        [Test]
+        public static void Guard_Leaves_Direct_Debug_Ops_When_Recording_Disabled()
+        {
+            RecordingHarness h = RecordingHarness.Create(RecordingTestData.Off());
+            RecordingDispatchGuard guard = new RecordingDispatchGuard(h.Service);
+
+            for (int i = 0; i < DebugOps.Length; i++)
+            {
+                ActionResult result;
+                Assert.False(guard.TryHandle(DebugOps[i], new JObject(), out result),
+                    "non-recording session keeps native debug ops for local development");
+                Assert.Null(result, "no fabricated result");
+            }
+        }
+
         [Test]
         public static void Guard_Leaves_Non_Recording_Actions_For_Normal_Dispatch()
         {

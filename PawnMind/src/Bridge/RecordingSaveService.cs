@@ -39,6 +39,21 @@ namespace PawnMind.Bridge
             this.metadataPort = metadataPort;
         }
 
+        /// <summary>
+        /// True when the session is configured for recording (armed, bound or
+        /// locked). Native debug/cheat operations stay reachable only while the
+        /// policy is disabled, so a recording run can never mutate money or items
+        /// through the debug back door.
+        /// </summary>
+        public bool RecordingActive
+        {
+            get
+            {
+                return policy != null
+                    && policy.State != RecordingSlotState.Disabled;
+            }
+        }
+
         public string StatusJson()
         {
             JObject row = new JObject();

@@ -21,6 +21,7 @@ namespace PawnMind.Core
         public const string NewGameForbidden = "recording_new_game_forbidden";
         public const string ActWrapperForbidden = "recording_act_wrapper_forbidden";
         public const string PressForbidden = "recording_press_forbidden";
+        public const string DebugForbidden = "recording_debug_forbidden";
         public const string SlotMismatch = "recording_slot_mismatch";
         public const string RunMismatch = "recording_run_mismatch";
         public const string StartIdentityMismatch = "recording_start_identity_mismatch";

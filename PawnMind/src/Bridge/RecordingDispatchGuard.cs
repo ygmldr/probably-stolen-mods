@@ -41,7 +41,31 @@ namespace PawnMind.Bridge
                 if (args == null) args = new JObject();
             }
 
-            if (!IsProtected(target)) return false;
+            // The generic act wrapper must never reach the native debug/cheat
+            // operations: they mutate money and items directly and would make the
+            // recorded run unauditable regardless of the recording configuration.
+            if (viaAct && IsDebugOp(target))
+            {
+                result = ActionResult.Failure(target, RecordingSaveErrors.ActWrapperForbidden);
+                return true;
+            }
+
+            if (!IsProtected(target))
+            {
+                if (!IsDebugOp(target)) return false;
+
+                // Direct debug ops stay available for local development only while
+                // the recording policy is disabled.
+                if (service == null)
+                {
+                    result = ActionResult.Failure(target, RecordingSaveErrors.ServiceUnavailable);
+                    return true;
+                }
+                if (!service.RecordingActive) return false;
+
+                result = ActionResult.Failure(target, RecordingSaveErrors.DebugForbidden);
+                return true;
+            }
 
             if (viaAct)
             {
@@ -89,6 +113,21 @@ namespace PawnMind.Bridge
                     result = service.ConfirmNewGame();
                     return true;
 
+                default:
+                    return false;
+            }
+        }
+
+        private static bool IsDebugOp(string op)
+        {
+            switch (op)
+            {
+                case "debug_pulse":
+                case "debug_dump":
+                case "debug_fill_water":
+                case "debug_grant":
+                case "debug_unlock_expedition":
+                    return true;
                 default:
                     return false;
             }
