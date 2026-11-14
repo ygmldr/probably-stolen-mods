@@ -85,6 +85,8 @@ RECORDING_TOOL_NAMES = frozenset({
     "sleep", "start_fermentation", "toggle_item", "toggle_service",
     "use_tool", "wait_for_change", "wait_for_events", "wanted_status",
     "wine_add_ingredient", "wine_status",
+    "capture_screenshot",
+    "list_screenshots",
 })
 
 NEW_GAME_OPTION_KINDS = ("scenario", "perk", "difficulty")
@@ -188,6 +190,16 @@ def build_server(client, tool_set=TOOL_SET_FULL):
     def get_action_history(limit: int = 20) -> list:
         """Recent actions with their args, ok flag and revision."""
         return client.action("get_action_history", limit=limit)
+
+    @tool()
+    def capture_screenshot(reason: str = "manual") -> dict:
+        """Capture the current game frame as evidence (JPEG, short side 768) and return its path relative to ModData/pawnmind/screenshots/. Use it right before stopping on a hard failure, or when the screen disagrees with what the bridge reports. Server-side throttling applies; returns screenshot_unavailable when capture is off."""
+        return client.action("capture_screenshot", reason=reason)
+
+    @tool()
+    def list_screenshots(limit: int = 20) -> dict:
+        """List recent evidence captures, newest first, with total_count/total_bytes/budget_bytes/dropped/budget_exhausted. Read-only."""
+        return client.action("list_screenshots", limit=limit)
 
     @tool()
     def act(action: str, args: dict, rev: int, action_id: str = "") -> dict:

@@ -1,6 +1,6 @@
 """S7A: server-side tool trimming for recording (`--tools full|recording`).
 
-The full server exposes 100 tools. The recording entrypoint must expose only the
+The full server exposes 102 tools. The recording entrypoint must expose only the
 minimum first-week surface, so a host-side allowlist is no longer the only thing
 keeping `act`/`press`/`new_game` away from a model. These tests pin the mode
 switch, the exact recording surface, the explicit exclusions, the demo
@@ -58,6 +58,8 @@ EXPECTED_RECORDING_TOOLS = frozenset({
     "sleep", "start_fermentation", "toggle_item", "toggle_service",
     "use_tool", "wait_for_change", "wait_for_events", "wanted_status",
     "wine_add_ingredient", "wine_status",
+    "capture_screenshot",
+    "list_screenshots",
 })
 
 #: Escape hatches and shortcuts that exist in full mode and must never appear
@@ -100,11 +102,11 @@ class ToolsModeTests(unittest.TestCase):
 
         return asyncio.run(scenario())
 
-    def test_full_mode_is_the_default_and_keeps_100_tools(self):
+    def test_full_mode_is_the_default_and_keeps_the_whole_surface(self):
         default_names = self._list_tool_names()
         explicit_names = self._list_tool_names("--tools", "full")
 
-        self.assertEqual(100, len(default_names))
+        self.assertEqual(102, len(default_names))
         self.assertEqual(default_names, explicit_names,
                          "omitting --tools must behave exactly like --tools full")
         for expected in ("act", "press", "get_ui_snapshot", "new_game", "save_game"):

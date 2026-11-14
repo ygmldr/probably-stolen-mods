@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Newtonsoft.Json.Linq;
 using PawnMind.Bridge;
 using PawnMind.Core;
@@ -78,9 +79,16 @@ namespace PawnMind.Tests
                 true);
         }
 
-        private static ActionRouter Router(long revision, Func<string, JObject, ActionResult> dispatch)
+        private static ActionRouter Router(
+            long revision,
+            Func<string, JObject, ActionResult> dispatch,
+            Func<long> refreshRevision = null,
+            string secretToken = null,
+            Func<WriteGateDecision> writeGate = null,
+            Action<ActionOutcome> onOutcome = null)
         {
-            return Router(delegate { return revision; }, dispatch);
+            return Router(delegate { return revision; }, dispatch,
+                refreshRevision, secretToken, writeGate, onOutcome);
         }
 
         private static ActionRouter Router(
@@ -88,7 +96,8 @@ namespace PawnMind.Tests
             Func<string, JObject, ActionResult> dispatch,
             Func<long> refreshRevision = null,
             string secretToken = null,
-            Func<WriteGateDecision> writeGate = null)
+            Func<WriteGateDecision> writeGate = null,
+            Action<ActionOutcome> onOutcome = null)
         {
             if (refreshRevision == null) refreshRevision = delegate { return revision(); };
             if (writeGate == null) writeGate = OpenGateProvider();
@@ -100,7 +109,8 @@ namespace PawnMind.Tests
                 new ActionHistory(),
                 refreshRevision,
                 secretToken,
-                writeGate);
+                writeGate,
+                onOutcome);
         }
 
         [Test]
@@ -1323,6 +1333,277 @@ namespace PawnMind.Tests
             Assert.Equal(1, dispatches, "read served once");
         }
 
+        [Test]
+        public static void Router_Notifies_Every_Successful_Write()
+        {
+            var outcomes = new List<ActionOutcome>();
+            ActionRouter router = Router(5, delegate(string op, JObject request)
+            {
+                return ActionResult.Success(op);
+            }, null, null, null, delegate(ActionOutcome outcome) { outcomes.Add(outcome); });
+
+            string response = router.Handle("{\"op\":\"open_shop\",\"rev\":5,\"action_id\":\"shot1\"}");
+
+            Assert.Contains(response, "\"ok\":true", "write succeeded");
+            Assert.Equal(1, outcomes.Count, "one outcome callback");
+            Assert.Equal("open_shop", outcomes[0].Op, "op recorded");
+            Assert.True(outcomes[0].Ok, "success flagged");
+            Assert.True(outcomes[0].Write, "write op flagged");
+            Assert.Equal(5L, outcomes[0].Revision, "revision recorded");
+            Assert.Null(outcomes[0].Error, "no error on success");
+        }
+
+        [Test]
+        public static void Router_Notifies_Every_Failed_Write()
+        {
+            var outcomes = new List<ActionOutcome>();
+            ActionRouter router = Router(5, delegate(string op, JObject request)
+            {
+                return ActionResult.Failure(op, "cannot_afford");
+            }, null, null, null, delegate(ActionOutcome outcome) { outcomes.Add(outcome); });
+
+            string response = router.Handle("{\"op\":\"buy_wholesale\",\"rev\":5,\"action_id\":\"shot2\"}");
+
+            Assert.Contains(response, "cannot_afford", "business rejection returned");
+            Assert.Equal(1, outcomes.Count, "business failures also produce evidence");
+            Assert.False(outcomes[0].Ok, "failure flagged");
+            Assert.Equal("cannot_afford", outcomes[0].Error, "error code recorded");
+            Assert.True(outcomes[0].Write, "write op flagged");
+        }
+
+        [Test]
+        public static void Router_Does_Not_Notify_Read_Success()
+        {
+            var outcomes = new List<ActionOutcome>();
+            ActionRouter router = Router(5, delegate(string op, JObject request)
+            {
+                return ActionResult.Success(op);
+            }, null, null, null, delegate(ActionOutcome outcome) { outcomes.Add(outcome); });
+
+            router.Handle("{\"op\":\"list_goods\"}");
+
+            Assert.Equal(0, outcomes.Count, "reads without a hard failure are not captured");
+        }
+
+        [Test]
+        public static void Router_Notifies_Read_Hard_Failure()
+        {
+            var outcomes = new List<ActionOutcome>();
+            ActionRouter router = Router(5, delegate(string op, JObject request)
+            {
+                return ActionResult.Failure(op, "native_error");
+            }, null, null, null, delegate(ActionOutcome outcome) { outcomes.Add(outcome); });
+
+            router.Handle("{\"op\":\"get_item\"}");
+
+            Assert.Equal(1, outcomes.Count, "hard read failure is captured");
+            Assert.False(outcomes[0].Ok, "failure flagged");
+            Assert.False(outcomes[0].Write, "read op flagged");
+            Assert.Equal("native_error", outcomes[0].Error, "error code recorded");
+        }
+
+        [Test]
+        public static void Router_Does_Not_Notify_Read_Business_Rejection()
+        {
+            var outcomes = new List<ActionOutcome>();
+            ActionRouter router = Router(5, delegate(string op, JObject request)
+            {
+                return ActionResult.Failure(op, "no_client");
+            }, null, null, null, delegate(ActionOutcome outcome) { outcomes.Add(outcome); });
+
+            router.Handle("{\"op\":\"list_goods\"}");
+
+            Assert.Equal(0, outcomes.Count, "soft read rejection is not captured");
+        }
+
+        [Test]
+        public static void Router_Notifies_Stale_Write_Attempt()
+        {
+            var outcomes = new List<ActionOutcome>();
+            ActionRouter router = Router(5, delegate(string op, JObject request)
+            {
+                throw new AssertionException("stale action must not dispatch");
+            }, null, null, null, delegate(ActionOutcome outcome) { outcomes.Add(outcome); });
+
+            router.Handle("{\"op\":\"open_shop\",\"rev\":4,\"action_id\":\"shot3\"}");
+
+            Assert.Equal(1, outcomes.Count, "a write attempt that returned stale_rev is captured");
+            Assert.False(outcomes[0].Ok, "failure flagged");
+            Assert.Equal("stale_rev", outcomes[0].Error, "stale_rev recorded as the outcome");
+        }
+
+        [Test]
+        public static void Router_Notifies_Locked_Version_Gate_Write()
+        {
+            var outcomes = new List<ActionOutcome>();
+            ActionRouter router = Router(
+                delegate { return 5; },
+                delegate(string op, JObject request)
+                {
+                    throw new AssertionException("locked gate must not dispatch");
+                },
+                null,
+                null,
+                delegate { return LockedGate(GameVersionGate.ReasonVersionMismatch); },
+                delegate(ActionOutcome outcome) { outcomes.Add(outcome); });
+
+            router.Handle("{\"op\":\"open_shop\",\"rev\":5,\"action_id\":\"shot4\"}");
+
+            Assert.Equal(1, outcomes.Count, "locked write attempt is captured");
+            Assert.Equal("game_version_mismatch", outcomes[0].Error, "gate reason recorded");
+            Assert.True(outcomes[0].Write, "write op flagged");
+        }
+
+        [Test]
+        public static void Router_Notifies_State_Unavailable_Once()
+        {
+            var outcomes = new List<ActionOutcome>();
+            ActionRouter router = Router(
+                delegate { return 5; },
+                delegate(string op, JObject request)
+                {
+                    throw new AssertionException("state unavailable must not dispatch");
+                },
+                delegate { return -1L; },
+                null,
+                null,
+                delegate(ActionOutcome outcome) { outcomes.Add(outcome); });
+
+            router.Handle("{\"op\":\"open_shop\",\"rev\":5,\"action_id\":\"shot5\"}");
+
+            Assert.Equal(1, outcomes.Count, "state unavailable captured once");
+            Assert.Equal("state_unavailable", outcomes[0].Error, "stable error");
+        }
+
+        [Test]
+        public static void Router_Notifies_Outcome_Unknown_Once()
+        {
+            int refreshes = 0;
+            var outcomes = new List<ActionOutcome>();
+            ActionRouter router = Router(
+                delegate { return 5; },
+                delegate(string op, JObject request)
+                {
+                    return ActionResult.Success(op);
+                },
+                delegate
+                {
+                    refreshes++;
+                    return refreshes >= 2 ? -1L : 5L;
+                },
+                null,
+                null,
+                delegate(ActionOutcome outcome) { outcomes.Add(outcome); });
+
+            router.Handle("{\"op\":\"open_shop\",\"rev\":5,\"action_id\":\"shot6\"}");
+
+            Assert.Equal(1, outcomes.Count, "unknown outcome captured once");
+            Assert.Equal("outcome_unknown", outcomes[0].Error, "unknown outcome code");
+        }
+
+        [Test]
+        public static void Router_Does_Not_Notify_Ping_Or_Action_History()
+        {
+            var outcomes = new List<ActionOutcome>();
+            ActionRouter router = Router(5, delegate(string op, JObject request)
+            {
+                return ActionResult.Success(op);
+            }, null, null, null, delegate(ActionOutcome outcome) { outcomes.Add(outcome); });
+
+            router.Handle("{\"op\":\"ping\"}");
+            router.Handle("{\"op\":\"get_action_history\",\"limit\":5}");
+
+            Assert.Equal(0, outcomes.Count, "protocol reads are not game actions");
+        }
+
+        [Test]
+        public static void Router_Callback_Exception_Does_Not_Break_The_Response()
+        {
+            ActionRouter router = Router(5, delegate(string op, JObject request)
+            {
+                return ActionResult.Success(op);
+            }, null, null, null, delegate
+            {
+                throw new InvalidOperationException("evidence boom");
+            });
+
+            string response = router.Handle("{\"op\":\"open_shop\",\"rev\":5,\"action_id\":\"shot7\"}");
+
+            Assert.Contains(response, "\"ok\":true", "response survives a broken evidence hook");
+            Assert.False(response.Contains("evidence boom"), "callback detail must not leak");
+        }
+
+        [Test]
+        public static void Router_Capture_Screenshot_Is_A_Read_Op_And_Bypasses_The_Version_Gate()
+        {
+            int calls = 0;
+            var outcomes = new List<ActionOutcome>();
+            ActionRouter router = Router(
+                delegate { return 5; },
+                delegate(string op, JObject request)
+                {
+                    calls++;
+                    Assert.Equal("capture_screenshot", op, "capture op dispatched");
+                    return ActionResult.SuccessRaw(op,
+                        "{\"ok\":true,\"path\":\"screenshots/a.jpg\",\"reason\":\"manual\",\"rev\":5,\"day\":1,\"timestamp\":\"t\"}");
+                },
+                null,
+                null,
+                delegate { return LockedGate(GameVersionGate.ReasonVersionMismatch); },
+                delegate(ActionOutcome outcome) { outcomes.Add(outcome); });
+
+            string response = router.Handle("{\"op\":\"capture_screenshot\",\"reason\":\"manual\"}");
+
+            Assert.Contains(response, "\"ok\":true", "manual capture works with a locked write gate");
+            Assert.Contains(response, "screenshots/a.jpg", "capture path returned");
+            Assert.Equal(1, calls, "capture dispatched without action_id or rev");
+            Assert.Equal(0, outcomes.Count, "read op does not trigger automatic evidence");
+        }
+
+        [Test]
+        public static void Router_List_Screenshots_Is_A_Read_Op()
+        {
+            int calls = 0;
+            ActionRouter router = Router(5, delegate(string op, JObject request)
+            {
+                calls++;
+                Assert.Equal("list_screenshots", op, "list op dispatched");
+                Assert.Equal(7, (int)request["limit"], "limit forwarded");
+                return ActionResult.SuccessRaw(op,
+                    "{\"ok\":true,\"total_count\":0,\"total_bytes\":0,\"budget_bytes\":1,\"dropped\":0,\"budget_exhausted\":false,\"screenshots\":[]}");
+            });
+
+            string response = router.Handle("{\"op\":\"list_screenshots\",\"limit\":7}");
+
+            Assert.Contains(response, "total_count", "status returned");
+            Assert.Equal(1, calls, "list dispatched without a revision");
+        }
+
+        [Test]
+        public static void Router_Notifies_After_Undelivered_Write()
+        {
+            var outcomes = new List<ActionOutcome>();
+            var router = new ActionRouter(
+                new ActionGate(),
+                delegate { return 5; },
+                delegate(string op, JObject request) { return ActionResult.Success(op); },
+                new ActionHistory(),
+                delegate { return 5; },
+                null,
+                OpenGateProvider(),
+                delegate(ActionOutcome outcome) { outcomes.Add(outcome); });
+
+            string response = router.Handle(
+                "{\"op\":\"open_shop\",\"rev\":5,\"action_id\":\"undelivered1\"}");
+            outcomes.Clear();
+
+            router.MarkResponseUndelivered(
+                "{\"op\":\"open_shop\",\"rev\":5,\"action_id\":\"undelivered1\"}",
+                response);
+
+            Assert.Equal(1, outcomes.Count, "undelivered write is captured");
+            Assert.Equal("outcome_unknown", outcomes[0].Error, "transport failure is unknown outcome");
+        }
     }
 
     internal static class ActionResultTests
@@ -1432,8 +1713,5 @@ namespace PawnMind.Tests
             JObject parsed = JObject.Parse(json);
             Assert.Equal("bad\nline", (string)parsed["error"], "error round-trips through json");
         }
-
-
-
     }
 }

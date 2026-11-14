@@ -42,6 +42,14 @@
       <HintPath>$(GameManaged)/UnityEngine.UI.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <Reference Include="UnityEngine.ScreenCaptureModule">
+      <HintPath>$(GameManaged)/UnityEngine.ScreenCaptureModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.ImageConversionModule">
+      <HintPath>$(GameManaged)/UnityEngine.ImageConversionModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
     <Reference Include="Unity.TextMeshPro">
       <HintPath>$(GameManaged)/Unity.TextMeshPro.dll</HintPath>
       <Private>false</Private>

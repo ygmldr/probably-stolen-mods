@@ -23,17 +23,18 @@
 
 ---
 
-## 2. 工具面：94 个“玩家等价”工具
+## 2. 工具面：96 个工具（94 个玩家等价 + 2 个取证）
 
 工具名统一带前缀：模型侧叫 **`mcp__pawnmind__<短名>`**。下面用短名。
 
-服务端刻意**不**提供 6 个旁路/作弊入口（`act`、`press`、`get_ui_snapshot`、`wait_until`、`wine_add_water`、`new_game`），**其余 94 个全部可用**，包括机器、酿酒、彩票、电话、夜间搜刮、市场委托、派系、鉴定、搬运等整块玩法。
+服务端刻意**不**提供 6 个旁路/作弊入口（`act`、`press`、`get_ui_snapshot`、`wait_until`、`wine_add_water`、`new_game`），**其余 94 个全部可用**，包括机器、酿酒、彩票、电话、夜间搜刮、市场委托、派系、鉴定、搬运等整块玩法；另有 `capture_screenshot` / `list_screenshots` 两个取证工具。
 
 | 系统 | 工具 | 用途 |
 |---|---|---|
 | 观察 | `ping` `get_state` `get_legal_actions` `get_run_summary` `get_action_history` `wait_for_events` `wait_for_change` | 只读；`rev` 从这里取 |
 | 新局菜单 | `get_new_game_options` `open_new_game_menu` `select_new_game_option` `new_game_next_page` `new_game_continue` `focus_new_game_selected_perk` `blur_new_game_option` `confirm_new_game` | 原生 UI 单步 |
 | 专用槽 | `get_recording_save_status` `save_recording_game` `load_recording_game` | 只认绑定槽 |
+| 取证 | `capture_screenshot` `list_screenshots` | 抓当前画面当证据；服务端节流 |
 | 开店与客流 | `open_shop` `call_next_customer` `advance_dialogue` `choose_dialogue` `end_day` `sleep` | 日常循环 |
 | 交易与议价 | `confirm_trade` `list_goods` `get_item` `buy_wholesale` `commissary_buy` `bargain_preview` `bargain` | 低买高卖、砍价、批发、补给站 |
 | 背包与搬运 | `list_containers` `list_inventory` `move_item` `get_layout` `read_item` `list_interactions` `activate_item` `toggle_item` `use_tool` | 形状摆放、容器整理、使用道具 |
@@ -223,6 +224,20 @@
 
 任一返回 `hover_conflict` / `not_hovered` / `ambiguous_target` 而你不确定原因 → 停机问人，不要连点。
 
+### 8.2 取证（停机前后必做）
+
+Mod 会自动在**每个写动作之后**抓一张 JPEG 截图（短边 768），存到 `ModData/pawnmind/screenshots/`，文件名带 rev/天数/op/结果。
+
+你额外要做的是：
+
+1. **停顿前先拍一张。** 遇到 `outcome_unknown`、`recording_*`、`readback_mismatch`、对账不平、或任何“我判断不了”的情况，在调用任何写工具**之前**先：
+   `capture_screenshot(reason="<简短原因>")`，例如 `capture_screenshot(reason="sleep_outcome_unknown")`。
+   `reason` 只用小写字母、数字、下划线。
+2. **把文件名写进报告。** 收尾报告的“未验证”段里列出这次关键截图的名字，方便对方按名字找图。
+3. **需要核对时可列出来**：`list_screenshots(limit=20)` 会给出最近的截图、总数、占用与是否超预算。
+4. **不要在主菜单的存档列表处截图**——那会拍到其它存档名。读档核对画面请在进入游戏后拍。
+5. 截图只是证据，不是许可：**拍完照仍然不许重试未知结果**。
+
 ---
 
 ## 9. 什么时候必须停机求助
@@ -258,6 +273,7 @@
 付租：金额、cash_before→cash_after、rent_days_left_after、rent_paid_total
 对账：起始现金 - 买入 + 卖出 - 已付租金 - 其它支出 = 当前现金（对/不对）
 异常：出现过的拒绝码、停机点、未确定项
+证据：关键截图文件名（如 20261114-221500_r128_d3_sleep_outcome_unknown.jpg）
 未验证：哪些结论只是“工具这么返回”，还没对着画面核对
 ```
 

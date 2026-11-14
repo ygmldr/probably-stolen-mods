@@ -21,6 +21,7 @@ public sealed class PawnMindMod : IMod
     private static RecordingSaveService _recordingService;
     private static RecordingDispatchGuard _recordingGuard;
     private static FirstWeekService _firstWeekService;
+    private static ScreenshotService _screenshotService;
     private BridgeServer _server;
     private ActionRouter _router;
     private GameObject _pumpObject;
@@ -97,6 +98,11 @@ public sealed class PawnMindMod : IMod
             _pumpObject.hideFlags = HideFlags.HideAndDontSave;
             UnityEngine.Object.DontDestroyOnLoad(_pumpObject);
 
+            // Evidence capture shares the pump object so it runs on the same
+            // main-thread tick as the bridge. Initialization cannot fail the mod.
+            _screenshotService = _pumpObject.AddComponent<ScreenshotService>();
+            _screenshotService.Initialize();
+
             _router = new ActionRouter(
                 new ActionGate(),
                 delegate { return StateSnapshot.CurrentRevision; },
@@ -106,7 +112,8 @@ public sealed class PawnMindMod : IMod
                 // so refreshing the snapshot here stays on the Unity main thread.
                 delegate { StateSnapshot.BuildJson(); return StateSnapshot.CurrentRevision; },
                 config.Token,
-                delegate { return writeGate; });
+                delegate { return writeGate; },
+                CaptureOutcome);
 
             // S3B menu writes are evaluated by the same S4 slot policy. The
             // default (recording unconfigured) still refuses every write before
@@ -173,6 +180,7 @@ public sealed class PawnMindMod : IMod
         }
 
         _pumpObject = null;
+        _screenshotService = null;
         _recordingArmed = false;
         _newGameService = null;
         _recordingService = null;
@@ -329,6 +337,37 @@ public sealed class PawnMindMod : IMod
                 return NewGameResult(
                     "blur_new_game_option",
                     service.BlurOption((string)request["id"]));
+            }
+
+            case "capture_screenshot":
+            {
+                ScreenshotService service = _screenshotService;
+                if (service == null)
+                {
+                    return ActionResult.Failure("capture_screenshot", "screenshot_unavailable");
+                }
+
+                long cash;
+                int day = ReadDayCash(out cash);
+                string reason = ReadString(request, "reason", "manual");
+                ScreenshotRequest capture = service.Request(
+                    reason, "ok", StateSnapshot.CurrentRevision, day, cash);
+                return ActionResult.SuccessRaw(
+                    "capture_screenshot",
+                    ScreenshotJson.CaptureResult(capture, StateSnapshot.CurrentRevision));
+            }
+
+            case "list_screenshots":
+            {
+                ScreenshotService service = _screenshotService;
+                if (service == null)
+                {
+                    return ActionResult.Failure("list_screenshots", "screenshot_unavailable");
+                }
+
+                return ActionResult.SuccessRaw(
+                    "list_screenshots",
+                    ScreenshotJson.ListResult(service.Ledger, ReadInt(request, "limit", 20)));
             }
 
             case "debug_pulse":
@@ -689,6 +728,58 @@ public sealed class PawnMindMod : IMod
             || op == "load_recording_game"
             || op == "new_game"
             || op == "confirm_new_game";
+    }
+
+    private static void CaptureOutcome(ActionOutcome outcome)
+    {
+        ScreenshotService service = _screenshotService;
+        if (service == null || outcome == null) return;
+
+        try
+        {
+            long cash;
+            int day = ReadDayCash(out cash);
+            string op = string.IsNullOrEmpty(outcome.Op) ? "unknown" : outcome.Op;
+            string result = outcome.Ok
+                ? "ok"
+                : (string.IsNullOrEmpty(outcome.Error) ? "unknown" : outcome.Error);
+            service.Request(op, result, outcome.Revision, day, cash);
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning("[PawnMind] evidence hook failed: " + e.GetType().Name);
+        }
+    }
+
+    private static int ReadDayCash(out long cash)
+    {
+        cash = 0;
+        try
+        {
+            if (!GameState.IsInGame) return 0;
+            cash = GameState.GetCash();
+            return GameState.GetDay();
+        }
+        catch (Exception)
+        {
+            return 0;
+        }
+    }
+
+    private static string ReadString(JObject request, string name, string fallback)
+    {
+        JToken token = request[name];
+        if (token == null || token.Type == JTokenType.Null || token.Type == JTokenType.Undefined)
+            return fallback;
+
+        try
+        {
+            return token.Type == JTokenType.String ? (string)token : fallback;
+        }
+        catch (Exception)
+        {
+            return fallback;
+        }
     }
 
     private static bool IsTrue(JToken token)

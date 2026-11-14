@@ -15,6 +15,7 @@
     <Compile Include="GameVersionGateTests.cs" />
     <Compile Include="ActionGateTests.cs" />
     <Compile Include="ActionRouterTests.cs" />
+    <Compile Include="ScreenshotEvidenceTests.cs" />
     <Compile Include="LegalActionTests.cs" />
     <Compile Include="ActionHistoryTests.cs" />
     <Compile Include="InventoryPagerTests.cs" />
@@ -67,6 +68,8 @@
     <Compile Include="../../src/Core/*.cs" />
     <Compile Include="../../src/Bridge/BridgeServer.cs" />
     <Compile Include="../../src/Bridge/ActionRouter.cs" />
+    <Compile Include="../../src/Bridge/ActionOutcome.cs" />
+    <Compile Include="../../src/Bridge/ScreenshotJson.cs" />
     <Compile Include="../../src/Bridge/ActionResult.cs" />
     <Compile Include="../../src/Bridge/NewGameMenuService.cs" />
     <Compile Include="../../src/Bridge/RecordingSaveService.cs" />

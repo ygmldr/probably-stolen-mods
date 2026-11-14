@@ -19,6 +19,7 @@ namespace PawnMind.Bridge
             new HashSet<string>(StringComparer.Ordinal)
             {
                 "bargain_preview",
+                "capture_screenshot",
                 "contraband_status",
                 "events_status",
                 "expedition_status",
@@ -45,6 +46,7 @@ namespace PawnMind.Bridge
                 "list_requests",
                 "list_services",
                 "list_signs",
+                "list_screenshots",
                 "list_tickets",
                 "list_upgrades",
                 "list_wine",
@@ -81,6 +83,7 @@ namespace PawnMind.Bridge
         private readonly Func<long> _refreshRevision;
         private readonly Func<WriteGateDecision> _writeGate;
         private readonly string _secretToken;
+        private readonly Action<ActionOutcome> _onOutcome;
 
         public ActionRouter(
             ActionGate gate,
@@ -89,7 +92,8 @@ namespace PawnMind.Bridge
             ActionHistory history = null,
             Func<long> refreshRevision = null,
             string secretToken = null,
-            Func<WriteGateDecision> writeGate = null)
+            Func<WriteGateDecision> writeGate = null,
+            Action<ActionOutcome> onOutcome = null)
         {
             if (gate == null) throw new ArgumentNullException("gate");
             if (revision == null) throw new ArgumentNullException("revision");
@@ -102,6 +106,7 @@ namespace PawnMind.Bridge
             _refreshRevision = refreshRevision;
             _writeGate = writeGate;
             _secretToken = secretToken;
+            _onOutcome = onOutcome;
         }
 
         public string Handle(string body)
@@ -134,8 +139,22 @@ namespace PawnMind.Bridge
                 return Scrub(_history.ToJson(ReadHistoryLimit(request)));
             }
 
-            if (ReadOnlyOps.Contains(op)) return HandleRead(op, request);
+            if (ReadOnlyOps.Contains(op))
+            {
+                string readResponse = HandleRead(op, request);
+                NotifyReadResponse(op, readResponse);
+                return readResponse;
+            }
 
+            // Every write result (success, business refusal, stale revision or a
+            // gate refusal) is evidence: the caller sees one outcome per attempt.
+            string writeResponse = HandleWrite(op, request);
+            NotifyWriteResponse(op, writeResponse);
+            return writeResponse;
+        }
+
+        private string HandleWrite(string op, JObject request)
+        {
             string actionId;
             string actionIdError;
             if (!TryReadActionId(request, out actionId, out actionIdError))
@@ -264,6 +283,7 @@ namespace PawnMind.Bridge
                 false,
                 "outcome_unknown",
                 CurrentRevision());
+            Notify(new ActionOutcome(op, false, true, "outcome_unknown", CurrentRevision()));
         }
 
         private string HandleRead(string op, JObject request)
@@ -290,6 +310,67 @@ namespace PawnMind.Bridge
             catch (Exception)
             {
                 return ActionResult.Failure(op, "exception");
+            }
+        }
+
+        private void NotifyReadResponse(string op, string response)
+        {
+            bool ok;
+            string error;
+            ParseResponse(response, out ok, out error);
+            if (!ok && FailureEvidence.IsHardFailure(error))
+            {
+                Notify(new ActionOutcome(op, false, false, error, CurrentRevision()));
+            }
+        }
+
+        private void NotifyWriteResponse(string op, string response)
+        {
+            bool ok;
+            string error;
+            ParseResponse(response, out ok, out error);
+            Notify(new ActionOutcome(op, ok, true, ok ? null : error, CurrentRevision()));
+        }
+
+        private void Notify(ActionOutcome outcome)
+        {
+            Action<ActionOutcome> handler = _onOutcome;
+            if (handler == null || outcome == null) return;
+
+            try
+            {
+                handler(outcome);
+            }
+            catch (Exception)
+            {
+                // Evidence capture must never break the action response.
+            }
+        }
+
+        private static void ParseResponse(string response, out bool ok, out string error)
+        {
+            ok = false;
+            error = null;
+
+            try
+            {
+                JObject json = JObject.Parse(response ?? "{}");
+                JToken flag = json["ok"];
+                ok = flag != null && flag.Type == JTokenType.Boolean && (bool)flag;
+
+                JToken code = json["error"];
+                if (code != null && code.Type == JTokenType.String)
+                {
+                    error = (string)code;
+                }
+                else if (!ok)
+                {
+                    error = "bad_response";
+                }
+            }
+            catch (Exception)
+            {
+                error = "bad_response";
             }
         }
 
