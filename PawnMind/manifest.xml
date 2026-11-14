@@ -3,17 +3,19 @@
   <ID>pawnmind</ID>
   <Name>PawnMind · AI Bridge</Name>
   <Author>local</Author>
-  <ModVersion>0.2.1</ModVersion>
+  <ModVersion>0.3.0</ModVersion>
   <Description><![CDATA[
-Local MCP bridge for Probably Stolen (experimental, M0).
+Local AI bridge for Probably Stolen.
 
-Starts a read-only HTTP endpoint on 127.0.0.1 that exposes a compact snapshot of
-what the player can currently see in the shop. The token is generated on first
-enable and stored in the game's ModData directory.
+Exposes a compact snapshot of what the player can already see (shop, dialogue,
+rent, inventory) plus a whitelisted set of single-step gameplay actions over a
+loopback-only HTTP endpoint, and mirrors them through a local MCP server.
 
-No gameplay action is executed in M0. The server binds to loopback only and
-requires a bearer token; it never reads hidden fields (appraisal truth, hidden
-customer identity).
+Security defaults: loopback only, bearer token required, revision and action-id
+checked on every write, and all write actions stay locked unless bridge.conf
+explicitly arms the dedicated recording save slot for the exact game version
+and assembly MVID. The bridge never reads hidden fields (appraisal truth, hidden
+customer identity, real water composition) and never calls AddCredit.
   ]]></Description>
   <GameVersions>
     <Version>0.46D</Version>
