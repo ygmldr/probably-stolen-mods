@@ -11,11 +11,11 @@
 
 | 问题 | 结论 |
 |---|---|
-| 能否不改动 Game MCP 就完成事件记录？ | **能**。100 个 MCP 工具全部经过 `agent/pawnmind_client.py` 的三个方法，改造点收敛在一处 |
+| 能否不改动 Game MCP 就完成事件记录？ | **能**。102 个 MCP 工具（含截图取证）全部经过 `agent/pawnmind_client.py` 的三个方法，改造点收敛在一处 |
 | 事件记录应放在哪一层？ | **Python 客户端层**，不是 Unity C# 层（理由见 ADR-002） |
 | 存档身份能否满足规范的 `save_id`？ | **部分**。游戏只提供槽号 + `runID`，没有稳定存档 UUID；且主菜单阶段完全无身份 |
 | 中文全文检索能否直接用 FTS5？ | **不能**。实测 2 字中文查询召回为 0（见 §6.2） |
-| 现有测试与模拟设施是否够做 P1？ | **够**。已有 94 工具的 fake 游戏、脚本策略与端到端测试 |
+| 现有测试与模拟设施是否够做 P1？ | **够**。已有 96 工具的 fake 游戏、脚本策略与端到端测试 |
 | 是否存在文档未提及的高危入口？ | **有**。C# 侧 5 个 `debug_*` op 存在但未暴露给 MCP，必须保持不暴露 |
 
 ---
@@ -59,8 +59,8 @@ PawnMind/
 
 产出（审计附件）：
 
-- [mcp-tools-full.json](<mcp-tools-full.json>) — 100 个工具的完整 `input_schema` 快照
-- [mcp-tools-recording.json](<mcp-tools-recording.json>) — 94 个（录制集）
+- [mcp-tools-full.json](<mcp-tools-full.json>) — 102 个工具的完整 `input_schema` 快照（P0 初审时为 100，截图取证特性后增加 2 个）
+- [mcp-tools-recording.json](<mcp-tools-recording.json>) — 96 个（录制集）
 - [tool-matrix.md](<tool-matrix.md>) — 逐工具的可读/写/风险/rev/参数/验证状态表
 
 ### 2.1 数量与集合差异
@@ -68,14 +68,14 @@ PawnMind/
 | 集合 | 数量 |
 |---|---|
 | 全部 MCP 工具 | **100** |
-| `--tools recording` | **94** |
+| `--tools recording` | **96** |
 | 录制集排除 | **6**：`act`、`press`、`get_ui_snapshot`、`wait_until`、`wine_add_water`、`new_game` |
 
 ### 2.2 传输通道分类（决定埋点位置）
 
 | 通道 | 工具数 | 说明 |
 |---|---|---|
-| `POST /action` | **94** | 全部经 `BridgeClient.action()`；含 42 个只读 op 与 52 个改状态 op |
+| `POST /action` | **96** | 全部经 `BridgeClient.action()`；含 42 个只读 op 与 54 个改状态 op |
 | `GET /state` | 5 | `get_state`、`get_run_summary`、`get_legal_actions`、`wait_for_change`、`wait_until` |
 | `GET /events` | 1 | `wait_for_events`（长轮询，最长 25s） |
 
@@ -112,14 +112,14 @@ C# `ActionRouter` 的 dispatch 中另有 5 个 op **不在 MCP 工具表里**：
 
 | 候选 | 覆盖 | 风险 | 结论 |
 |---|---|---|---|
-| Unity C# `ActionRouter.Dispatch` | 只覆盖 `/action` 的 94 个，且拿不到 `/state` 读取上下文 | 需改游戏内 Mod、涉及主线程与持久化、要重新过 ModLoader 信任 | **不选** |
+| Unity C# `ActionRouter.Dispatch` | 只覆盖 `/action` 的 96 个，且拿不到 `/state` 读取上下文 | 需改游戏内 Mod、涉及主线程与持久化、要重新过 ModLoader 信任 | **不选** |
 | MCP Server（`agent/mcp_server.py`） | 100/100 工具 | 无 Unity 依赖，纯 Python | **选** |
 | `agent/pawnmind_client.py` 的三个方法 | 100/100 工具，**且只有一个文件** | 同左 | **选（更优）** |
 
 ### 3.2 实测的调用收敛
 
 ```
-client.action(...)      94 个工具  →  POST /action
+client.action(...)      96 个工具  →  POST /action
 client.get_state()       5 个工具  →  GET /state
 client.wait_events()     1 个工具  →  GET /events
 ```
@@ -233,7 +233,7 @@ unicode61：不切分 CJK，整段中文成为一个 token
 
 | 资产 | 位置 | 能力 |
 |---|---|---|
-| fake 游戏桥 | [agent/fake_game.py](<../../PawnMind/agent/fake_game.py>) | 127.0.0.1 随机端口，实现 94 工具子集：四阶段新局菜单、录制三态、交易原子性、房东对话、跨日、租金回执、存读档绑定 |
+| fake 游戏桥 | [agent/fake_game.py](<../../PawnMind/agent/fake_game.py>) | 127.0.0.1 随机端口，实现 96 工具子集：四阶段新局菜单、录制三态、交易原子性、房东对话、跨日、租金回执、存读档绑定 |
 | 脚本策略端到端 | [agent/demo_agent.py](<../../PawnMind/agent/demo_agent.py>) | 走真实 MCP stdio，19 个 allowlist 工具跑完整首周 |
 | 预检脚本 | [agent/preflight.py](<../../PawnMind/agent/preflight.py>) | 只读健康检查，退出码 0/1/2 |
 | 端到端测试 | `agent/tests/test_demo_agent_e2e.py` 等 | 81 项 Python 测试全绿 |
