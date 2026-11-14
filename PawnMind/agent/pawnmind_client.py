@@ -47,6 +47,13 @@ def load_config(path):
     return config
 
 
+class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Surface every 3xx as an HTTPError instead of following it."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
 class BridgeClient:
     def __init__(self, config_path=None, timeout=8.0):
         self.config_path = config_path or DEFAULT_CONFIG
@@ -55,7 +62,12 @@ class BridgeClient:
         self.token = config["token"]
         self.timeout = timeout
         # Never let a local bridge follow a redirect and forward the bearer token.
-        self.opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        # ProxyHandler({}) ignores ambient proxies; _NoRedirectHandler turns 3xx
+        # into an HTTPError so the token stays on the configured port.
+        self.opener = urllib.request.build_opener(
+            urllib.request.ProxyHandler({}),
+            _NoRedirectHandler(),
+        )
 
     def request(self, method, path, payload=None, auth=True, timeout=None):
         url = "http://127.0.0.1:%d%s" % (self.port, path)
@@ -71,6 +83,8 @@ class BridgeClient:
                 return json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as error:
             body = error.read().decode("utf-8", "replace")
+            if self.token:
+                body = body.replace(self.token, "[redacted]")
             raise BridgeError("bridge returned HTTP %d" % error.code, error.code, body)
         except (urllib.error.URLError, OSError) as error:
             raise BridgeError("bridge unavailable: %s" % error)

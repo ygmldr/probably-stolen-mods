@@ -1,0 +1,80 @@
+# =============================================================================
+# PawnMind × DSH 宿主覆盖层（DSH patch layer）
+#
+# 作用：给 DSH 的 web profile 叠加两行配置
+#   1. @deepseek-ai/dsh-mcp-client      —— 把 PawnMind 的 stdio MCP server 挂成
+#                                          serverName=pawnmind（模型侧工具名
+#                                          mcp__pawnmind__get_state 这种形状）
+#   2. @deepseek-ai/dsh-agent-default-model —— 新会话默认模型
+#                                          opencode-go / deepseek-v4.1-flash
+#
+# 本文件是纯离线交付：不含 token、不含真实用户目录、不联网、不调用模型。
+# 组合结果已用 `--dump-config` 离线验证（见
+# docs/pawnmind-ai-host-setup.zh-CN.md 第 8 节）；真实模型调用与真机联调留给 S8。
+#
+# 启动前在本机 shell 里准备（都不写进仓库）：
+#
+#   export PAWNMIND_HOME=/mnt/d/code/game_mods/PawnMind          # PawnMind 包根（绝对路径）
+#   export PAWNMIND_BRIDGE_CONF="/mnt/c/Users/<你>/AppData/LocalLow/Questing Goose Studio/Probably Stolen/ModData/pawnmind/bridge.conf"
+#   # 模型认证：opencode-go 路由的内置引用是 OPENCODE_API_KEY；但本机 web profile
+#   # 把它覆盖成了 OPENCODE_GO_API_KEY，且凭据库里可能已有该引用。以实际
+#   # `--dump-config` 为准，细节见 docs 第 5.2 节。
+#   # export OPENCODE_API_KEY=...
+#
+# 启动（两种等价形态，见 docs 第 6.2 节）：
+#
+#   # A（推荐）：工作目录 = PawnMind/play，play/AGENTS.md 会自动成为 project instructions
+#   cd PawnMind/play && dsh --profile web --patch ../agent/dsh/pawnmind.patch.yml
+#
+#   # B：工作目录 = 仓库根；`--patch` 用相对仓库根的路径
+#   dsh --profile web --patch PawnMind/agent/dsh/pawnmind.patch.yml
+#
+# 注意：DSH 的 profile 已装好 opencode-go 路由所需的 pi-ai 目录（见
+# `dsh-llm-pi-ai` 的 provider 数据，opencode-go 的原生认证变量就是
+# OPENCODE_API_KEY）；本文件不新增 provider，只选择 provider/model。
+# =============================================================================
+
+# --- 1) PawnMind MCP server（stdio）------------------------------------------
+# `insert` 往组合树里加新行；serverName 决定模型侧工具前缀 mcp__pawnmind__*。
+- insert:
+    - id: mcp-pawnmind
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: pawnmind
+        transport: stdio
+        # 指到 PawnMind/.venv/bin/python。stdio 子进程的 command 按“父进程 cwd”解析，
+        # 不随下面的 cwd 变，所以优先用 PAWNMIND_HOME 拼绝对路径；只有从仓库根目录
+        # 启动 dsh 时才退回相对写法。
+        command: !!js (process.env.PAWNMIND_HOME || 'PawnMind') + '/.venv/bin/python'
+        args:
+          - '-m'
+          - 'agent.mcp_server'
+          # 录制模式：服务端只注册首周 28 个工具（act/press/new_game/load_game/
+          # save_game 根本不存在）。全量 100 个工具只用于开发，不用于试玩。
+          - '--tools'
+          - 'recording'
+          - '--config'
+          # bridge.conf 由游戏内 Mod 写盘、含 token：路径只从本机环境变量来。
+          # 未设置时用占位路径，让 MCP 进程启动即报错退出（工具不出现），而不是
+          # 静默连到别的端口。占位符不是可用路径，别照抄。
+          - !!js process.env.PAWNMIND_BRIDGE_CONF || '/ABSOLUTE/PATH/TO/ModData/pawnmind/bridge.conf'
+        # cwd 必须是 PawnMind 包根：`-m agent.mcp_server` 靠它把 agent 包放进 sys.path。
+        cwd: !!js process.env.PAWNMIND_HOME || 'PawnMind'
+        # 单次 tools/call 上限：wait_for_events 本身最长 25s 长轮询，加上游戏帧等待，
+        # 默认 60s 偏紧，放宽到 120s。
+        toolCallTimeoutMs: 120000
+        # 游戏没开时不要因此拒绝整个 profile：工具先不出现，日志里留错误。
+        failOnStartupError: false
+        reconnect:
+          enabled: true
+
+# --- 2) 默认模型：opencode-go / deepseek-v4.1-flash --------------------------
+# 与 @deepseek-ai/dsh-base 里的 `agent-default-model` 是同一个 entry id：
+# patch 按 id 覆盖整条 config（不是再挂第二条，重复注册同一服务会冲突），
+# 所以这里重述 provider/model 两个 field 即可。
+# 认证：见文件头与 docs 第 5.2 节，key 不写进本文件。
+- id: agent-default-model
+  name: '@deepseek-ai/dsh-agent-default-model'
+  config:
+    provider: opencode-go
+    model: deepseek-v4.1-flash

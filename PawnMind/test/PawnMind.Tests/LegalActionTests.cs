@@ -88,6 +88,24 @@ namespace PawnMind.Tests
         }
 
         [Test]
+        public static void Disabled_Choices_Are_Not_Offered()
+        {
+            var flags = new GameFlags
+            {
+                InGame = true,
+                HasClient = true,
+                ClientArrived = true,
+                DialogueChoice = true,
+                ChoiceIndices = new List<int> { 0, 1, 2 },
+                DisabledChoiceIndices = new List<int> { 1, 2 }
+            };
+            var actions = Build(flags);
+            Assert.NotNull(Find(actions, "choose_dialogue", "index", 0), "enabled choice offered");
+            Assert.Null(Find(actions, "choose_dialogue", "index", 1), "disabled choice not offered");
+            Assert.Null(Find(actions, "choose_dialogue", "index", 2), "disabled choice not offered");
+        }
+
+        [Test]
         public static void Counter_Items_Offer_Buy_And_Sell()
         {
             var flags = new GameFlags

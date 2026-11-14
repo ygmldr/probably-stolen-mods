@@ -2,6 +2,7 @@ using System;
 using Newtonsoft.Json.Linq;
 using PawnMind.Bridge;
 using PawnMind.Core;
+using PawnMind.Game;
 using UnityEngine;
 
 /// <summary>
@@ -15,6 +16,11 @@ public sealed class PawnMindMod : IMod
 
     private static ModManifest _manifest;
     private static bool _allowTestItems;
+    private static bool _recordingArmed;
+    private static NewGameMenuService _newGameService;
+    private static RecordingSaveService _recordingService;
+    private static RecordingDispatchGuard _recordingGuard;
+    private static FirstWeekService _firstWeekService;
     private BridgeServer _server;
     private ActionRouter _router;
     private GameObject _pumpObject;
@@ -32,6 +38,61 @@ public sealed class PawnMindMod : IMod
             BridgeConfig config = LoadOrCreateConfig();
             _allowTestItems = config.AllowTestItems;
 
+            RecordingSettings recordingSettings = RecordingSettings.From(config);
+            _recordingArmed = recordingSettings.Error == null;
+            RecordingSlotPolicy recordingPolicy = new RecordingSlotPolicy(recordingSettings);
+            _recordingService = new RecordingSaveService(
+                recordingPolicy,
+                RecordingSaveAdapter.Instance,
+                RecordingSaveAdapter.Instance,
+                RecordingSaveAdapter.Instance,
+                NewGameMenuAdapter.Instance,
+                RecordingSaveAdapter.Instance);
+            _recordingGuard = new RecordingDispatchGuard(_recordingService);
+
+            // S5: one service instance owns the receipt tracker for both /state
+            // and the choose_dialogue action, so one payment is counted once.
+            _firstWeekService = new FirstWeekService(
+                FirstWeekAdapter.Instance,
+                FirstWeekAdapter.Instance,
+                FirstWeekAdapter.Instance);
+            FirstWeekService.SetCurrent(_firstWeekService);
+
+            string modVersion = _manifest == null ? "unknown" : _manifest.ModVersion;
+            GameIdentity gameIdentity;
+            try
+            {
+                // OnEnable runs on the Unity main thread. Capture the identity here
+                // so HTTP handling only reads cached strings, never Unity objects.
+                gameIdentity = GameVersionAdapter.Read();
+            }
+            catch (Exception)
+            {
+                gameIdentity = new GameIdentity(null, null);
+            }
+
+            // Expected values come only from bridge.conf. They are never filled
+            // from the installed identity, so a fresh config locks all writes.
+            WriteGateDecision writeGate = GameVersionGate.Evaluate(
+                gameIdentity,
+                config.ExpectedGameVersion,
+                config.ExpectedAssemblyMvid);
+            BridgeHealth health = BridgeHealth.From(writeGate);
+
+            Debug.Log("[PawnMind] game identity: "
+                + (string.IsNullOrEmpty(gameIdentity.GameVersion) ? "UNKNOWN" : gameIdentity.GameVersion)
+                + " / " + (string.IsNullOrEmpty(gameIdentity.AssemblyMvid) ? "UNKNOWN" : gameIdentity.AssemblyMvid)
+                + "; write gate: " + writeGate.State
+                + (string.IsNullOrEmpty(writeGate.Reason) ? string.Empty : " (" + writeGate.Reason + ")")
+                + "; latest: " + GameVersionGate.LatestUnverified);
+
+            if (!writeGate.WriteAllowed)
+            {
+                Debug.LogWarning("[PawnMind] write actions locked: " + writeGate.Reason
+                    + ". Set expected_game_version and expected_assembly_mvid in bridge.conf only after"
+                    + " confirming the Steam stable build.");
+            }
+
             _pumpObject = new GameObject("PawnMind.Pump");
             _pumpObject.hideFlags = HideFlags.HideAndDontSave;
             UnityEngine.Object.DontDestroyOnLoad(_pumpObject);
@@ -40,19 +101,47 @@ public sealed class PawnMindMod : IMod
                 new ActionGate(),
                 delegate { return StateSnapshot.CurrentRevision; },
                 DispatchAction,
-                new ActionHistory(100));
+                new ActionHistory(100),
+                // Handle() runs inside BridgeServer.Tick from MainThreadPump.Update,
+                // so refreshing the snapshot here stays on the Unity main thread.
+                delegate { StateSnapshot.BuildJson(); return StateSnapshot.CurrentRevision; },
+                config.Token,
+                delegate { return writeGate; });
+
+            // S3B menu writes are evaluated by the same S4 slot policy. The
+            // default (recording unconfigured) still refuses every write before
+            // any native callback; only get_new_game_options is a read.
+            _newGameService = new NewGameMenuService(
+                NewGameMenuAdapter.Instance,
+                NewGameMenuAdapter.Instance,
+                delegate
+                {
+                    RecordingSaveService service = _recordingService;
+                    return service == null
+                        ? RecordingSaveErrors.ServiceUnavailable
+                        : service.CheckMenuWrite();
+                });
 
             _server = new BridgeServer(
                 config,
                 StateSnapshot.BuildJson,
                 _router.Handle,
                 delegate(string message) { Debug.LogWarning(message); },
-                _manifest == null ? "unknown" : _manifest.ModVersion,
-                delegate { return StateSnapshot.CurrentRevision; });
+                modVersion,
+                delegate { return StateSnapshot.CurrentRevision; },
+                delegate { return health; },
+                new BridgeLimits(),
+                // A dispatched write whose response never reached the client must
+                // not stay cached as a success for the retrying agent.
+                _router.MarkResponseUndelivered);
 
             MainThreadPump pump = _pumpObject.AddComponent<MainThreadPump>();
             pump.Initialize(_server);
             _server.Start();
+
+            Debug.Log("[PawnMind] recording policy: "
+                + (recordingSettings.Error == null ? "armed" : recordingSettings.Error)
+                + "; writes still require the version gate and a bound slot.");
 
             Debug.Log("[PawnMind] listening on http://127.0.0.1:" + config.Port
                 + "/ (config: ModData/" + ModId + "/" + ConfigFile + ")");
@@ -84,10 +173,28 @@ public sealed class PawnMindMod : IMod
         }
 
         _pumpObject = null;
+        _recordingArmed = false;
+        _newGameService = null;
+        _recordingService = null;
+        _recordingGuard = null;
+        FirstWeekService.SetCurrent(null);
+        _firstWeekService = null;
     }
 
     private static ActionResult DispatchAction(string op, JObject request)
     {
+        ActionResult recordingResult;
+        if (_recordingGuard != null
+            && _recordingGuard.TryHandle(op, request, out recordingResult))
+        {
+            if (recordingResult.Ok && IsRunChangeOp(op))
+            {
+                FirstWeekService service = FirstWeekService.Current;
+                if (service != null) service.ResetRentReceipts();
+            }
+            return recordingResult;
+        }
+
         if (op == "act")
         {
             string inner = (string)request["action"];
@@ -110,19 +217,119 @@ public sealed class PawnMindMod : IMod
                 return GameActions.AdvanceDialogue();
 
             case "choose_dialogue":
-                return GameActions.ChooseDialogue(ReadInt(request, "index", -1));
+            {
+                FirstWeekService service = FirstWeekService.Current;
+                if (service == null)
+                {
+                    return ActionResult.Failure("choose_dialogue", "not_initialized");
+                }
+                return service.ChooseDialogue(
+                    ReadInt(request, "index", -1), StateSnapshot.CurrentRevision);
+            }
 
             case "end_day":
-                return GameActions.EndDay();
+            {
+                FirstWeekService service = FirstWeekService.Current;
+                if (service == null)
+                {
+                    return ActionResult.Failure("end_day", "not_initialized");
+                }
+                return service.EndDay(StateSnapshot.CurrentRevision);
+            }
 
-            case "new_game":
-                return GameActions.NewGame();
+            case "get_new_game_options":
+                return NewGameOptions();
 
-            case "load_game":
-                return GameActions.LoadGame(ReadInt(request, "slot", -1));
+            case "get_recording_save_status":
+            {
+                RecordingSaveService service = RecordingService;
+                if (service == null)
+                {
+                    return ActionResult.Failure(
+                        "get_recording_save_status", "not_initialized");
+                }
+                return ActionResult.SuccessRaw(
+                    "get_recording_save_status", service.StatusJson());
+            }
 
-            case "sleep":
-                return GameActions.Sleep();
+            case "open_new_game_menu":
+            {
+                NewGameMenuService service = NewGameService;
+                if (service == null)
+                {
+                    return ActionResult.Failure("open_new_game_menu", "not_initialized");
+                }
+                return NewGameResult("open_new_game_menu", service.Open());
+            }
+
+            case "select_new_game_option":
+            {
+                NewGameOptionKind kind;
+                if (!TryParseNewGameKind((string)request["kind"], out kind))
+                {
+                    return ActionResult.Failure("select_new_game_option", "bad_kind");
+                }
+                NewGameMenuService service = NewGameService;
+                if (service == null)
+                {
+                    return ActionResult.Failure("select_new_game_option", "not_initialized");
+                }
+                return ActionResult.SuccessRaw(
+                    "select_new_game_option",
+                    NewGameMenuJson.SelectJson(service.Select(kind, (string)request["id"])));
+            }
+
+            case "new_game_next_page":
+            {
+                NewGamePageRow row;
+                if (!TryParseNewGameRow((string)request["row"], out row))
+                {
+                    return ActionResult.Failure("new_game_next_page", "bad_row");
+                }
+                NewGameMenuService service = NewGameService;
+                if (service == null)
+                {
+                    return ActionResult.Failure("new_game_next_page", "not_initialized");
+                }
+                return NewGameResult(
+                    "new_game_next_page",
+                    service.NextPage(row, ReadInt(request, "direction", 0)));
+            }
+
+            case "new_game_continue":
+            {
+                NewGameMenuService service = NewGameService;
+                if (service == null)
+                {
+                    return ActionResult.Failure("new_game_continue", "not_initialized");
+                }
+                return NewGameResult("new_game_continue", service.Continue());
+            }
+
+            case "focus_new_game_selected_perk":
+            {
+                NewGameMenuService service = NewGameService;
+                if (service == null)
+                {
+                    return ActionResult.Failure(
+                        "focus_new_game_selected_perk", "not_initialized");
+                }
+                return NewGameResult(
+                    "focus_new_game_selected_perk",
+                    service.FocusSelectedPerk((string)request["id"]));
+            }
+
+            case "blur_new_game_option":
+            {
+                NewGameMenuService service = NewGameService;
+                if (service == null)
+                {
+                    return ActionResult.Failure("blur_new_game_option", "not_initialized");
+                }
+                return NewGameResult(
+                    "blur_new_game_option",
+                    service.BlurOption((string)request["id"]));
+            }
 
             case "debug_pulse":
                 Diagnostics.Pulse();
@@ -297,7 +504,7 @@ public sealed class PawnMindMod : IMod
 
             case "list_contacts":
                 return ActionResult.SuccessRaw("list_contacts", PhoneService.ListJson(
-                    request["include_hidden"] != null && (bool)request["include_hidden"]));
+                    IsTrue(request["include_hidden"]), _allowTestItems, _recordingArmed));
 
             case "call":
                 return ActionResult.SuccessRaw("call", PhoneService.CallJson(
@@ -402,12 +609,6 @@ public sealed class PawnMindMod : IMod
             case "get_ui_snapshot":
                 return ActionResult.SuccessRaw("get_ui_snapshot", UiSnapshot.BuildJson());
 
-            case "press":
-                return UiSnapshot.Press((string)request["control_id"]);
-
-            case "save_game":
-                return GameActions.SaveGame();
-
             case "confirm_trade":
                 return GameActions.ConfirmTrade(
                     ReadInt(request, "item_id", -1),
@@ -425,6 +626,74 @@ public sealed class PawnMindMod : IMod
             default:
                 return ActionResult.Failure(op, "unknown_op");
         }
+    }
+
+    private static NewGameMenuService NewGameService
+    {
+        get { return _newGameService; }
+    }
+
+    private static RecordingSaveService RecordingService
+    {
+        get { return _recordingService; }
+    }
+
+    private static ActionResult NewGameOptions()
+    {
+        NewGameMenuService service = NewGameService;
+        if (service == null) return ActionResult.Failure("get_new_game_options", "not_initialized");
+
+        try
+        {
+            return ActionResult.SuccessRaw(
+                "get_new_game_options",
+                NewGameMenuJson.OptionsJson(service.GetOptions()));
+        }
+        catch (Exception)
+        {
+            return ActionResult.Failure("get_new_game_options", "new_game_read_failed");
+        }
+    }
+
+    private static ActionResult NewGameResult(string op, NewGameMenuActionResult result)
+    {
+        return ActionResult.SuccessRaw(op, NewGameMenuJson.ActionResultJson(op, result));
+    }
+
+    private static bool TryParseNewGameKind(string value, out NewGameOptionKind kind)
+    {
+        kind = NewGameOptionKind.Scenario;
+        switch ((value ?? string.Empty).Trim().ToLowerInvariant())
+        {
+            case "scenario": kind = NewGameOptionKind.Scenario; return true;
+            case "perk": kind = NewGameOptionKind.Perk; return true;
+            case "difficulty": kind = NewGameOptionKind.Difficulty; return true;
+            default: return false;
+        }
+    }
+
+    private static bool TryParseNewGameRow(string value, out NewGamePageRow row)
+    {
+        row = NewGamePageRow.Available;
+        switch ((value ?? string.Empty).Trim().ToLowerInvariant())
+        {
+            case "available": row = NewGamePageRow.Available; return true;
+            case "selected": row = NewGamePageRow.Selected; return true;
+            default: return false;
+        }
+    }
+
+    private static bool IsRunChangeOp(string op)
+    {
+        return op == "load_game"
+            || op == "load_recording_game"
+            || op == "new_game"
+            || op == "confirm_new_game";
+    }
+
+    private static bool IsTrue(JToken token)
+    {
+        return token != null && token.Type == JTokenType.Boolean && (bool)token;
     }
 
     private static int ReadInt(JObject request, string name, int fallback)

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using PawnMind.Core;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 
 namespace PawnMind.Game
 {
@@ -21,7 +22,9 @@ namespace PawnMind.Game
             {
                 try
                 {
-                    return PlayerStore.Instance != null;
+                    // Instance creates an empty store on first access; HasInstance
+                    // is the only safe main-menu/game-state probe.
+                    return PlayerStore.HasInstance;
                 }
                 catch
                 {
@@ -111,45 +114,6 @@ namespace PawnMind.Game
             {
                 return null;
             }
-        }
-
-        public static List<int> GetSaveSlots()
-        {
-            try
-            {
-                return SaveFiles.IndexLoad<List<int>>("activeSaveSlotId", new List<int>());
-            }
-            catch
-            {
-                return new List<int>();
-            }
-        }
-
-        public static List<Dictionary<string, object>> GetSavePreviews()
-        {
-            var previews = new List<Dictionary<string, object>>();
-            try
-            {
-                List<int> slots = GetSaveSlots();
-                for (int i = 0; i < slots.Count; i++)
-                {
-                    SavePreviewData preview = SaveUIManager.GetPreview(slots[i]);
-                    if (preview == null) continue;
-
-                    var row = new Dictionary<string, object>();
-                    row["slot"] = slots[i];
-                    row["day"] = preview.dayCount;
-                    row["credit"] = preview.credit;
-                    row["name"] = preview.GetDisplayName();
-                    row["saved_at"] = preview.lastSaveDateTime.ToString("o");
-                    previews.Add(row);
-                }
-            }
-            catch
-            {
-            }
-
-            return previews;
         }
 
         private static readonly FieldInfo ClientGridField =
@@ -480,40 +444,187 @@ namespace PawnMind.Game
             }
         }
 
-        public static List<Dictionary<string, object>> GetDialogueChoices()
+        /// <summary>
+        /// S5 read-only dialogue projection. Enabled mirrors the native button
+        /// interactable state (DialogUIManager.DisplayChoice uses the same
+        /// Dialogue.IsChoiceEnabledAt call). The identity is an opaque handle
+        /// used only for post-select readback and is never serialized.
+        /// </summary>
+        public static DialogueView ReadDialogueView()
         {
-            var described = new List<Dictionary<string, object>>();
+            var view = new DialogueView
+            {
+                Readable = true,
+                Available = false,
+                Ended = true
+            };
+
             try
             {
                 DialogUIManager ui = DialogUIManager.Instance;
-                if (ui == null) return described;
+                if (ui == null) return view;
 
                 Dialogue current = ui.GetCurrentDialog();
-                if (current == null || current.choices == null) return described;
+                if (current == null) return view;
 
-                for (int i = 0; i < current.choices.Count; i++)
+                view.Available = true;
+                view.Identity = "dialogue_" + RuntimeHelpers.GetHashCode(current);
+                view.Speaker = current.title;
+                view.Text = current.plainText;
+                view.Ended = ui.IsCurrentDialogEnd();
+                view.Choice = ui.IsChoice();
+                view.Typing = ui.IsLineStillDisplaying(current);
+
+                if (current.choices != null)
                 {
-                    var choice = current.choices[i];
-                    Dialogue line = choice.Item2;
-                    if (line == null) continue;
-
-                    var row = new Dictionary<string, object>();
-                    row["index"] = i;
-                    row["text"] = line.plainText ?? string.Empty;
-                    if (choice.Item1 != null)
+                    for (int i = 0; i < current.choices.Count; i++)
                     {
-                        row["item_id"] = choice.Item1.GetUniqueID();
-                        row["item_name"] = choice.Item1.name;
-                    }
+                        var choice = current.choices[i];
+                        Dialogue line = choice.Item2;
+                        var cell = new DialogueChoiceView
+                        {
+                            Index = i,
+                            Text = line == null ? string.Empty : (line.plainText ?? string.Empty),
+                            Enabled = SafeChoiceEnabled(current, i),
+                            HasItem = choice.Item1 != null
+                        };
+                        if (cell.HasItem)
+                        {
+                            cell.ItemId = choice.Item1.GetUniqueID();
+                            cell.ItemName = choice.Item1.name;
+                        }
 
-                    described.Add(row);
+                        view.Choices.Add(cell);
+                    }
                 }
+
+                return view;
             }
             catch
             {
+                return new DialogueView
+                {
+                    Readable = false,
+                    Error = DialogueChoiceErrors.DialogueUnavailable,
+                    Available = false,
+                    Ended = true
+                };
             }
+        }
 
-            return described;
+        private static bool SafeChoiceEnabled(Dialogue current, int index)
+        {
+            try
+            {
+                return current.IsChoiceEnabledAt(index);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>Single guarded native call; the service owns the pre-check.</summary>
+        public static void SelectDialogueChoice(int index)
+        {
+            DialogUIManager ui = DialogUIManager.Instance;
+            if (ui == null) throw new InvalidOperationException("no_dialogue");
+            ui.SelectChoice(index);
+        }
+
+        public static RentSnapshot ReadRentSnapshot()
+        {
+            try
+            {
+                if (!PlayerStore.HasInstance) return UnreadableRent();
+                PlayerStore store = PlayerStore.Instance;
+                StoreStation station = StoreStation.Instance;
+                if (store == null || store.runStats == null || station == null) return UnreadableRent();
+
+                return new RentSnapshot
+                {
+                    Readable = true,
+                    Due = store.GetRentValue(),
+                    RentValue = store.rentValue,
+                    TemporaryRent = store.temporaryRent,
+                    DaysLeft = store.GetRentDayCounter(),
+                    DaysUntilRent = store.dayUntilRent,
+                    CanPay = store.CanPayRent(),
+                    RentPaidTotal = store.runStats.rentPaid,
+                    RentWeeksPaid = store.runStats.rentWeeksPaid,
+                    RentWeeksMissed = store.runStats.rentWeeksMissed,
+                    StartingRent = store.startingRent,
+                    Cash = store.playerCash,
+                    Day = station.dayCounter,
+                    RunId = store.runID ?? string.Empty
+                };
+            }
+            catch
+            {
+                return UnreadableRent();
+            }
+        }
+
+        private static RentSnapshot UnreadableRent()
+        {
+            return new RentSnapshot
+            {
+                Readable = false,
+                Error = RentErrors.RentUnavailable
+            };
+        }
+
+        public static ShopDaySnapshot ReadShopDaySnapshot()
+        {
+            try
+            {
+                if (!PlayerStore.HasInstance)
+                {
+                    return new ShopDaySnapshot
+                    {
+                        Readable = true,
+                        InGame = false
+                    };
+                }
+
+                PlayerStore store = PlayerStore.Instance;
+                StoreStation station = StoreStation.Instance;
+                if (store == null || station == null)
+                {
+                    return new ShopDaySnapshot
+                    {
+                        Readable = false,
+                        Error = DayCycleErrors.ReadbackUnavailable
+                    };
+                }
+
+                return new ShopDaySnapshot
+                {
+                    Readable = true,
+                    InGame = true,
+                    CanEndDay = store.CanEndDay(),
+                    Day = station.dayCounter,
+                    Cash = store.playerCash,
+                    RentDaysLeft = store.dayUntilRent,
+                    RentDue = store.GetRentValue()
+                };
+            }
+            catch
+            {
+                return new ShopDaySnapshot
+                {
+                    Readable = false,
+                    Error = DayCycleErrors.ReadbackUnavailable
+                };
+            }
+        }
+
+        public static void EndDay()
+        {
+            if (!PlayerStore.HasInstance) throw new InvalidOperationException("not_in_game");
+            PlayerStore store = PlayerStore.Instance;
+            if (store == null) throw new InvalidOperationException("not_in_game");
+            store.EndDay();
         }
 
         public static Dictionary<string, object> GetBargainSnapshot()
@@ -563,32 +674,6 @@ namespace PawnMind.Game
             catch
             {
                 return false;
-            }
-        }
-
-        public static Dictionary<string, object> GetDialogueSnapshot()
-        {
-            try
-            {
-                DialogUIManager ui = DialogUIManager.Instance;
-                if (ui == null) return null;
-
-                var snapshot = new Dictionary<string, object>();
-                snapshot["choice"] = ui.IsChoice();
-                snapshot["ended"] = ui.IsCurrentDialogEnd();
-                Dialogue current = ui.GetCurrentDialog();
-                snapshot["typing"] = current != null && ui.IsLineStillDisplaying(current);
-                if (current != null)
-                {
-                    snapshot["speaker"] = current.title;
-                    snapshot["text"] = current.plainText;
-                }
-
-                return snapshot;
-            }
-            catch
-            {
-                return null;
             }
         }
 

@@ -50,8 +50,8 @@
 ## 当前版本与架构（2026-11-11）
 
 - Git tag：`v1.0.1`；`manifest.xml` 仍是 0.2.1（发版前同步）。
-- 测试：C# 144 项 + 适配器契约 + Python 8 项。
-- 89 个 MCP 工具；入口 `agent/mcp_server.py`，HTTP 客户端 `agent/pawnmind_client.py`。
+- 测试：以 `./test.sh` 与 `agent/tests` 实际输出为准（2026-11-14：C# 462 + 脚本门禁 53 + 适配器契约 392、Python 81，均 0 skip）。
+- 100 个 MCP 工具（`--tools recording` 只注册首周录制用 28 个）；入口 `agent/mcp_server.py`，HTTP 客户端 `agent/pawnmind_client.py`。
 - `agent/orchestrator.py` 只有确定性 `RulePolicy`，还不是 LLM agent。
 
 ```
@@ -71,7 +71,7 @@ agent/mcp_server.py         stdio MCP
 - 不把隐藏字段（鉴定答案、隐藏身份、真实水质）暴露给 MCP。
 - 不提供任意代码执行、任意文件读写、`AddCredit`、生成物品。
 - 新增 MCP 工具时，先在 `agent/tests/` 加工具注册/参数测试；C# 侧若新增游戏成员，先补适配器契约。
-- `new_game` 只用于新档，不得在自动化/真机测试中调用；测试统一槽 17。
+- `new_game` 在录制模式下恒被拒绝；受控开局只能走 `confirm_new_game`（S3B 菜单 + S4 专用槽授权，默认全锁）。普通离线回归禁止创建任何存档；历史开发测试的槽 17 约定不再用于录制。
 
 ## 审查入口
 
@@ -79,7 +79,7 @@ agent/mcp_server.py         stdio MCP
 2. 对照 `docs/pawnmind-capability-matrix.zh-CN.md` 检查每个“真机/代码/未接”的声明。
 3. 重点看 `src/Bridge/`（rev/token/主线程/回滚）和 `src/Game/`（隐藏字段/反射边界）。
 4. 跑 `./test.sh` 和 `.venv/bin/python -m unittest discover -s agent/tests`。
-5. 不要动用户存档；只允许槽 17。
+5. 不要动用户存档；录制只允许已绑定的专用槽（`recording_slot`），默认全锁。
 
 ## 已知“不是 bug 但别误判”
 

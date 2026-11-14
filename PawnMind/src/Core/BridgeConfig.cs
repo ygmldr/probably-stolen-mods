@@ -21,10 +21,48 @@ namespace PawnMind.Core
         public string Token { get; set; }
         public bool AllowTestItems { get; set; }
 
+        /// <summary>
+        /// User-confirmed game identity for recording (set during S8 preflight).
+        /// Empty means all write actions stay locked; the mod never fills these
+        /// from the currently installed build.
+        /// </summary>
+        public string ExpectedGameVersion { get; set; }
+        public string ExpectedAssemblyMvid { get; set; }
+
+        /// <summary>
+        /// Recording opt-in. Empty/off is the default and keeps every recording
+        /// write locked. The mod never writes these three values from the
+        /// installed game identity or the currently active save slot.
+        /// </summary>
+        public string RecordingMode { get; set; }
+        public int? RecordingSlot
+        {
+            get { return _recordingSlot; }
+            set
+            {
+                _recordingSlot = value;
+                _recordingSlotRaw = value.HasValue
+                    ? value.Value.ToString(CultureInfo.InvariantCulture)
+                    : string.Empty;
+                _recordingSlotInvalid = false;
+            }
+        }
+        public bool RecordingIsolationAck { get; set; }
+        public string RecordingSlotRaw { get { return _recordingSlotRaw; } }
+        public bool RecordingSlotInvalid { get { return _recordingSlotInvalid; } }
+
+        private int? _recordingSlot;
+        private string _recordingSlotRaw = string.Empty;
+        private bool _recordingSlotInvalid;
+
         public BridgeConfig()
         {
             Port = DefaultPort;
             Token = string.Empty;
+            ExpectedGameVersion = string.Empty;
+            ExpectedAssemblyMvid = string.Empty;
+            RecordingMode = string.Empty;
+            RecordingIsolationAck = false;
         }
 
         public static BridgeConfig Create(int port, string token)
@@ -64,7 +102,41 @@ namespace PawnMind.Core
         {
             return "# pawnmind bridge config v1\n"
                 + "port=" + Port.ToString(CultureInfo.InvariantCulture) + "\n"
-                + "token=" + Token + "\n";
+                + "token=" + Token + "\n"
+                + "# Set expected_* only after confirming the recording game build; empty locks writes.\n"
+                + "expected_game_version=" + (ExpectedGameVersion ?? string.Empty) + "\n"
+                + "expected_assembly_mvid=" + (ExpectedAssemblyMvid ?? string.Empty) + "\n"
+                + "# Recording is user-only: set all three keys after confirming an isolated slot.\n"
+                + "recording_mode=" + (RecordingMode ?? string.Empty) + "\n"
+                + "recording_slot=" + (_recordingSlot.HasValue
+                    ? _recordingSlot.Value.ToString(CultureInfo.InvariantCulture)
+                    : (_recordingSlotRaw ?? string.Empty)) + "\n"
+                + "recording_isolation_ack=" + (RecordingIsolationAck ? "true" : "false") + "\n";
+        }
+
+        /// <summary>
+        /// Parses only the recording slot text. Malformed text is remembered as
+        /// invalid instead of rejecting the whole config: regenerating the file
+        /// would silently discard the user's other explicit settings.
+        /// </summary>
+        private void SetRecordingSlotText(string raw)
+        {
+            _recordingSlotRaw = raw ?? string.Empty;
+            _recordingSlotInvalid = false;
+            _recordingSlot = null;
+
+            if (_recordingSlotRaw.Length == 0) return;
+
+            int value;
+            if (int.TryParse(_recordingSlotRaw, NumberStyles.Integer,
+                CultureInfo.InvariantCulture, out value))
+            {
+                _recordingSlot = value;
+            }
+            else
+            {
+                _recordingSlotInvalid = true;
+            }
         }
 
         public static bool TryParse(string text, out BridgeConfig config, out string error)
@@ -81,6 +153,11 @@ namespace PawnMind.Core
             int port = DefaultPort;
             string token = string.Empty;
             bool allowTestItems = false;
+            string expectedGameVersion = string.Empty;
+            string expectedAssemblyMvid = string.Empty;
+            string recordingMode = string.Empty;
+            string recordingSlotRaw = string.Empty;
+            bool recordingIsolationAck = false;
 
             string[] lines = text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
             for (int i = 0; i < lines.Length; i++)
@@ -115,10 +192,36 @@ namespace PawnMind.Core
                     allowTestItems = string.Equals(value, "true", StringComparison.OrdinalIgnoreCase)
                         || value == "1";
                 }
+                else if (key == "expected_game_version")
+                {
+                    expectedGameVersion = value;
+                }
+                else if (key == "expected_assembly_mvid")
+                {
+                    expectedAssemblyMvid = value;
+                }
+                else if (key == "recording_mode")
+                {
+                    recordingMode = value;
+                }
+                else if (key == "recording_slot")
+                {
+                    recordingSlotRaw = value;
+                }
+                else if (key == "recording_isolation_ack")
+                {
+                    recordingIsolationAck = string.Equals(value, "true", StringComparison.OrdinalIgnoreCase)
+                        || value == "1";
+                }
             }
 
             BridgeConfig parsed = Create(port, token);
             parsed.AllowTestItems = allowTestItems;
+            parsed.ExpectedGameVersion = expectedGameVersion;
+            parsed.ExpectedAssemblyMvid = expectedAssemblyMvid;
+            parsed.RecordingMode = recordingMode;
+            parsed.RecordingIsolationAck = recordingIsolationAck;
+            parsed.SetRecordingSlotText(recordingSlotRaw);
             if (!parsed.TryValidate(out error)) return false;
 
             config = parsed;

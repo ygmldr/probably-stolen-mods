@@ -14,6 +14,9 @@ namespace PawnMind.Core
 
     public static class PhoneDirectory
     {
+        /// <summary>Stable error code for a hidden-contact request that is not allowed.</summary>
+        public const string HiddenContactsForbidden = "hidden_contacts_forbidden";
+
         public static List<PhoneContact> Visible(IEnumerable<PhoneContact> contacts, bool includeHidden)
         {
             var result = new List<PhoneContact>();
@@ -26,6 +29,42 @@ namespace PawnMind.Core
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// Resolves whether the caller may expand contacts the phone book has not
+        /// shown yet. Fail-closed: only an explicit debug profile
+        /// (allow_test_items=true) outside recording may see them. Production and
+        /// every recording session get the visible set, and asking for hidden
+        /// contacts there returns <see cref="HiddenContactsForbidden"/> instead of
+        /// silently widening the answer.
+        /// </summary>
+        public static bool TryResolveIncludeHidden(
+            bool requested,
+            bool allowTestItems,
+            bool recordingArmed,
+            out bool includeHidden,
+            out string error)
+        {
+            includeHidden = false;
+            error = null;
+
+            if (!requested) return true;
+
+            if (recordingArmed)
+            {
+                error = HiddenContactsForbidden;
+                return false;
+            }
+
+            if (!allowTestItems)
+            {
+                error = HiddenContactsForbidden;
+                return false;
+            }
+
+            includeHidden = true;
+            return true;
         }
     }
 }

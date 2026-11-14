@@ -11,37 +11,43 @@
     <Optimize>true</Optimize>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <!-- Explicit override: -p:GameManaged="D:\...\Managed" or GAME_MANAGED env. -->
+    <GameManaged Condition="'$(GameManaged)' == '' and '$(GAME_MANAGED)' != ''">$(GAME_MANAGED)</GameManaged>
+    <GameManaged Condition="'$(GameManaged)' == ''">D:\Program Files\steam\steamapps\common\Probably Stolen\Probably Stolen_Data\Managed</GameManaged>
+  </PropertyGroup>
+
   <ItemGroup>
     <Compile Include="**/*.cs" Exclude="bin/**/*.cs;obj/**/*.cs" />
   </ItemGroup>
 
   <ItemGroup>
     <Reference Include="Assembly-CSharp">
-      <HintPath>D:\Program Files\steam\steamapps\common\Probably Stolen\Probably Stolen_Data\Managed\Assembly-CSharp.dll</HintPath>
+      <HintPath>$(GameManaged)/Assembly-CSharp.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine">
-      <HintPath>D:\Program Files\steam\steamapps\common\Probably Stolen\Probably Stolen_Data\Managed\UnityEngine.dll</HintPath>
+      <HintPath>$(GameManaged)/UnityEngine.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.CoreModule">
-      <HintPath>D:\Program Files\steam\steamapps\common\Probably Stolen\Probably Stolen_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
+      <HintPath>$(GameManaged)/UnityEngine.CoreModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.InputLegacyModule">
-      <HintPath>D:\Program Files\steam\steamapps\common\Probably Stolen\Probably Stolen_Data\Managed\UnityEngine.InputLegacyModule.dll</HintPath>
+      <HintPath>$(GameManaged)/UnityEngine.InputLegacyModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.UI">
-      <HintPath>D:\Program Files\steam\steamapps\common\Probably Stolen\Probably Stolen_Data\Managed\UnityEngine.UI.dll</HintPath>
+      <HintPath>$(GameManaged)/UnityEngine.UI.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="Unity.TextMeshPro">
-      <HintPath>D:\Program Files\steam\steamapps\common\Probably Stolen\Probably Stolen_Data\Managed\Unity.TextMeshPro.dll</HintPath>
+      <HintPath>$(GameManaged)/Unity.TextMeshPro.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="Newtonsoft.Json">
-      <HintPath>D:\Program Files\steam\steamapps\common\Probably Stolen\Probably Stolen_Data\Managed\Newtonsoft.Json.dll</HintPath>
+      <HintPath>$(GameManaged)/Newtonsoft.Json.dll</HintPath>
       <Private>false</Private>
     </Reference>
   </ItemGroup>

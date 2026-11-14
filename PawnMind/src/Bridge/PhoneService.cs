@@ -8,8 +8,16 @@ namespace PawnMind.Bridge
 {
     internal static class PhoneService
     {
-        public static string ListJson(bool includeHidden)
+        public static string ListJson(bool includeHidden, bool allowTestItems, bool recordingArmed)
         {
+            bool resolvedHidden;
+            string hiddenError;
+            if (!PhoneDirectory.TryResolveIncludeHidden(
+                    includeHidden, allowTestItems, recordingArmed, out resolvedHidden, out hiddenError))
+            {
+                return "{\"ok\":false,\"error\":\"" + Escape(hiddenError) + "\"}";
+            }
+
             var contacts = new List<PhoneContact>();
             try
             {
@@ -34,7 +42,7 @@ namespace PawnMind.Bridge
                 return "{\"ok\":false,\"error\":\"phone_list_failed\",\"detail\":\"" + Escape(e.Message) + "\"}";
             }
 
-            List<PhoneContact> visible = PhoneDirectory.Visible(contacts, includeHidden);
+            List<PhoneContact> visible = PhoneDirectory.Visible(contacts, resolvedHidden);
             var rows = new List<Dictionary<string, object>>();
             for (int i = 0; i < visible.Count; i++)
             {

@@ -40,7 +40,7 @@ This workspace contains two mods for **Probably Stolen 0.46D**:
 - `PawnMind/src/Game/`：唯一允许反射/直连游戏类型的层
 - `PawnMind/test/PawnMind.Tests/`：纯逻辑测试
 - `PawnMind/test/PawnMind.AdapterTests/`：对 `Assembly-CSharp.dll` 的契约测试（DLL 缺失时 SKIP）
-- `PawnMind/agent/mcp_server.py`：stdio MCP，89 个工具
+- `PawnMind/agent/mcp_server.py`：stdio MCP，100 个工具（`--tools recording` 只注册录制用 28 个）
 - `PawnMind/agent/pawnmind_client.py`：HTTP 客户端 + 长轮询
 - `PawnMind/agent/orchestrator.py`：observe→decide→act 基线，只有 `RulePolicy`
 - 详细规则见 [`PawnMind/AGENTS.md`](PawnMind/AGENTS.md)
@@ -82,7 +82,7 @@ cd PawnMind && ./build.sh
 - 只监听 `127.0.0.1`；除 `/health` 外都要 Bearer token。
 - 日志/错误响应不得包含 token。
 - 写操作失败不得留下半状态；能回滚的回滚。
-- 不读用户存档、不 `new_game`；真机测试只用**槽 17**。
+- 不读用户存档；普通回归禁止 `new_game`。录制流程只允许用户批准的专用槽（`recording_slot`，且必须等于游戏当时的下一个自动分配槽），全部经 S4 策略，默认全锁。历史开发测试的槽 17 约定不再用于录制。
 - 禁止触碰：`save_11*`、`save_0/1/3/4/7`、`save_13` 等用户存档。
 - 发布包不要带 `allow_test_items=true`；debug 注入仅测试档使用。
 

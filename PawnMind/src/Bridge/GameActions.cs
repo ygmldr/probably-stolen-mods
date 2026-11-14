@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using PawnMind.Core;
 using PawnMind.Game;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 
 namespace PawnMind.Bridge
 {
@@ -59,81 +58,6 @@ namespace PawnMind.Bridge
             return ActionResult.Success("advance_dialogue");
         }
 
-        public static ActionResult ChooseDialogue(int index)
-        {
-            DialogUIManager ui = GetDialogUi();
-            if (ui == null) return ActionResult.Failure("choose_dialogue", "no_dialogue");
-            if (!ui.IsChoice()) return ActionResult.Failure("choose_dialogue", "no_choice");
-
-            Dialogue current = ui.GetCurrentDialog();
-            if (current == null || current.choices == null)
-                return ActionResult.Failure("choose_dialogue", "no_choice");
-            if (index < 0 || index >= current.choices.Count)
-                return ActionResult.Failure("choose_dialogue", "bad_index");
-
-            ui.SelectChoice(index);
-            return ActionResult.Success("choose_dialogue");
-        }
-
-        public static ActionResult EndDay()
-        {
-            PlayerStore store;
-            if (!TryStore(out store)) return ActionResult.Failure("end_day", "not_in_game");
-            if (!store.CanEndDay()) return ActionResult.Failure("end_day", "cannot_end_day");
-
-            store.EndDay();
-            return ActionResult.Success("end_day");
-        }
-
-        public static ActionResult NewGame()
-        {
-            PlayerStore existing;
-            if (TryStore(out existing)) return ActionResult.Failure("new_game", "already_in_game");
-
-            NewGameData data = NewGameData.Instance;
-            if (data == null) return ActionResult.Failure("new_game", "no_new_game_data");
-
-            data.saveSlot = -1;
-            data.saveFile = null;
-            data.isLoadFromMainMenu = false;
-            data.startType = NewGameData.StartType.APPRENTICE;
-            data.skipIntro = true;
-
-            EmporiumEntry.sceneLoadStartTime = Time.realtimeSinceStartup;
-            SceneManager.LoadScene("InventoryScene", LoadSceneMode.Single);
-            return ActionResult.Success("new_game");
-        }
-
-        public static ActionResult LoadGame(int slot)
-        {
-            PlayerStore existing;
-            if (TryStore(out existing)) return ActionResult.Failure("load_game", "already_in_game");
-
-            NewGameData data = NewGameData.Instance;
-            if (data == null) return ActionResult.Failure("load_game", "no_new_game_data");
-
-            MainMenuUIController controller = MainMenuUIController.Instance;
-            if (controller == null) return ActionResult.Failure("load_game", "no_main_menu");
-
-            data.saveSlot = slot;
-            data.saveFile = null;
-            data.isLoadFromMainMenu = true;
-            controller.StartNewGameClick();
-            return ActionResult.Success("load_game");
-        }
-
-        public static ActionResult Sleep()
-        {
-            PlayerStore store;
-            if (!TryStore(out store)) return ActionResult.Failure("sleep", "not_in_game");
-
-            EndOfDayUIManager ui = EndOfDayUIManager.Instance;
-            if (ui == null) return ActionResult.Failure("sleep", "no_end_of_day_ui");
-
-            ui.OnEndDayButtonClick();
-            return ActionResult.Success("sleep");
-        }
-
         public static ActionResult BuyWholesale()
         {
             PlayerStore store;
@@ -184,15 +108,6 @@ namespace PawnMind.Bridge
 
             store.commissaryData.BuyItem(identifier);
             return ActionResult.Success("commissary_buy");
-        }
-
-        public static ActionResult SaveGame()
-        {
-            PlayerStore store;
-            if (!TryStore(out store)) return ActionResult.Failure("save_game", "not_in_game");
-
-            store.SaveGame();
-            return ActionResult.Success("save_game");
         }
 
         public static ActionResult MoveItem(int itemId, string targetContainer, int x, int y, int turns)
@@ -496,6 +411,13 @@ namespace PawnMind.Bridge
         {
             try
             {
+                // Do not call the Instance getter at the main menu: it creates an
+                // empty PlayerStore and makes "not in game" checks lie.
+                if (!PlayerStore.HasInstance)
+                {
+                    store = null;
+                    return false;
+                }
                 store = PlayerStore.Instance;
                 return store != null;
             }

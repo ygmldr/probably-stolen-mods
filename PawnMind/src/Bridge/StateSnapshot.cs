@@ -42,6 +42,7 @@ namespace PawnMind.Bridge
                 state["client"] = null;
                 state["negotiated_item"] = null;
                 state["run_summary"] = null;
+                state["rent"] = null;
                 return state;
             }
 
@@ -75,14 +76,8 @@ namespace PawnMind.Bridge
             state["inventory"] = DescribeItems(inventory);
             state["can_call_next"] = GameState.GetCanNextClient();
             state["can_end_day"] = GameState.GetCanEndDay();
-            Dictionary<string, object> dialogue = GameState.GetDialogueSnapshot();
-            if (dialogue != null)
-            {
-                dialogue["choices"] = GameState.GetDialogueChoices();
-            }
-
-            state["dialogue"] = dialogue;
-
+            state["dialogue"] = FirstWeekJson.Dialogue(GameState.ReadDialogueView());
+            state["rent"] = BuildRentState();
 
             StoreClient client = GameState.GetCurrentClient();
             state["client"] = client == null ? null : DescribeClient(client);
@@ -108,21 +103,17 @@ namespace PawnMind.Bridge
             flags.HasClient = client != null;
             flags.ClientArrived = GameState.IsClientArrived();
 
-            Dictionary<string, object> dialogue = GameState.GetDialogueSnapshot();
-            if (dialogue != null)
+            DialogueView dialogue = GameState.ReadDialogueView();
+            flags.DialogueActive = dialogue.Available && !dialogue.Ended;
+            flags.DialogueTyping = dialogue.Typing;
+            flags.DialogueChoice = dialogue.Available && dialogue.Choice;
+            if (flags.DialogueChoice)
             {
-                bool ended = dialogue.ContainsKey("ended") && dialogue["ended"] is bool && (bool)dialogue["ended"];
-                flags.DialogueActive = !ended;
-                flags.DialogueTyping = dialogue.ContainsKey("typing") && dialogue["typing"] is bool && (bool)dialogue["typing"];
-                flags.DialogueChoice = dialogue.ContainsKey("choice") && dialogue["choice"] is bool && (bool)dialogue["choice"];
-                if (flags.DialogueChoice)
+                for (int i = 0; i < dialogue.Choices.Count; i++)
                 {
-                    List<Dictionary<string, object>> choices = GameState.GetDialogueChoices();
-                    for (int i = 0; i < choices.Count; i++)
-                    {
-                        object index;
-                        if (choices[i].TryGetValue("index", out index)) flags.ChoiceIndices.Add(System.Convert.ToInt32(index));
-                    }
+                    DialogueChoiceView choice = dialogue.Choices[i];
+                    flags.ChoiceIndices.Add(choice.Index);
+                    if (!choice.Enabled) flags.DisabledChoiceIndices.Add(choice.Index);
                 }
             }
 
@@ -182,6 +173,20 @@ namespace PawnMind.Bridge
             return described;
         }
 
+        private static Dictionary<string, object> BuildRentState()
+        {
+            FirstWeekService service = FirstWeekService.Current;
+            if (service != null) return service.RentState(CurrentRevision);
+
+            // Even without the action service, show the visible rent state; the
+            // absent tracker means a receipt cannot be asserted.
+            return FirstWeekJson.Rent(new RentObservation
+            {
+                Snapshot = GameState.ReadRentSnapshot(),
+                Error = RentErrors.ReceiptUnavailable
+            });
+        }
+
         private static Dictionary<string, object> BuildRunSummary(Dictionary<string, object> state)
         {
             var summary = new Dictionary<string, object>();
@@ -226,12 +231,12 @@ namespace PawnMind.Bridge
             var description = new Dictionary<string, object>();
             description["name"] = client.displayName;
             description["intent"] = client.clientIntent.ToString();
-            description["cash"] = client.clientCash;
+            // S6A: the private wallet field is not shown by the game (only the
+            // negotiation budget is); omit it instead of exposing a hidden value.
             description["uses_budget"] = client.useClientBudget;
             description["impatience"] = client.clientImpatience;
             description["is_wanted"] = client.isWanted;
             description["report_reward"] = client.reportReward;
-            description["stealth_wanted"] = client.isStealthWanted;
             description["reported"] = client.reported;
             description["can_report"] = SafeCanReport(client);
             description["wanted_poster_id"] = client.wantedPosterId;

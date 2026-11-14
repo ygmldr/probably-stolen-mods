@@ -21,9 +21,10 @@ namespace PawnMind.Bridge
             payload["finished"] = SafeBool(delegate { return WineHelper.IsFinishedWine(item); });
             payload["can_modify"] = SafeBool(delegate { return WineHelper.CanModifyLiquid(item); });
             payload["quality_tier"] = SafeInt(delegate { return WineHelper.GetWineQualityTier(item); });
-            payload["water_quality"] = SafeInt(delegate { return WineHelper.GetWaterQualityScore(item); });
+            // S6A: the true water purity score and the hidden counterfeit tag are
+            // answer keys the player cannot see (the bottle only exposes the
+            // label projection). Fail closed: expose neither.
             payload["extract_per_mille"] = SafeInt(delegate { return WineHelper.GetWineExtractPerMille(item); });
-            payload["contaminant_per_mille"] = SafeInt(delegate { return WineHelper.GetWineContaminantPerMille(item); });
             return JsonConvert.SerializeObject(payload);
         }
 

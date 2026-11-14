@@ -30,6 +30,16 @@ namespace PawnMind.Tests
 
         private static void WithServer(Func<string> stateProvider, Func<string, string> actionHandler, string version, Action<int> body)
         {
+            WithServer(stateProvider, actionHandler, version, null, body);
+        }
+
+        private static void WithServer(
+            Func<string> stateProvider,
+            Func<string, string> actionHandler,
+            string version,
+            Func<BridgeHealth> healthProvider,
+            Action<int> body)
+        {
             int port = FreePort();
             var logs = new List<string>();
             var server = new BridgeServer(
@@ -37,7 +47,9 @@ namespace PawnMind.Tests
                 stateProvider,
                 actionHandler,
                 logs.Add,
-                version);
+                version,
+                null,
+                healthProvider);
 
             _server = server;
             server.Start();
@@ -138,6 +150,142 @@ namespace PawnMind.Tests
                 string response = Get(port, "/health", null);
                 Assert.Contains(response, "\"version\":\"9.9.9\"", "version is injected");
             });
+        }
+
+        [Test]
+        public static void Http_Health_Reports_Identity_Gate_And_Unverified_Latest()
+        {
+            const string mvid = "11111111-2222-3333-4444-555555555555";
+            var health = new BridgeHealth
+            {
+                GameVersion = "VERSION 1-Rev1",
+                GameAssemblyMvid = mvid,
+                ExpectedGameVersion = "VERSION 1-Rev1",
+                ExpectedAssemblyMvid = mvid,
+                WriteGateState = GameVersionGate.StateOpen,
+                WriteGateReason = null
+            };
+
+            WithServer(
+                delegate { return "{}"; },
+                delegate(string body) { return "{}"; },
+                "0.2.1",
+                delegate { return health; },
+                delegate(int port)
+                {
+                    string response = Get(port, "/health", null);
+                    Assert.Contains(response, "200 OK", "health status");
+                    Assert.Contains(response, "\"version\":\"0.2.1\"", "legacy version field");
+                    Assert.Contains(response, "\"mod_version\":\"0.2.1\"", "mod version field");
+                    Assert.Contains(response, "\"game_version\":\"VERSION 1-Rev1\"", "actual game version");
+                    Assert.Contains(response, "\"game_assembly_mvid\":\"" + mvid + "\"", "actual assembly mvid");
+                    Assert.Contains(response, "\"expected_game_version\":\"VERSION 1-Rev1\"", "expected game version");
+                    Assert.Contains(response, "\"expected_assembly_mvid\":\"" + mvid + "\"", "expected assembly mvid");
+                    Assert.Contains(response, "\"write_gate\":\"open\"", "write gate state");
+                    Assert.Contains(response, "\"latest\":\"UNVERIFIED\"", "latest is not claimed as verified");
+                    Assert.Contains(response, "\"latest_verified\":false", "latest verification flag");
+                    Assert.False(response.Contains(Token), "health must not leak the bearer token");
+                });
+        }
+
+        [Test]
+        public static void Http_Health_Scrubs_Token_From_Configured_Fields()
+        {
+            var health = new BridgeHealth
+            {
+                GameVersion = "VERSION 1-Rev1",
+                GameAssemblyMvid = "11111111-2222-3333-4444-555555555555",
+                ExpectedGameVersion = "VERSION " + Token,
+                ExpectedAssemblyMvid = "11111111-2222-3333-4444-555555555555",
+                WriteGateState = GameVersionGate.StateOpen,
+                WriteGateReason = null
+            };
+
+            WithServer(
+                delegate { return "{}"; },
+                delegate(string body) { return "{}"; },
+                "0.2.1",
+                delegate { return health; },
+                delegate(int port)
+                {
+                    string response = Get(port, "/health", null);
+                    Assert.False(response.Contains(Token), "health must never echo the bearer token");
+                    Assert.Contains(response, "[redacted]", "token-looking config text is redacted");
+                });
+        }
+
+        [Test]
+        public static void Http_Health_Provider_Failure_Fails_Closed()
+        {
+            WithServer(
+                delegate { return "{}"; },
+                delegate(string body) { return "{}"; },
+                "0.2.1",
+                delegate { throw new InvalidOperationException("health boom"); },
+                delegate(int port)
+                {
+                    string response = Get(port, "/health", null);
+                    Assert.Contains(response, "200 OK", "health endpoint still answers");
+                    Assert.Contains(response, "\"write_gate\":\"locked\"", "provider failure locks writes");
+                    Assert.Contains(
+                        response,
+                        "\"write_gate_reason\":\"version_gate_unconfigured\"",
+                        "stable locked reason");
+                    Assert.Contains(response, "\"latest\":\"UNVERIFIED\"", "latest remains unverified");
+                    Assert.False(response.Contains("health boom"), "provider detail must not leak");
+                });
+        }
+
+        [Test]
+        public static void Http_Health_Reports_Locked_Gate_Without_Expected_Identity()
+        {
+            var health = new BridgeHealth
+            {
+                GameVersion = "VERSION 1-Rev1",
+                GameAssemblyMvid = "11111111-2222-3333-4444-555555555555",
+                ExpectedGameVersion = string.Empty,
+                ExpectedAssemblyMvid = string.Empty,
+                WriteGateState = GameVersionGate.StateLocked,
+                WriteGateReason = GameVersionGate.ReasonUnconfigured
+            };
+
+            WithServer(
+                delegate { return "{}"; },
+                delegate(string body) { return "{}"; },
+                "0.2.1",
+                delegate { return health; },
+                delegate(int port)
+                {
+                    string response = Get(port, "/health", null);
+                    Assert.Contains(response, "\"write_gate\":\"locked\"", "missing expectation locks writes");
+                    Assert.Contains(
+                        response,
+                        "\"write_gate_reason\":\"version_gate_unconfigured\"",
+                        "stable locked reason");
+                    Assert.Contains(response, "\"expected_game_version\":null", "missing expected version");
+                    Assert.Contains(response, "\"expected_assembly_mvid\":null", "missing expected mvid");
+                    Assert.Contains(response, "\"latest\":\"UNVERIFIED\"", "latest remains unverified");
+                });
+        }
+
+        [Test]
+        public static void Http_Health_Without_Identity_Provider_Fails_Closed()
+        {
+            WithServer(
+                delegate { return "{}"; },
+                delegate(string body) { return "{}"; },
+                "0.2.1",
+                delegate(int port)
+                {
+                    string response = Get(port, "/health", null);
+                    Assert.Contains(response, "\"game_version\":\"UNKNOWN\"", "missing identity is explicit");
+                    Assert.Contains(response, "\"write_gate\":\"locked\"", "missing provider locks writes");
+                    Assert.Contains(
+                        response,
+                        "\"write_gate_reason\":\"version_gate_unconfigured\"",
+                        "stable locked reason");
+                    Assert.Contains(response, "\"latest\":\"UNVERIFIED\"", "latest remains unverified");
+                });
         }
 
         [Test]
@@ -258,7 +406,9 @@ namespace PawnMind.Tests
                     + "\r\nAuthorization: Bearer " + Token
                     + "\r\nContent-Length: 70000\r\n\r\n";
                 string response = SendRaw(port, raw);
-                Assert.Contains(response, "400 Bad Request", "oversized body rejected");
+                // S6A: an oversized declared body is a 413, not a generic 400.
+                Assert.Contains(response, "413 Payload Too Large", "oversized body rejected");
+                Assert.Contains(response, "\"error\":\"body_too_large\"", "stable oversized error code");
             });
         }
     }

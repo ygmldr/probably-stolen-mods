@@ -10,14 +10,15 @@
 > 游戏版本：正式版 0.46D（主菜单 VERSION 100，原生 ModLoader）。
 > 反编译/逆向产物统一放在根目录 `_decomp/`，不提交、不分发。
 
-## 当前状态（2026-11-11）
+## 当前状态（2026-11-14）
 
-- PawnMind tag：`v1.0.1`（最新提交 `3eb3154`）
-- MCP 工具：**89 个**
-- 测试：C# **144 项** + 适配器契约 + Python **8 项**
+- PawnMind tag：`v1.0.1`（最新提交 `3eb3154`；本工作树有大量未提交的离线改造）
+- MCP 工具：**100 个**（`--tools recording` 只注册首周录制用 28 个）
+- 测试：C# **462**（含脚本门禁 53）+ 适配器契约 **392** + Python **81**，均 0 skip
 - 构建产物：`PawnMind/dist/PawnMind/{manifest.xml, PawnMind.dll}`
-- 真机测试统一使用**槽 17**；没有动用户主档
-- **还没有**接入 LLM agent loop；`agent/orchestrator.py` 只有确定性 `RulePolicy`
+- 已离线完成：新局菜单语义、专用录制槽授权、首周付租回执、传输加固与隐藏字段清理
+- **尚未真机验证**：以上全部只经过假 UI/假桥与已安装程序集契约；真机步骤见 [`docs/pawnmind-s8-runbook.zh-CN.md`](docs/pawnmind-s8-runbook.zh-CN.md)
+- **还没有**接入真实 LLM 宿主；`agent/orchestrator.py` 只有 `RulePolicy`，`agent/demo_agent.py` 是脚本化演示
 
 ## PawnMind 架构
 
@@ -34,7 +35,7 @@ PawnMind.dll  ── HTTP 127.0.0.1:15528 ──  Python MCP stdio
 - `src/Core/`：纯逻辑，无 Unity 依赖
 - `src/Bridge/`：HTTP、鉴权、revision、状态快照、动作路由
 - `src/Game/`：唯一允许直连/反射游戏类型的层，所有访问在主线程
-- `agent/mcp_server.py`：stdio MCP 服务，89 个工具
+- `agent/mcp_server.py`：stdio MCP 服务，100 个工具（`--tools recording` 只注册录制用 28 个）
 - `agent/pawnmind_client.py`：HTTP 客户端（长轮询 `/events`）
 - `agent/orchestrator.py`：最小 observe→decide→act 闭环 + `RulePolicy` 基线
 
@@ -50,8 +51,10 @@ PawnMind.dll  ── HTTP 127.0.0.1:15528 ──  Python MCP stdio
 
 | 层 | 已接 |
 |---|---|
-| 观察 | `/state`：日期、现金、店态、顾客、意图/预算/是否通缉、对话正文+选项、议价物、背包/布局、合法动作 |
-| 经营 | 开店、叫客、对话/选项、买卖、砍价、关店/睡觉、存读档 |
+| 观察 | `/state`：日期、现金、店态、顾客、意图/预算/是否通缉、对话正文+选项（含 `enabled`）、议价物、背包/布局、合法动作、`rent` 与租金回执 |
+| 经营 | 开店、叫客、对话/选项（禁用项拒绝且不误报）、买卖、砍价、关店/睡觉、存读档 |
+| 新局 | 只读菜单选项、单步选择/翻页/继续、hover 消歧、首局弹窗只报告；`confirm_new_game` 经专用槽授权后触发一次原生开局 |
+| 录制保护 | `recording_mode`/`recording_slot`/`recording_isolation_ack` 全锁；绑定槽后只允许该槽 save/load/sleep，`act`/`press`/`new_game`/`load_game` 一律拦截 |
 | 物品 | 背包分页、精确形状/旋转放置、二维布局、自动重排、阅读/书籍 |
 | 夜间 | 垃圾场、配给站、杰克逊博士、搜刮、补给站代币、批发 |
 | 机器 | 枚举/状态/槽位/放入/收取、熔炉、水培、酿酒发酵、催陈器入酒 |

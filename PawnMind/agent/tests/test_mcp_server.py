@@ -112,6 +112,29 @@ class McpServerTests(unittest.TestCase):
         self.assertEqual(3, actions[0]["rev"])
         self.assertIn("action_id", actions[0])
 
+    def test_list_contacts_hidden_is_documented_debug_only(self):
+        async def scenario():
+            async with stdio_client(self.params) as (read, write):
+                async with ClientSession(read, write) as session:
+                    await session.initialize()
+                    tools = await session.list_tools()
+                    contact = next(tool for tool in tools.tools if tool.name == "list_contacts")
+                    description = (contact.description or "") + " " + json.dumps(contact.input_schema)
+                    self.assertIn("allow_test_items", description)
+                    self.assertIn("hidden_contacts_forbidden", description)
+
+                    result = await session.call_tool("list_contacts", {"include_hidden": True})
+                    payload = json.loads(result.content[0].text)
+                    self.assertTrue(payload["ok"])
+
+        asyncio.run(scenario())
+
+        calls = [
+            item for item in RECEIVED
+            if item.get("op") == "list_contacts" and item.get("include_hidden") is True
+        ]
+        self.assertEqual(1, len(calls))
+
 
 if __name__ == "__main__":
     unittest.main()

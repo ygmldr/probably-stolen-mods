@@ -77,6 +77,62 @@ namespace PawnMind.Tests
                 "malformed line must fail");
             Assert.NotNull(error, "error should be set");
         }
+
+        [Test]
+        public static void Config_Expected_Identity_Defaults_To_Empty()
+        {
+            BridgeConfig config = BridgeConfig.Create(BridgeConfig.DefaultPort, Token());
+            Assert.Equal(string.Empty, config.ExpectedGameVersion, "expected game version defaults empty");
+            Assert.Equal(string.Empty, config.ExpectedAssemblyMvid, "expected mvid defaults empty");
+        }
+
+        [Test]
+        public static void Config_RoundTrips_Expected_Identity()
+        {
+            const string mvid = "11111111-2222-3333-4444-555555555555";
+            BridgeConfig original = BridgeConfig.Create(16000, Token(40));
+            original.ExpectedGameVersion = "VERSION 1-Rev1";
+            original.ExpectedAssemblyMvid = mvid;
+
+            string text = original.Serialize();
+            Assert.Contains(text, "expected_game_version=VERSION 1-Rev1", "serialized expected version");
+            Assert.Contains(text, "expected_assembly_mvid=" + mvid, "serialized expected mvid");
+
+            BridgeConfig parsed;
+            string error;
+            Assert.True(BridgeConfig.TryParse(text, out parsed, out error), "parse: " + error);
+            Assert.Equal(original.ExpectedGameVersion, parsed.ExpectedGameVersion, "expected version round-trip");
+            Assert.Equal(original.ExpectedAssemblyMvid, parsed.ExpectedAssemblyMvid, "expected mvid round-trip");
+        }
+
+        [Test]
+        public static void Config_Parse_Reads_Expected_Identity()
+        {
+            const string mvid = "11111111-2222-3333-4444-555555555555";
+            string text = "# config\nport=16000\ntoken=" + Token(40)
+                + "\nexpected_game_version=  VERSION 1-Rev1  "
+                + "\nexpected_assembly_mvid=" + mvid + "\n";
+
+            BridgeConfig parsed;
+            string error;
+            Assert.True(BridgeConfig.TryParse(text, out parsed, out error), "parse: " + error);
+            Assert.Equal("VERSION 1-Rev1", parsed.ExpectedGameVersion, "expected version is trimmed");
+            Assert.Equal(mvid, parsed.ExpectedAssemblyMvid, "expected mvid is read");
+        }
+
+        [Test]
+        public static void Config_Parse_Treats_Empty_Expected_Identity_As_Missing()
+        {
+            BridgeConfig parsed;
+            string error;
+            Assert.True(BridgeConfig.TryParse(
+                "port=16000\ntoken=" + Token(40)
+                + "\nexpected_game_version=\nexpected_assembly_mvid=\n",
+                out parsed,
+                out error), "parse: " + error);
+            Assert.Equal(string.Empty, parsed.ExpectedGameVersion, "empty expected version stays empty");
+            Assert.Equal(string.Empty, parsed.ExpectedAssemblyMvid, "empty expected mvid stays empty");
+        }
     }
 
     internal static class HttpRequestParserTests

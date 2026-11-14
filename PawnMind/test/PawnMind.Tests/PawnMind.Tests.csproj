@@ -12,6 +12,7 @@
   <ItemGroup>
     <Compile Include="TestRunner.cs" />
     <Compile Include="BridgeCoreTests.cs" />
+    <Compile Include="GameVersionGateTests.cs" />
     <Compile Include="ActionGateTests.cs" />
     <Compile Include="ActionRouterTests.cs" />
     <Compile Include="LegalActionTests.cs" />
@@ -48,10 +49,30 @@
     <Compile Include="ContrabandRulesTests.cs" />
     <Compile Include="ReportRulesTests.cs" />
     <Compile Include="BridgeServerTests.cs" />
+    <Compile Include="BridgeTransportTests.cs" />
+    <Compile Include="HiddenInfoGuardTests.cs" />
+    <Compile Include="NewGameMenuRulesTests.cs" />
+    <Compile Include="NewGameMenuSessionTests.cs" />
+    <Compile Include="NewGameMenuServiceTests.cs" />
+    <Compile Include="RecordingConfigTests.cs" />
+    <Compile Include="RecordingTestFakes.cs" />
+    <Compile Include="RecordingSavePolicyTests.cs" />
+    <Compile Include="RecordingSaveServiceTests.cs" />
+    <Compile Include="RecordingDispatchGuardTests.cs" />
+    <Compile Include="RecordingMenuPolicyTests.cs" />
+    <Compile Include="FirstWeekCoreTests.cs" />
+    <Compile Include="FirstWeekServiceTests.cs" />
+    <Compile Include="FirstWeekJsonTests.cs" />
+    <Compile Include="FirstWeekSleepTests.cs" />
     <Compile Include="../../src/Core/*.cs" />
     <Compile Include="../../src/Bridge/BridgeServer.cs" />
     <Compile Include="../../src/Bridge/ActionRouter.cs" />
     <Compile Include="../../src/Bridge/ActionResult.cs" />
+    <Compile Include="../../src/Bridge/NewGameMenuService.cs" />
+    <Compile Include="../../src/Bridge/RecordingSaveService.cs" />
+    <Compile Include="../../src/Bridge/RecordingDispatchGuard.cs" />
+    <Compile Include="../../src/Bridge/FirstWeekService.cs" />
+    <Compile Include="../../src/Bridge/FirstWeekJson.cs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Newtonsoft.Json">

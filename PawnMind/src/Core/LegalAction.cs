@@ -43,6 +43,7 @@ namespace PawnMind.Core
         public bool DialogueTyping;
         public bool DialogueChoice;
         public List<int> ChoiceIndices = new List<int>();
+        public List<int> DisabledChoiceIndices = new List<int>();
         public bool BargainOpen;
         public bool CanSellDiscount;
         public bool CanSellMarkup;
@@ -81,7 +82,11 @@ namespace PawnMind.Core
             {
                 for (int i = 0; i < flags.ChoiceIndices.Count; i++)
                 {
-                    actions.Add(new LegalAction("choose_dialogue").With("index", flags.ChoiceIndices[i]));
+                    int index = flags.ChoiceIndices[i];
+                    if (flags.DisabledChoiceIndices != null
+                        && flags.DisabledChoiceIndices.Contains(index)) continue;
+
+                    actions.Add(new LegalAction("choose_dialogue").With("index", index));
                 }
             }
             else if (flags.HasClient && flags.DialogueActive)
