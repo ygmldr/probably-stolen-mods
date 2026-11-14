@@ -811,8 +811,14 @@ def main():
 
     recorder = None
     if args.memory == "on":
-        from .memory.recorder import RecordingClient
-        from .memory.store import EventStore, MemoryUnavailable
+        # Works both as `python -m agent.mcp_server` (package form) and as
+        # `python agent/mcp_server.py` (script form, where relative imports fail).
+        try:
+            from .memory.recorder import RecordingClient
+            from .memory.store import EventStore, MemoryUnavailable
+        except ImportError:
+            from memory.recorder import RecordingClient
+            from memory.store import EventStore, MemoryUnavailable
 
         db_path = args.memory_db or _default_memory_db()
         try:
