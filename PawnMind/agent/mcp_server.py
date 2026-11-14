@@ -40,40 +40,51 @@ TOOL_SET_FULL = "full"
 TOOL_SET_RECORDING = "recording"
 TOOL_SET_CHOICES = (TOOL_SET_FULL, TOOL_SET_RECORDING)
 
-#: The minimum first-week recording surface. Recording mode registers exactly
-#: this set; every other tool stays unregistered. This is an allowlist, so a
-#: tool added to the server later is absent from recording mode until someone
-#: deliberately adds it here. `demo_agent.ALLOWED_OPS` must stay a subset;
+#: Recording mode registers exactly this set; every other tool stays
+#: unregistered. `demo_agent.ALLOWED_OPS` must stay a subset;
 #: `test_mcp_tools_mode.py` pins that relation.
+# Tools a human player could equivalently use during the recording run. This
+# is a whitelist, not a blacklist: a tool added to this server later does NOT
+# silently join the recording surface -- it must be listed here on purpose.
+#
+# Excluded on purpose (see tests/test_mcp_tools_mode.py):
+#   act             generic any-op entry point; bypasses every typed tool,
+#                   the rev/action_id gate and the recording slot policy
+#   press           invokes an arbitrary UI control; same bypass problem
+#   get_ui_snapshot control enumerator that only exists to feed press
+#   wait_until      host-side polling helper, not a game action (duplicates
+#                   wait_for_events / wait_for_change)
+#   wine_add_water  injects pure water into a bottle; no player action does
+#                   this, so it would be a shortcut/cheat
+#   new_game        hardcodes APPRENTICE + skipIntro=true, so it cannot express
+#                   the player's own scenario/difficulty/perk choice; the menu
+#                   flow (get_new_game_options .. confirm_new_game) is the only
+#                   start path that preserves that choice
 RECORDING_TOOL_NAMES = frozenset({
-    "ping",
-    "get_state",
-    "get_legal_actions",
-    "get_run_summary",
-    "get_action_history",
-    "wait_for_events",
-    "wait_for_change",
-    "get_new_game_options",
-    "open_new_game_menu",
-    "select_new_game_option",
-    "new_game_next_page",
-    "new_game_continue",
-    "focus_new_game_selected_perk",
-    "blur_new_game_option",
-    "confirm_new_game",
-    "get_recording_save_status",
-    "save_recording_game",
-    "load_recording_game",
-    "choose_dialogue",
-    "advance_dialogue",
-    "confirm_trade",
-    "open_shop",
-    "call_next_customer",
-    "list_goods",
-    "get_item",
-    "list_inventory",
-    "end_day",
-    "sleep",
+    "activate_item", "advance_dialogue", "advance_expedition", "analyze_item",
+    "arrest_wanted", "bargain", "bargain_preview", "barter_accept",
+    "barter_status", "blur_new_game_option", "buy_upgrade", "buy_wholesale",
+    "call", "call_next_customer", "choose_dialogue", "commissary_buy",
+    "confirm_new_game", "confirm_trade", "contraband_status", "deliver_request",
+    "dispatch_expedition", "end_call", "end_day", "events_status",
+    "expedition_status", "focus_new_game_selected_perk", "get_action_history", "get_item",
+    "get_layout", "get_legal_actions", "get_new_game_options", "get_recording_save_status",
+    "get_run_summary", "get_state", "go_out", "health_status",
+    "husbandry_status", "inspect_ticket", "list_analyzers", "list_books",
+    "list_contacts", "list_containers", "list_factions", "list_goods",
+    "list_interactions", "list_inventory", "list_labels", "list_locations",
+    "list_machines", "list_marks", "list_requests", "list_services",
+    "list_signs", "list_tickets", "list_upgrades", "list_wine",
+    "load_game", "load_recording_game", "lottery_status", "machine_collect",
+    "machine_grow_status", "machine_insert", "machine_status", "move_item",
+    "new_game_continue", "new_game_next_page", "open_new_game_menu", "open_shop",
+    "phone_advance", "phone_choose", "phone_state", "ping",
+    "read_book", "read_item", "redeem_ticket", "report_client",
+    "return_home", "save_game", "save_recording_game", "scavenge",
+    "security_status", "select_new_game_option", "set_label", "set_pen_mode",
+    "sleep", "start_fermentation", "toggle_item", "toggle_service",
+    "use_tool", "wait_for_change", "wait_for_events", "wanted_status",
+    "wine_add_ingredient", "wine_status",
 })
 
 NEW_GAME_OPTION_KINDS = ("scenario", "perk", "difficulty")
@@ -757,7 +768,8 @@ def main():
         default=TOOL_SET_FULL,
         help=(
             "tool surface to register: full (all 100 tools, default) or "
-            "recording (minimum first-week recording set)"
+            "recording (94 player-equivalent tools; act/press/debug shortcuts "
+            "and the hardcoded new_game are left out)"
         ),
     )
     parser.add_argument("--probe", action="store_true", help="check the bridge and exit")

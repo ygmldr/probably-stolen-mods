@@ -31,8 +31,8 @@ namespace PawnMind.Core
 
         /// <summary>
         /// Recording opt-in. Empty/off is the default and keeps every recording
-        /// write locked. The mod never writes these three values from the
-        /// installed game identity or the currently active save slot.
+        /// write locked. The mod never writes these values from the installed
+        /// game identity or the currently active save slot.
         /// </summary>
         public string RecordingMode { get; set; }
         public int? RecordingSlot
@@ -47,7 +47,23 @@ namespace PawnMind.Core
                 _recordingSlotInvalid = false;
             }
         }
+
+        /// <summary>
+        /// User declaration that the configured slot lives in an isolated game
+        /// profile/environment. This is one of two accepted ways to unlock
+        /// recording writes; it is only a declaration, not something the mod can
+        /// verify.
+        /// </summary>
         public bool RecordingIsolationAck { get; set; }
+
+        /// <summary>
+        /// Honest alternative to <see cref="RecordingIsolationAck"/> for a user
+        /// who keeps an existing played profile but limits recording to one new
+        /// dedicated slot. It declares "same profile, dedicated slot only", not
+        /// isolation. Either declaration unlocks writes; isolation is reported
+        /// first when both are present.
+        /// </summary>
+        public bool RecordingDedicatedSlotAck { get; set; }
         public string RecordingSlotRaw { get { return _recordingSlotRaw; } }
         public bool RecordingSlotInvalid { get { return _recordingSlotInvalid; } }
 
@@ -63,6 +79,7 @@ namespace PawnMind.Core
             ExpectedAssemblyMvid = string.Empty;
             RecordingMode = string.Empty;
             RecordingIsolationAck = false;
+            RecordingDedicatedSlotAck = false;
         }
 
         public static BridgeConfig Create(int port, string token)
@@ -106,12 +123,16 @@ namespace PawnMind.Core
                 + "# Set expected_* only after confirming the recording game build; empty locks writes.\n"
                 + "expected_game_version=" + (ExpectedGameVersion ?? string.Empty) + "\n"
                 + "expected_assembly_mvid=" + (ExpectedAssemblyMvid ?? string.Empty) + "\n"
-                + "# Recording is user-only: set all three keys after confirming an isolated slot.\n"
+                + "# Recording is user-only. Provide at least one acknowledgment method:\n"
+                + "#   recording_isolation_ack      = isolated environment (separate profile/LocalLow)\n"
+                + "#   recording_dedicated_slot_ack = existing played profile + new dedicated slot only\n"
+                + "# Neither/false keeps every recording write locked.\n"
                 + "recording_mode=" + (RecordingMode ?? string.Empty) + "\n"
                 + "recording_slot=" + (_recordingSlot.HasValue
                     ? _recordingSlot.Value.ToString(CultureInfo.InvariantCulture)
                     : (_recordingSlotRaw ?? string.Empty)) + "\n"
-                + "recording_isolation_ack=" + (RecordingIsolationAck ? "true" : "false") + "\n";
+                + "recording_isolation_ack=" + (RecordingIsolationAck ? "true" : "false") + "\n"
+                + "recording_dedicated_slot_ack=" + (RecordingDedicatedSlotAck ? "true" : "false") + "\n";
         }
 
         /// <summary>
@@ -158,6 +179,7 @@ namespace PawnMind.Core
             string recordingMode = string.Empty;
             string recordingSlotRaw = string.Empty;
             bool recordingIsolationAck = false;
+            bool recordingDedicatedSlotAck = false;
 
             string[] lines = text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
             for (int i = 0; i < lines.Length; i++)
@@ -213,6 +235,11 @@ namespace PawnMind.Core
                     recordingIsolationAck = string.Equals(value, "true", StringComparison.OrdinalIgnoreCase)
                         || value == "1";
                 }
+                else if (key == "recording_dedicated_slot_ack")
+                {
+                    recordingDedicatedSlotAck = string.Equals(value, "true", StringComparison.OrdinalIgnoreCase)
+                        || value == "1";
+                }
             }
 
             BridgeConfig parsed = Create(port, token);
@@ -221,6 +248,7 @@ namespace PawnMind.Core
             parsed.ExpectedAssemblyMvid = expectedAssemblyMvid;
             parsed.RecordingMode = recordingMode;
             parsed.RecordingIsolationAck = recordingIsolationAck;
+            parsed.RecordingDedicatedSlotAck = recordingDedicatedSlotAck;
             parsed.SetRecordingSlotText(recordingSlotRaw);
             if (!parsed.TryValidate(out error)) return false;
 

@@ -30,66 +30,45 @@ sys.path.insert(0, AGENT_DIR)
 import demo_agent  # noqa: E402
 import mcp_server  # noqa: E402
 
-#: The recording surface promised in the S7A plan. Keep this list explicit so a
-#: broadened server whitelist cannot silently widen the recorded attack surface.
+#: The recording surface: every tool a human player could equivalently use.
+#: Keep this list explicit so a broadened server whitelist cannot silently
+#: widen the recorded attack surface.
 EXPECTED_RECORDING_TOOLS = frozenset({
-    "ping",
-    "get_state",
-    "get_legal_actions",
-    "get_run_summary",
-    "get_action_history",
-    "wait_for_events",
-    "wait_for_change",
-    "get_new_game_options",
-    "open_new_game_menu",
-    "select_new_game_option",
-    "new_game_next_page",
-    "new_game_continue",
-    "focus_new_game_selected_perk",
-    "blur_new_game_option",
-    "confirm_new_game",
-    "get_recording_save_status",
-    "save_recording_game",
-    "load_recording_game",
-    "choose_dialogue",
-    "advance_dialogue",
-    "confirm_trade",
-    "open_shop",
-    "call_next_customer",
-    "list_goods",
-    "get_item",
-    "list_inventory",
-    "end_day",
-    "sleep",
+    "activate_item", "advance_dialogue", "advance_expedition", "analyze_item",
+    "arrest_wanted", "bargain", "bargain_preview", "barter_accept",
+    "barter_status", "blur_new_game_option", "buy_upgrade", "buy_wholesale",
+    "call", "call_next_customer", "choose_dialogue", "commissary_buy",
+    "confirm_new_game", "confirm_trade", "contraband_status", "deliver_request",
+    "dispatch_expedition", "end_call", "end_day", "events_status",
+    "expedition_status", "focus_new_game_selected_perk", "get_action_history", "get_item",
+    "get_layout", "get_legal_actions", "get_new_game_options", "get_recording_save_status",
+    "get_run_summary", "get_state", "go_out", "health_status",
+    "husbandry_status", "inspect_ticket", "list_analyzers", "list_books",
+    "list_contacts", "list_containers", "list_factions", "list_goods",
+    "list_interactions", "list_inventory", "list_labels", "list_locations",
+    "list_machines", "list_marks", "list_requests", "list_services",
+    "list_signs", "list_tickets", "list_upgrades", "list_wine",
+    "load_game", "load_recording_game", "lottery_status", "machine_collect",
+    "machine_grow_status", "machine_insert", "machine_status", "move_item",
+    "new_game_continue", "new_game_next_page", "open_new_game_menu", "open_shop",
+    "phone_advance", "phone_choose", "phone_state", "ping",
+    "read_book", "read_item", "redeem_ticket", "report_client",
+    "return_home", "save_game", "save_recording_game", "scavenge",
+    "security_status", "select_new_game_option", "set_label", "set_pen_mode",
+    "sleep", "start_fermentation", "toggle_item", "toggle_service",
+    "use_tool", "wait_for_change", "wait_for_events", "wanted_status",
+    "wine_add_ingredient", "wine_status",
 })
 
-#: Tools that exist in full mode and must never appear in the recording mode.
-#: `act`/`press`/`get_ui_snapshot` are arbitrary-target escape hatches; the
-#: legacy/new-game and hidden-state tools are outside the recorded flow.
+#: Escape hatches and shortcuts that exist in full mode and must never appear
+#: in recording mode. Each entry has a written reason in mcp_server.py.
 FORBIDDEN_IN_RECORDING = (
-    "act",
-    "press",
-    "get_ui_snapshot",
-    "new_game",
-    "load_game",
-    "save_game",
-    "wine_add_water",
-    "machine_insert",
-    "machine_collect",
-    "move_item",
-    "set_label",
-    "analyze_item",
-    "go_out",
-    "buy_wholesale",
-    "deliver_request",
-    "arrest_wanted",
-    "redeem_ticket",
-    "buy_upgrade",
-    "toggle_service",
-    "activate_item",
-    "toggle_item",
-    "use_tool",
-    "bargain",
+    "act",              # generic any-op entry: bypasses every gate
+    "press",           # arbitrary UI control invocation
+    "get_ui_snapshot",  # control enumerator that only feeds press
+    "wait_until",       # host polling helper, not a game action
+    "wine_add_water",   # injects pure water; not a player action
+    "new_game",         # hardcodes apprentice + skipIntro, cannot express choice
 )
 
 

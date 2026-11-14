@@ -36,10 +36,61 @@ namespace PawnMind.Tests
         {
             RecordingSlotPolicy policy = new RecordingSlotPolicy(RecordingTestData.Unacknowledged());
             Assert.Equal(RecordingSlotState.Disabled, policy.State, "unacknowledged config is disabled");
+            Assert.Equal(RecordingAcknowledgment.None, policy.Settings.Acknowledgment,
+                "neither declaration counts as an acknowledgment");
             Assert.Equal(RecordingSaveErrors.IsolationUnacknowledged,
                 policy.Check(RecordingOperation.ConfirmNewGame).Error, "stable ack code");
             Assert.Equal(RecordingSaveErrors.IsolationUnacknowledged,
                 policy.Check(RecordingOperation.SaveGame).Error, "ack gates every write");
+        }
+
+        [Test]
+        public static void Policy_Dedicated_Slot_Ack_Alone_Arms_Recording()
+        {
+            RecordingSettings settings = RecordingTestData.DedicatedSlot();
+            RecordingSlotPolicy policy = new RecordingSlotPolicy(settings);
+
+            Assert.Equal(RecordingSlotState.Armed, policy.State,
+                "a dedicated-slot-only declaration arms recording");
+            Assert.Equal(RecordingAcknowledgment.DedicatedSlot, policy.Settings.Acknowledgment,
+                "the actual confirmation method is recorded");
+            Assert.False(policy.Settings.IsolationAcknowledged,
+                "the dedicated-slot path must not claim an isolated environment");
+            Assert.True(policy.Check(RecordingOperation.MenuWrite).Allowed,
+                "menu preparation is allowed");
+            Assert.True(policy.Check(RecordingOperation.ConfirmNewGame).Allowed,
+                "the controlled start is allowed");
+            Assert.Equal(RecordingSaveErrors.NotBound,
+                policy.Check(RecordingOperation.SaveGame).Error,
+                "saving still requires a bound dedicated slot");
+        }
+
+        [Test]
+        public static void Policy_Isolation_Ack_Alone_Still_Arms_Recording()
+        {
+            RecordingSettings settings = RecordingTestData.Valid();
+            RecordingSlotPolicy policy = new RecordingSlotPolicy(settings);
+
+            Assert.Equal(RecordingSlotState.Armed, policy.State,
+                "isolation-only acknowledgement stays a valid regression path");
+            Assert.Equal(RecordingAcknowledgment.Isolation, policy.Settings.Acknowledgment,
+                "the isolation declaration is recorded");
+            Assert.False(policy.Settings.DedicatedSlotAcknowledged,
+                "the isolation path must not claim a dedicated-slot confirmation");
+        }
+
+        [Test]
+        public static void Policy_Both_Acks_Arm_And_Report_Isolation_First()
+        {
+            RecordingSettings settings = RecordingTestData.BothAcks();
+            RecordingSlotPolicy policy = new RecordingSlotPolicy(settings);
+
+            Assert.Equal(RecordingSlotState.Armed, policy.State, "both declarations are accepted");
+            Assert.True(policy.Settings.IsolationAcknowledged, "isolation flag preserved");
+            Assert.True(policy.Settings.DedicatedSlotAcknowledged,
+                "dedicated-slot flag preserved");
+            Assert.Equal(RecordingAcknowledgment.Isolation, policy.Settings.Acknowledgment,
+                "isolation wins when both declarations are present");
         }
 
         [Test]

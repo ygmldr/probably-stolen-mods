@@ -63,6 +63,68 @@ namespace PawnMind.Tests
         }
 
         [Test]
+        public static void Service_Status_Reports_Acknowledgment_Mode()
+        {
+            RecordingHarness off = RecordingHarness.Create(RecordingTestData.Off());
+            JObject offStatus = JObject.Parse(off.Service.StatusJson());
+            Assert.NotNull(offStatus["acknowledgment"],
+                "acknowledgment is always present");
+            Assert.Equal(JTokenType.Null, offStatus["acknowledgment"].Type,
+                "no configured recording means no acknowledgment method");
+            Assert.Equal("recording_unconfigured", (string)offStatus["error"],
+                "default error is unchanged");
+
+            RecordingHarness none = RecordingHarness.Create(RecordingTestData.Unacknowledged());
+            JObject noneStatus = JObject.Parse(none.Service.StatusJson());
+            Assert.Equal(JTokenType.Null, noneStatus["acknowledgment"].Type,
+                "missing acknowledgments report null");
+            Assert.Equal("recording_isolation_unacknowledged", (string)noneStatus["error"],
+                "stable unacknowledged error code is unchanged");
+
+            RecordingHarness isolation = RecordingHarness.Create(RecordingTestData.Valid());
+            JObject isolationStatus = JObject.Parse(isolation.Service.StatusJson());
+            Assert.Equal("isolation", (string)isolationStatus["acknowledgment"],
+                "isolation-only acknowledgement is reported");
+            Assert.Equal("armed", (string)isolationStatus["recording_mode"],
+                "isolation-only still arms recording");
+
+            RecordingHarness dedicated =
+                RecordingHarness.Create(RecordingTestData.DedicatedSlot());
+            JObject dedicatedStatus = JObject.Parse(dedicated.Service.StatusJson());
+            Assert.Equal("dedicated_slot", (string)dedicatedStatus["acknowledgment"],
+                "dedicated-slot acknowledgement is reported");
+            Assert.Equal("armed", (string)dedicatedStatus["recording_mode"],
+                "dedicated-slot-only arms recording");
+
+            RecordingHarness both = RecordingHarness.Create(RecordingTestData.BothAcks());
+            JObject bothStatus = JObject.Parse(both.Service.StatusJson());
+            Assert.Equal("isolation", (string)bothStatus["acknowledgment"],
+                "isolation is reported first when both declarations are present");
+            Assert.Equal("armed", (string)bothStatus["recording_mode"],
+                "both acknowledgments arm recording");
+        }
+
+        [Test]
+        public static void Service_Dedicated_Slot_Ack_Can_Bind_And_Save()
+        {
+            RecordingHarness h = RecordingHarness.Create(RecordingTestData.DedicatedSlot());
+            h.Bind();
+
+            Assert.Equal(RecordingSlotState.Bound, h.Policy.State,
+                "the dedicated-slot-only declaration can bind a run");
+            Assert.Equal(7, h.Policy.Binding.Slot, "the configured slot is bound");
+            Assert.True(h.Service.SaveRecordingGame().Ok,
+                "a bound save is allowed under the dedicated-slot declaration");
+            Assert.Equal(1, h.NativePort.SaveCalls, "native save dispatched once");
+
+            JObject status = JObject.Parse(h.Service.StatusJson());
+            Assert.Equal("dedicated_slot", (string)status["acknowledgment"],
+                "status keeps the actual acknowledgment method after binding");
+            Assert.Equal("bound", (string)status["recording_mode"],
+                "binding state is unchanged by the new field");
+        }
+
+        [Test]
         public static void Service_Valid_Config_Without_Ack_Denies_Everything()
         {
             RecordingHarness h = RecordingHarness.Create(RecordingTestData.Unacknowledged());
@@ -361,6 +423,8 @@ namespace PawnMind.Tests
             Assert.Contains(status, "\"next_free_known\":true", "prediction flag");
             Assert.Contains(status, "\"configured_slot_occupied\":false",
                 "configured slot is free");
+            Assert.Contains(status, "\"acknowledgment\":\"isolation\"",
+                "the effective acknowledgment method is exposed");
 
             Assert.False(status.Contains("preview"), "no save preview");
             Assert.False(status.Contains("path"), "no save path");
@@ -372,9 +436,10 @@ namespace PawnMind.Tests
             JObject parsed = JObject.Parse(status);
             string[] allowed =
             {
-                "ok", "recording_mode", "configured_slot", "next_free_slot",
-                "next_free_known", "configured_slot_occupied", "bound", "binding",
-                "slot_matches", "run_matches", "last_save_time", "error"
+                "ok", "recording_mode", "acknowledgment", "configured_slot",
+                "next_free_slot", "next_free_known", "configured_slot_occupied",
+                "bound", "binding", "slot_matches", "run_matches", "last_save_time",
+                "error"
             };
             foreach (JProperty property in parsed.Properties())
             {
@@ -516,6 +581,8 @@ namespace PawnMind.Tests
             JObject status = JObject.Parse(service.StatusJson());
             Assert.Equal("disabled", (string)status["recording_mode"],
                 "an unavailable service stays disabled");
+            Assert.Equal(JTokenType.Null, status["acknowledgment"].Type,
+                "an unavailable service has no acknowledgment method");
             Assert.Equal(JTokenType.Null, status["configured_slot"].Type,
                 "no configured slot");
             Assert.NotNull(status["next_free_slot"], "next_free_slot is still present");

@@ -55,6 +55,17 @@ namespace PawnMind.Core
         Locked
     }
 
+    /// <summary>
+    /// The user declaration that actually unlocked recording writes. Isolation
+    /// is reported first when both declarations are present.
+    /// </summary>
+    public enum RecordingAcknowledgment
+    {
+        None,
+        Isolation,
+        DedicatedSlot
+    }
+
     public enum RecordingOperation
     {
         NewGame,
@@ -81,38 +92,61 @@ namespace PawnMind.Core
         public string Mode { get; private set; }
         public int? Slot { get; private set; }
         public bool IsolationAcknowledged { get; private set; }
+        public bool DedicatedSlotAcknowledged { get; private set; }
+
+        /// <summary>
+        /// Confirmation method that unlocked writes. None when recording is
+        /// disabled, the slot is invalid, or neither confirmation was given.
+        /// </summary>
+        public RecordingAcknowledgment Acknowledgment { get; private set; }
         public string Error { get; private set; }
 
         private RecordingSettings()
         {
         }
 
-        public static RecordingSettings Create(string mode, int? slot, bool isolationAcknowledged)
+        public static RecordingSettings Create(
+            string mode,
+            int? slot,
+            bool isolationAcknowledged)
+        {
+            return Create(mode, slot, isolationAcknowledged, false);
+        }
+
+        public static RecordingSettings Create(
+            string mode,
+            int? slot,
+            bool isolationAcknowledged,
+            bool dedicatedSlotAcknowledged)
         {
             string normalized = (mode ?? string.Empty).Trim().ToLowerInvariant();
             if (normalized != ModeRecording && normalized != ModeOn)
             {
                 return Invalid(normalized, slot, isolationAcknowledged,
-                    RecordingSaveErrors.Unconfigured);
+                    dedicatedSlotAcknowledged, RecordingSaveErrors.Unconfigured);
             }
 
             if (!slot.HasValue || slot.Value < 0)
             {
                 return Invalid(normalized, slot, isolationAcknowledged,
-                    RecordingSaveErrors.SlotInvalid);
+                    dedicatedSlotAcknowledged, RecordingSaveErrors.SlotInvalid);
             }
 
-            if (!isolationAcknowledged)
+            if (!isolationAcknowledged && !dedicatedSlotAcknowledged)
             {
                 return Invalid(normalized, slot, isolationAcknowledged,
-                    RecordingSaveErrors.IsolationUnacknowledged);
+                    dedicatedSlotAcknowledged, RecordingSaveErrors.IsolationUnacknowledged);
             }
 
             return new RecordingSettings
             {
                 Mode = normalized,
                 Slot = slot,
-                IsolationAcknowledged = true,
+                IsolationAcknowledged = isolationAcknowledged,
+                DedicatedSlotAcknowledged = dedicatedSlotAcknowledged,
+                Acknowledgment = isolationAcknowledged
+                    ? RecordingAcknowledgment.Isolation
+                    : RecordingAcknowledgment.DedicatedSlot,
                 Error = null
             };
         }
@@ -121,14 +155,16 @@ namespace PawnMind.Core
         {
             if (config == null)
             {
-                return Invalid(string.Empty, null, false, RecordingSaveErrors.Unconfigured);
+                return Invalid(string.Empty, null, false, false,
+                    RecordingSaveErrors.Unconfigured);
             }
 
             string normalized = (config.RecordingMode ?? string.Empty).Trim().ToLowerInvariant();
             if (normalized != ModeRecording && normalized != ModeOn)
             {
                 return Invalid(normalized, config.RecordingSlot,
-                    config.RecordingIsolationAck, RecordingSaveErrors.Unconfigured);
+                    config.RecordingIsolationAck, config.RecordingDedicatedSlotAck,
+                    RecordingSaveErrors.Unconfigured);
             }
 
             if (config.RecordingSlotInvalid
@@ -136,20 +172,25 @@ namespace PawnMind.Core
                 || config.RecordingSlot.Value < 0)
             {
                 return Invalid(normalized, config.RecordingSlot,
-                    config.RecordingIsolationAck, RecordingSaveErrors.SlotInvalid);
+                    config.RecordingIsolationAck, config.RecordingDedicatedSlotAck,
+                    RecordingSaveErrors.SlotInvalid);
             }
 
-            if (!config.RecordingIsolationAck)
+            if (!config.RecordingIsolationAck && !config.RecordingDedicatedSlotAck)
             {
                 return Invalid(normalized, config.RecordingSlot,
-                    false, RecordingSaveErrors.IsolationUnacknowledged);
+                    false, false, RecordingSaveErrors.IsolationUnacknowledged);
             }
 
             return new RecordingSettings
             {
                 Mode = normalized,
                 Slot = config.RecordingSlot,
-                IsolationAcknowledged = true,
+                IsolationAcknowledged = config.RecordingIsolationAck,
+                DedicatedSlotAcknowledged = config.RecordingDedicatedSlotAck,
+                Acknowledgment = config.RecordingIsolationAck
+                    ? RecordingAcknowledgment.Isolation
+                    : RecordingAcknowledgment.DedicatedSlot,
                 Error = null
             };
         }
@@ -158,6 +199,7 @@ namespace PawnMind.Core
             string mode,
             int? slot,
             bool isolationAcknowledged,
+            bool dedicatedSlotAcknowledged,
             string error)
         {
             return new RecordingSettings
@@ -165,6 +207,8 @@ namespace PawnMind.Core
                 Mode = mode,
                 Slot = slot,
                 IsolationAcknowledged = isolationAcknowledged,
+                DedicatedSlotAcknowledged = dedicatedSlotAcknowledged,
+                Acknowledgment = RecordingAcknowledgment.None,
                 Error = error
             };
         }
@@ -264,6 +308,7 @@ namespace PawnMind.Core
         public RecordingSlotState State;
         public string Error;
         public int? ConfiguredSlot;
+        public RecordingAcknowledgment Acknowledgment;
         public bool Bound;
         public RecordingBinding Binding;
         public bool InGame;
@@ -634,6 +679,7 @@ namespace PawnMind.Core
                 State = state,
                 Error = CurrentError(),
                 ConfiguredSlot = settings.Slot,
+                Acknowledgment = settings.Acknowledgment,
                 Bound = state == RecordingSlotState.Bound,
                 Binding = binding,
                 StartPending = startIssued,

@@ -6,7 +6,7 @@
 
 | 层 | 内容 |
 |---|---|
-| 配置 | `BridgeConfig` 新增 `recording_mode`（空/`off` 默认锁定）、`recording_slot`（空=未选定，保留非法原文但不拖垮整份配置）、`recording_isolation_ack`（只接受 `true`/`1`）。默认序列化不会自动填槽或自动确认隔离。 |
+| 配置 | `BridgeConfig` 新增 `recording_mode`（空/`off` 默认锁定）、`recording_slot`（空=未选定，保留非法原文但不拖垮整份配置）、`recording_isolation_ack`（只接受 `true`/`1`）、`recording_dedicated_slot_ack`（只接受 `true`/`1`；诚实声明“沿用现有已游玩配置 + 新专用槽”，不冒充隔离）。两个 ack 至少一个为 true 才解锁；默认序列化不会自动填槽或自动确认。 |
 | Core 策略 | `RecordingSlotPolicy`：`Disabled → Armed → Bound`，任何绑定/回读不符进入 `Locked`；不自动复用旧绑定，不回滚，不重试。`RecordingSettings` 只从用户配置解析。 |
 | Core 端口 | 注入 `IRecordingGameStatePort`、`IRecordingSlotInventoryPort`、`IRecordingNativeSavePort`、`IRecordingSaveMetadataPort`。Core 不引用 Unity/游戏类型。 |
 | Bridge 服务 | `RecordingSaveService`：`get_recording_save_status`（只读）、`save_recording_game`、`load_recording_game`、`confirm_new_game`，以及旧入口 `new_game` / `load_game` / `save_game` / `sleep` / `press` 的统一策略。 |
@@ -21,6 +21,23 @@
 - `PlayerStore.InitialSave()` 自己调用 `SaveFiles.NextFreeSlotId()` 分配槽号并写盘，**不读取** `NewGameData.saveSlot` 作为分配目标。
 - 因此 S4 不把目标槽写进 `NewGameData.saveSlot`。受控开始路径是：菜单难度页原生 Start → 清空 `saveSlot` 为 `-1` → 场景加载 → `InitialSave` 自动分槽 → 回读 `PlayerStore.saveSlotId/runID/runNumber/startType/startScenarioId`，必须与配置槽号及启动意图完全一致才进入 `Bound`；不符立即 `Locked`，不回滚、不重试。
 - 开始前只读检查：`activeSaveSlotId` 索引 + `slotIdGenerator` 预测下一个空闲槽；目标槽必须在索引中未占用且等于预测的下一个自动分配槽，否则在调用原生 Start 前拒绝（`recording_slot_occupied` / `recording_slot_not_next_free` / `recording_slot_allocation_unknown` / `recording_slot_inventory_unavailable`）。
+
+## 配置模板（两种确认方式二选一）
+
+```ini
+recording_mode=recording
+recording_slot=<必须等于游戏当时的 next free slot>
+
+# A. 隔离环境：独立 Windows 用户 / 独立 LocalLow，与本机原档分离
+recording_isolation_ack=false
+# B. 同配置专用槽：沿用现有已游玩配置，但只允许绑定这个新专用槽
+recording_dedicated_slot_ack=true
+```
+
+- `recording_isolation_ack=true` 表示用户声明 A：当前是隔离环境。它是用户声明，代码无法验证 OS 用户/LocalLow/Steam 云同步是否真的分离。
+- `recording_dedicated_slot_ack=true` 表示用户声明 B：**不**使用隔离环境，而是沿用现有已游玩配置，只把录制写入限制在这个新专用槽。这个声明不得被理解为隔离；它只是让配置与实际选择一致，避免把 isolation ack 填成不实的 true。
+- 两者至少一个为 true 才可能 `Armed`；两者都 false/缺失时错误码仍为 `recording_isolation_unacknowledged`（保持不变，避免破坏既有协议/测试），所有录制写操作保持锁定。
+- 两者都 true 时 `Armed`，但状态里的 `acknowledgment` 优先报 `isolation`；实际只用一种时应把另一种留 false。
 
 ## 强制入口与状态语义
 
@@ -39,7 +56,7 @@
 
 ## 只读状态接口
 
-`get_recording_save_status` 只输出：`recording_mode`、`configured_slot`、`bound`、`binding{slot,run_id,run_number,start_type,start_scenario_id}`、`slot_matches`、`run_matches`、`last_save_time`、`error`。不输出其他槽号/预览/路径/寄存器。`last_save_time` 仅在已绑定时读取该专用槽的 `preview_<slot>` 索引时间；未绑定时不读取任何槽预览。
+`get_recording_save_status` 只输出：`recording_mode`、`acknowledgment`、`configured_slot`、`bound`、`binding{slot,run_id,run_number,start_type,start_scenario_id}`、`slot_matches`、`run_matches`、`last_save_time`、`error`。`acknowledgment` 是只读枚举，只能是 `"isolation"`、`"dedicated_slot"` 或 `null`（配置未启用/槽非法/两个 ack 都未给时）；两者都声明时优先报 `isolation`。不输出其他槽号/预览/路径/寄存器。`last_save_time` 仅在已绑定时读取该专用槽的 `preview_<slot>` 索引时间；未绑定时不读取任何槽预览。
 
 ## 测试证据
 
@@ -47,13 +64,13 @@
 - **Green（主代理可复跑）**：
   - `REQUIRE_GAME=1 ./test.sh`：C# **374**、脚本门禁 **53**、适配器契约 **384**，`adapter contract OK`，`strict mode: REQUIRE_GAME=1`，**无 SKIP**。
   - `dotnet build src/PawnMind.csproj -c Release`：**0 警告 / 0 错误**。
-- 覆盖：默认全锁；ack 缺失；槽缺失/非法/被占；预测槽不一致；回读槽号不符 → Locked 且只调用一次原生；只有绑定槽 save/load；其他槽不触达原生；`act` / `press` 绕过拒绝；sleep 未绑定拒绝；进程新实例不自动复用绑定；版本门禁锁定即使录制配置合法也拒绝；状态 JSON 不含其他槽/预览/路径；错误码稳定。
+- 覆盖：默认全锁；ack 缺失；仅 isolation ack / 仅 dedicated-slot ack / 两者都有（状态优先报 isolation）；槽缺失/非法/被占；预测槽不一致；回读槽号不符 → Locked 且只调用一次原生；只有绑定槽 save/load；其他槽不触达原生；`act` / `press` 绕过拒绝；sleep 未绑定拒绝；进程新实例不自动复用绑定；版本门禁锁定即使录制配置合法也拒绝；状态 JSON 含 `acknowledgment` 且不含其他槽/预览/路径；错误码稳定。
 
 ## S8 必须人工确认（离线无法证明安全）
 
 1. **目标槽为空**：生产库存只读 `SaveFiles` 索引。若存在“文件在、索引不在”的孤儿槽，预测可能变化；S8 必须由用户确认专用槽在游戏菜单中为空，并接受启动后回读不符即停机。
-2. **隔离环境**：`recording_isolation_ack` 只是用户声明；代码不能证明 OS 用户/LocalLow/Steam 云同步与原用户档分离。S8 需人工核验并确认专用槽号。
-3. **原生新局真实写盘**：`confirm_new_game` 的离线实现只调用 fake；真机上难度页 Start 会立即触发 `InitialSave` 写盘。用户必须在 S8 对隔离环境和“一次原生新局写盘”明确授权。
+2. **运行环境声明**：`recording_isolation_ack` 和 `recording_dedicated_slot_ack` 都只是用户声明；代码不能证明 OS 用户/LocalLow/Steam 云同步与原用户档分离。S8 需人工核验并确认专用槽号。若用户明确选择“现有已游玩配置 + 新专用槽”，必须用 `recording_dedicated_slot_ack=true` 诚实声明，不得把 isolation ack 填成 true；此时其它用户存档与录制同处一个配置，唯一保护是策略只允许绑定这一个专用槽，需人工接受剩余误操作风险。
+3. **原生新局真实写盘**：`confirm_new_game` 的离线实现只调用 fake；真机上难度页 Start 会立即触发 `InitialSave` 写盘。用户必须在 S8 对所选运行环境（隔离环境或同配置专用槽）和“一次原生新局写盘”明确授权。
 4. **重启后绑定**：新 Mod/游戏进程实例只回到 `Armed`，不会复用旧 `Bound`；当前没有离线可证的自动重新绑定。S8 需人工决定重启后的继续方式（重新受控开局或人工重新绑定），不得自动读用户槽。
 5. **首局 prompt**：只接受本地化文本识别为 `first_run_confirm` / `skip_intro_first_run_confirm` 的弹窗，且走原生 `OnYesClick`。若正式版文本/行为变化，会 fail closed；S8 需核对真实弹窗。
 6. **最近保存时间**：Rev13 的 `PlayerStore.lastSaveTime` 静态代码未见写入；状态改用绑定槽的 `preview_<slot>.lastSaveDateTime`。若保存/跨日自动保存的索引写入滞后，时间可能短暂偏旧；S8 需以游戏 UI 存档时间为准。

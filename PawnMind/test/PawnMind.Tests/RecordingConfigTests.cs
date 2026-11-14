@@ -19,6 +19,7 @@ namespace PawnMind.Tests
             Assert.Equal(string.Empty, config.RecordingMode, "recording mode defaults empty");
             Assert.Null(config.RecordingSlot, "recording slot defaults unset");
             Assert.False(config.RecordingIsolationAck, "isolation ack defaults false");
+            Assert.False(config.RecordingDedicatedSlotAck, "dedicated-slot ack defaults false");
             Assert.False(config.RecordingSlotInvalid, "default slot is not marked invalid");
 
             RecordingSettings settings = RecordingSettings.From(config);
@@ -31,6 +32,18 @@ namespace PawnMind.Tests
             Assert.Contains(text, "recording_isolation_ack=false", "ack stays false");
             Assert.False(text.Contains("recording_isolation_ack=true"),
                 "serialization must never auto-approve isolation");
+            Assert.Contains(text, "recording_dedicated_slot_ack=false",
+                "dedicated-slot ack stays false");
+            Assert.False(text.Contains("recording_dedicated_slot_ack=true"),
+                "serialization must never auto-approve a dedicated slot");
+            Assert.Contains(text, "#   recording_isolation_ack",
+                "serialized comment documents the isolation opt-in");
+            Assert.Contains(text, "#   recording_dedicated_slot_ack",
+                "serialized comment documents the dedicated-slot opt-in");
+            Assert.Contains(text, "isolated environment",
+                "serialized comment explains the isolation declaration");
+            Assert.Contains(text, "existing played profile + new dedicated slot",
+                "serialized comment explains the dedicated-slot declaration");
         }
 
         [Test]
@@ -59,6 +72,92 @@ namespace PawnMind.Tests
         }
 
         [Test]
+        public static void Config_Recording_Dedicated_Slot_Ack_Parses_And_RoundTrips()
+        {
+            string text = BaseConfig()
+                + "recording_mode=recording\n"
+                + "recording_slot=40\n"
+                + "recording_isolation_ack=false\n"
+                + "recording_dedicated_slot_ack=true\n";
+
+            BridgeConfig parsed;
+            string error;
+            Assert.True(BridgeConfig.TryParse(text, out parsed, out error), "parse: " + error);
+            Assert.False(parsed.RecordingIsolationAck, "isolation ack stays an honest false");
+            Assert.True(parsed.RecordingDedicatedSlotAck, "dedicated-slot ack parsed");
+
+            RecordingSettings settings = RecordingSettings.From(parsed);
+            Assert.Null(settings.Error, "dedicated-slot ack alone unlocks writes");
+            Assert.Equal(40, settings.Slot.Value, "resolved slot");
+            Assert.False(settings.IsolationAcknowledged, "isolation was not declared");
+            Assert.True(settings.DedicatedSlotAcknowledged, "dedicated-slot was declared");
+            Assert.Equal(RecordingAcknowledgment.DedicatedSlot, settings.Acknowledgment,
+                "the effective acknowledgment is recorded");
+
+            RecordingSlotPolicy policy = new RecordingSlotPolicy(settings);
+            Assert.Equal(RecordingSlotState.Armed, policy.State,
+                "dedicated-slot ack alone arms the policy");
+
+            BridgeConfig numeric;
+            Assert.True(BridgeConfig.TryParse(
+                BaseConfig() + "recording_mode=on\nrecording_slot=40\n"
+                    + "recording_dedicated_slot_ack=1\n",
+                out numeric,
+                out error), "parse numeric dedicated-slot ack: " + error);
+            Assert.True(numeric.RecordingDedicatedSlotAck, "1 is explicit true");
+            Assert.Equal(RecordingAcknowledgment.DedicatedSlot,
+                RecordingSettings.From(numeric).Acknowledgment,
+                "numeric dedicated-slot ack unlocks the same way");
+
+            string serialized = parsed.Serialize();
+            Assert.Contains(serialized, "recording_isolation_ack=false",
+                "isolation stays false in serialization");
+            Assert.Contains(serialized, "recording_dedicated_slot_ack=true",
+                "dedicated-slot round-trip");
+
+            BridgeConfig reparsed;
+            Assert.True(BridgeConfig.TryParse(serialized, out reparsed, out error),
+                "serialized config parses: " + error);
+            Assert.True(reparsed.RecordingDedicatedSlotAck,
+                "dedicated-slot survives a round-trip");
+            Assert.False(reparsed.RecordingIsolationAck,
+                "isolation false survives a round-trip");
+        }
+
+        [Test]
+        public static void Config_Recording_Both_Acks_Prefer_Isolation()
+        {
+            string text = BaseConfig()
+                + "recording_mode=on\n"
+                + "recording_slot=7\n"
+                + "recording_isolation_ack=true\n"
+                + "recording_dedicated_slot_ack=true\n";
+
+            BridgeConfig parsed;
+            string error;
+            Assert.True(BridgeConfig.TryParse(text, out parsed, out error), "parse: " + error);
+            Assert.True(parsed.RecordingIsolationAck, "isolation parsed");
+            Assert.True(parsed.RecordingDedicatedSlotAck, "dedicated-slot parsed");
+
+            RecordingSettings settings = RecordingSettings.From(parsed);
+            Assert.Null(settings.Error, "both acks arm writes");
+            Assert.True(settings.IsolationAcknowledged, "isolation raw flag is preserved");
+            Assert.True(settings.DedicatedSlotAcknowledged,
+                "dedicated-slot raw flag is preserved");
+            Assert.Equal(RecordingAcknowledgment.Isolation, settings.Acknowledgment,
+                "isolation is reported first when both declarations are present");
+
+            RecordingSlotPolicy policy = new RecordingSlotPolicy(settings);
+            Assert.Equal(RecordingSlotState.Armed, policy.State, "both acks arm the policy");
+
+            string serialized = parsed.Serialize();
+            Assert.Contains(serialized, "recording_isolation_ack=true",
+                "isolation round-trip");
+            Assert.Contains(serialized, "recording_dedicated_slot_ack=true",
+                "dedicated-slot round-trip");
+        }
+
+        [Test]
         public static void Config_Recording_Mode_Off_Or_Unknown_Stays_Unconfigured()
         {
             string[] modes = { "", "off", "disabled", "banana" };
@@ -77,6 +176,19 @@ namespace PawnMind.Tests
                 Assert.Equal(RecordingSaveErrors.Unconfigured, RecordingSettings.From(config).Error,
                     "only an explicit recording mode may arm writes: " + modes[i]);
             }
+
+            BridgeConfig dedicatedOff;
+            string dedicatedError;
+            Assert.True(BridgeConfig.TryParse(
+                BaseConfig()
+                + "recording_mode=off\n"
+                + "recording_slot=40\n"
+                + "recording_dedicated_slot_ack=true\n",
+                out dedicatedOff,
+                out dedicatedError), "parse dedicated ack with off mode: " + dedicatedError);
+            Assert.Equal(RecordingSaveErrors.Unconfigured,
+                RecordingSettings.From(dedicatedOff).Error,
+                "a dedicated-slot ack does not bypass the explicit recording mode");
         }
 
         [Test]
@@ -108,6 +220,9 @@ namespace PawnMind.Tests
                 out error), "parse missing ack: " + error);
             Assert.Equal(RecordingSaveErrors.IsolationUnacknowledged,
                 RecordingSettings.From(missing).Error, "missing ack locks");
+            Assert.Equal(RecordingAcknowledgment.None,
+                RecordingSettings.From(missing).Acknowledgment,
+                "no acknowledgment method was used when both keys are absent");
 
             BridgeConfig explicitFalse;
             Assert.True(BridgeConfig.TryParse(
@@ -116,6 +231,20 @@ namespace PawnMind.Tests
                 out error), "parse false ack: " + error);
             Assert.Equal(RecordingSaveErrors.IsolationUnacknowledged,
                 RecordingSettings.From(explicitFalse).Error, "false ack locks");
+
+            BridgeConfig bothFalse;
+            Assert.True(BridgeConfig.TryParse(
+                BaseConfig() + "recording_mode=on\nrecording_slot=7\n"
+                    + "recording_isolation_ack=false\n"
+                    + "recording_dedicated_slot_ack=false\n",
+                out bothFalse,
+                out error), "parse both false acks: " + error);
+            Assert.Equal(RecordingSaveErrors.IsolationUnacknowledged,
+                RecordingSettings.From(bothFalse).Error,
+                "explicitly false acks keep the stable unacknowledged code");
+            Assert.Equal(RecordingAcknowledgment.None,
+                RecordingSettings.From(bothFalse).Acknowledgment,
+                "explicitly false acks are not a confirmation method");
 
             BridgeConfig numeric;
             Assert.True(BridgeConfig.TryParse(
@@ -137,6 +266,18 @@ namespace PawnMind.Tests
             Assert.Null(missing.RecordingSlot, "missing slot stays unset");
             Assert.Equal(RecordingSaveErrors.SlotInvalid, RecordingSettings.From(missing).Error,
                 "missing slot must use the invalid-slot code");
+
+            BridgeConfig dedicatedMissing;
+            Assert.True(BridgeConfig.TryParse(
+                BaseConfig() + "recording_mode=on\nrecording_dedicated_slot_ack=true\n",
+                out dedicatedMissing,
+                out error), "parse dedicated ack without slot: " + error);
+            Assert.Equal(RecordingSaveErrors.SlotInvalid,
+                RecordingSettings.From(dedicatedMissing).Error,
+                "dedicated-slot ack still requires an explicit slot");
+            Assert.Equal(RecordingAcknowledgment.None,
+                RecordingSettings.From(dedicatedMissing).Acknowledgment,
+                "an invalid slot never reports an effective acknowledgment");
 
             BridgeConfig negative;
             Assert.True(BridgeConfig.TryParse(

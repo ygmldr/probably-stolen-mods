@@ -25,13 +25,13 @@
 | S4 | 专用录制槽状态机、所有写入口统一拦截、绑定回读 | [S4](<pawnmind-s4-offline-evidence.zh-CN.md>) |
 | S5 | 禁用对话选项拒绝、付租回执、跨日回读、隐藏字段清理 | [S5](<pawnmind-s5-offline-evidence.zh-CN.md>) |
 | S6 | HTTP 非阻塞/有界、断线 unknown、隐藏字段审计；AI 宿主模板 + fake 游戏端到端 | [S6A](<pawnmind-s6a-offline-evidence.zh-CN.md>) / [S6B](<pawnmind-s6b-offline-evidence.zh-CN.md>) |
-| S7 | 录制模式 28 工具裁剪、文档同步、S8 Runbook | 本文 + [Runbook](<pawnmind-s8-runbook.zh-CN.md>) |
+| S7 | 录制模式工具面（94 个玩家等价工具，排除 6 个旁路）、文档同步、S8 Runbook | 本文 + [Runbook](<pawnmind-s8-runbook.zh-CN.md>) |
 | S7+ | DSH 宿主补丁（`mcp-pawnmind` + 默认模型 `opencode-go/deepseek-v4.1-flash`）、试玩剧本 `PawnMind/play/AGENTS.md`、只读预检脚本 `agent/preflight.py`、`next_free_slot` 只读字段 | [宿主说明](<pawnmind-ai-host-setup.zh-CN.md>) |
 
 ## 3. 关键行为（给 S8 的预期）
 
 - **默认全锁**：`recording_mode` 为空时，`new_game`/`save_game`/`sleep`/`press`/`act` 旁路与菜单写全部拒绝；只有读接口可用。
-- **解锁条件**：`recording_mode=recording|on` + `recording_slot=<下一个自动分配槽>` + `recording_isolation_ack=true` + 版本门禁 `open`。
+- **解锁条件**：`recording_mode=recording|on` + `recording_slot=<下一个自动分配槽>` + 版本门禁 `open` + 环境确认（`recording_isolation_ack=true` 用于隔离环境，**或** `recording_dedicated_slot_ack=true` 表示接受“现有配置 + 专用槽”的同配置风险）。
 - **开局唯一路径**：菜单选择 → 难度页 → `confirm_new_game`（一次原生 Start，游戏自己 `InitialSave` 分槽）→ 回读槽号/runID/开局意图，全中才 `Bound`；任何不符 `Locked`，不回滚不重试。
 - **绑定后**：只有该槽 `save/load` 与 `sleep` 自动保存可使用；其他槽 `recording_slot_not_bound`。
 - **付租**：禁用选项 `choice_disabled` 且零变化；成功后有一次性 `last_payment` 回执。

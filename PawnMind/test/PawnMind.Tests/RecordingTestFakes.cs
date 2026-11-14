@@ -130,6 +130,16 @@ namespace PawnMind.Tests
             return RecordingSettings.Create("on", slot, true);
         }
 
+        public static RecordingSettings DedicatedSlot(int slot = 7)
+        {
+            return RecordingSettings.Create("on", slot, false, true);
+        }
+
+        public static RecordingSettings BothAcks(int slot = 7)
+        {
+            return RecordingSettings.Create("on", slot, true, true);
+        }
+
         public static RecordingSettings Off()
         {
             return RecordingSettings.Create("off", null, false);

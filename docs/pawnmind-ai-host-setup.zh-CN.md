@@ -149,7 +149,7 @@ dsh --profile web --patch ../agent/dsh/pawnmind.patch.yml --port 3090 --no-open
 
 - `-m agent.mcp_server` 依赖 cwd 在 `sys.path` 上，所以 `cwd` 必须是包根。
 - stdio 子进程的 `command` 由**父进程 cwd** 解析，不随配置里的 `cwd` 变（已用 Node `spawn` 实测：`spawn('./rel.sh', {cwd})` 返回 `ENOENT`）。所以从 `PawnMind/play` 启动时，必须用 `PAWNMIND_HOME` 拼绝对路径。
-- `--tools recording`：服务端只注册首周 28 个工具；`--tools full`（默认 100 个）只用于开发，**不要**用在试玩/录像。
+- `--tools recording`：服务端注册 94 个玩家等价工具；`--tools full`（默认 100 个）只用于开发，**不要**用在试玩/录像。
 - `toolCallTimeoutMs: 120000`：`wait_for_events` 本身最长 25s 长轮询，默认 60s 偏紧。
 - `failOnStartupError: false`：游戏没开时不要因为 MCP 连不上就拒绝整个 profile；工具先不出现，日志里留错误。若 `bridge.conf` 路径错，MCP 进程会**启动即退出**（`BridgeClient` 构造失败，退出码 2），症状同样是“没有 `mcp__pawnmind__*` 工具”。
 
@@ -232,7 +232,7 @@ dsh --profile web --patch PawnMind/agent/dsh/pawnmind.patch.yml
 ### 6.3 启动后应该看到
 
 - DSH 的工具列表里出现 **`mcp__pawnmind__*`**，例如 `mcp__pawnmind__get_state`、`mcp__pawnmind__get_new_game_options`、`mcp__pawnmind__confirm_trade`。
-- 恰好 28 个 PawnMind 工具，**没有** `mcp__pawnmind__act`、`press`、`get_ui_snapshot`、`new_game`、`load_game`、`save_game`。
+- 94 个 PawnMind 工具，**没有** `mcp__pawnmind__act`、`press`、`get_ui_snapshot`、`wait_until`、`wine_add_water`、`new_game`。
 - 默认模型显示 `opencode-go / deepseek-v4.1-flash`。
 
 > ⚠ 以上三条是**离线推断 + 服务端已验证**（§8.4），DSH 真实加载时的工具列表 UI **未验证**（S8）。如果只看到 0 个 `mcp__pawnmind__*`，先去看 DSH 日志里 MCP 子进程的 stderr（`bridge.conf` 不存在 / python 路径错 / `import mcp` 失败）。
@@ -349,7 +349,7 @@ schema 里与本 patch 相关的两条（从 dump 出的 JSON Schema 里读，�
 
 > 这个脚本只是把表达式当 JS 求值，用来核对字符串；它**不**证明 DSH 启动时会这样求值。
 
-### 8.4 服务端 side：patch 里那条 stdio 命令确实给出 28 个工具
+### 8.4 服务端 side：patch 里那条 stdio 命令确实给出 94 个工具
 
 用 `fake_game.py`（离线测试替身，**不是游戏**）起一个临时桥，按 patch 里那条命令的**等价绝对路径形式**跑一次真实 stdio 握手：
 
@@ -381,7 +381,7 @@ Ran 7 tests in 25.754s
 OK
 ```
 
-也就是说：`cwd=PawnMind` + `-m agent.mcp_server --tools recording` 这个**模块形式**能工作，28 个工具与 [`RECORDING_TOOL_NAMES`](../PawnMind/agent/mcp_server.py) 完全一致，`act` / `press` / `new_game` / `load_game` / `save_game` 都不在。既有测试 [`test_mcp_entrypoint.py`](../PawnMind/agent/tests/test_mcp_entrypoint.py)（`-m` 入口）与 [`test_mcp_tools_mode.py`](../PawnMind/agent/tests/test_mcp_tools_mode.py)（recording 集合）覆盖了同一层的回归。
+也就是说：`cwd=PawnMind` + `-m agent.mcp_server --tools recording` 这个**模块形式**能工作，94 个工具与 [`RECORDING_TOOL_NAMES`](../PawnMind/agent/mcp_server.py) 完全一致，`act` / `press` / `get_ui_snapshot` / `wait_until` / `wine_add_water` / `new_game` 都不在。既有测试 [`test_mcp_entrypoint.py`](../PawnMind/agent/tests/test_mcp_entrypoint.py)（`-m` 入口）与 [`test_mcp_tools_mode.py`](../PawnMind/agent/tests/test_mcp_tools_mode.py)（recording 集合）覆盖了同一层的回归。
 
 上面这段输出是按三列排版过的，原始输出是每行一个工具名。校验脚本是本轮的临时文件，**没有入库**；要复现就把它存成任意路径再跑：
 
@@ -452,56 +452,56 @@ dsh --profile headless --patch /tmp/pm-mcp.yml --json \
 
 ---
 
-## 9. 工具面：服务端 28、模型可见 28、剧本约束
+## 9. 工具面：服务端 94、模型可见 94、剧本约束
 
-### 9.1 服务端 `--tools recording`（28 个，硬白名单）
+### 9.1 设计原则：玩家能做的，AI 都能做
 
-由 [`mcp_server.py`](../PawnMind/agent/mcp_server.py) 的 `RECORDING_TOOL_NAMES` 定义，`test_mcp_tools_mode.py` 用真实 stdio 断言**完全相等**（多一个也会测挂）：
+录制集不是“首周最小闭环”，而是**玩家等价面**：机器、酿酒、净水、彩票、电话、夜间搜刮、市场委托、派系、鉴定、搬运、书本、自动售货升级……全部保留。
 
-```
-ping                     get_state                 get_legal_actions
-get_run_summary          get_action_history        wait_for_events
-wait_for_change          get_new_game_options      open_new_game_menu
-select_new_game_option   new_game_next_page        new_game_continue
-focus_new_game_selected_perk                       blur_new_game_option
-confirm_new_game         get_recording_save_status save_recording_game
-load_recording_game      choose_dialogue           advance_dialogue
-confirm_trade            open_shop                 call_next_customer
-list_goods               get_item                  list_inventory
-end_day                  sleep
-```
+理由很直接：这些就是游戏内容。砍掉它们，AI 只能站柜台低买高卖，等于把一款模拟经营玩成小卖部；而且夜间被动收入（自动售货/售水）、净水、酿酒恰恰是这个游戏的主要利润来源。
 
-这 28 个里**没有**：`act`、`press`、`get_ui_snapshot`、`wait_until`、`new_game`、`load_game`、`save_game`、`wine_add_water`、`debug_*`，也没有夜间外出、书本、机器、酒类、彩票、电话、标签、容器移动等 72 个全量工具。取舍理由见 §9.4。
+`RECORDING_TOOL_NAMES`（[mcp_server.py](../PawnMind/agent/mcp_server.py)）仍是**硬白名单**：以后新增的工具默认**不会**进录制集，必须显式加上，`test_mcp_tools_mode.py` 会用真实 stdio 断言注册集合与它**完全相等**。
 
-### 9.2 模型可见：28（DSH 侧没有已验证的工具过滤）
+### 9.2 被排除的 6 个，以及理由
 
-`@deepseek-ai/dsh-mcp-client` 的 schema 里**没有** per-tool allowlist 字段，所以 DSH 会把服务端注册的 28 个全部暴露给模型。**旧文档里“宿主 allowlist 19 个”那一层在 DSH 上不成立**，现在是两层：
+| 工具 | 为什么排除 |
+|---|---|
+| `act` | 按名字调用任意 op，绕过所有强类型工具、`rev`/`action_id` 门禁和录制槽策略 |
+| `press` | 按任意 UI 控件，同样是旁路 |
+| `get_ui_snapshot` | 只用来给 `press` 枚举控件；没有 `press` 就是噪音 |
+| `wait_until` | 宿主轮询助手，不是游戏动作，和 `wait_for_events` 重复 |
+| `wine_add_water` | 直接往瓶里注纯水；玩家没有这个动作，属于捷径 |
+| `new_game` | 硬编码 `APPRENTICE + skipIntro=true`，无法表达玩家自己选的场景/难度/特质；唯一能表达选择的入口是菜单 → `confirm_new_game` |
 
-1. **服务端硬白名单**（`--tools recording`）：危险工具在协议里根本不存在；
-2. **剧本软约束**（[`PawnMind/play/AGENTS.md`](../PawnMind/play/AGENTS.md)）：只允许 `mcp__pawnmind__*`，并规定单步、回读、`rev`、错误处置。
+其余 **94 个**全部注册。
 
-[`demo_agent.py`](../PawnMind/agent/demo_agent.py) 的 `REQUIRED_TOOLS`（19 个）现在只作为“脚本策略最小集”保留，**不再是宿主 allowlist**；`test_mcp_tools_mode.py` 仍断言它 ⊆ 服务端 recording 集，防止两处清单漂移。
+### 9.3 模型可见：94（DSH 侧没有已验证的 per-tool allowlist）
 
-> 未验证/未交付：DSH 侧能不能用权限配置把宿主工具（`bash`/`read`/`write`/`web_fetch`/子代理）真的禁掉。本轮没有写这种 patch——没验证过的权限键不写进交付物。S8 若需要，先 `--dump-config-schema` 查出键名再单独加层。
+`@deepseek-ai/dsh-mcp-client` 的 schema 里**没有** per-tool allowlist 字段，所以 DSH 会暴露服务端注册的全部 94 个。实际有两层半：
 
-### 9.3 为什么还是安全的
+1. **服务端硬白名单**（`--tools recording`）：那 6 个旁路工具在协议里根本不存在；
+2. **宿主工具收紧**（[`play-headless.patch.yml`](../PawnMind/agent/dsh/play-headless.patch.yml)）：用 `--dump-config` 验证过，组合后模型侧启用的 tool 行只剩执行器，shell/文件/网页/子代理/工作流全部 `disabled: true`；
+3. **剧本软约束**（[`PawnMind/play/AGENTS.md`](../PawnMind/play/AGENTS.md)）：只允许 `mcp__pawnmind__*`，单步、回读、`rev`、错误处置。
 
-- 录制进程里没有 `act`/`press`/`new_game`/`save_game`/`load_game`，模型再怎么被提示词诱导也调不到。
-- 写动作必须带 `rev`，`action_id` 由 MCP 客户端生成并按幂等处理。
-- 录制槽默认全锁，`confirm_new_game` / `save_recording_game` / `load_recording_game` 只认已绑定的专用槽，且要求 `recording_slot` 等于游戏当时的下一个自动分配槽。
-- 没有 `set_label`/`analyze_item`/隐藏字段读取工具；`get_item`/`list_goods` 只给可见字段。
+[`demo_agent.py`](../PawnMind/agent/demo_agent.py) 的 `REQUIRED_TOOLS`（19 个）只是“脚本策略最小集”，不再是宿主 allowlist；`test_mcp_tools_mode.py` 仍断言它 ⊆ 服务端录制集，防止两处清单漂移。
 
-### 9.4 recording 模式排除了什么
+### 9.4 为什么还是安全的
 
-| 类别 | 工具 | 为什么排除 |
-|---|---|---|
-| 任意 UI 逃逸 | `act`、`press`、`get_ui_snapshot`、`wait_until` | 可绕开强类型参数/枚举控件；等于任意 UI 路径 |
-| 旧存档入口 | `new_game`、`load_game`、`save_game` | 会碰非专用槽；录制只走带槽位门禁的 `confirm_new_game` / `*_recording_game` |
-| 调试/注入 | `wine_add_water`（及未来 `debug_*`） | 直接改隐藏状态 |
-| 夜间/批发 | `list_locations`、`go_out`、`scavenge`、`buy_wholesale` 等 | 首周闭环固定在店内，改变世界状态且不在脚本路径上 |
-| 鉴定/标签/机器/酒类/彩票/电话/阵营 | 其余约 50 个 | 需要隐藏信息或跨天状态，成功路径也缺样本 |
+- 没有 `act`/`press`/`new_game`，模型再怎么被提示词诱导也调不到旁路。
+- `save_game` / `save_recording_game` 只能写已绑定专用槽；`load_game` / `load_recording_game` 只允许该槽、且必须在主菜单——所以它读不到其它档，也读不到不是自己开的局。
+- 写动作必须带 `rev`，`action_id` 由客户端生成并按幂等处理；`act` 包裹受保护 op 仍被服务端直接拒绝。
+- 录制槽默认全锁，`recording_slot` 必须等于游戏当时的下一个自动分配槽。
+- 提供的是强类型工具，不是“任意参数”入口；隐藏字段（鉴定答案、真实水质、隐藏身份）不在返回里。
 
-底线：**新增任何工具默认不进录制集**；要进必须同时改 `RECORDING_TOOL_NAMES`、更新本节、让 `test_mcp_tools_mode.py` 的显式集合断言通过。
+### 9.5 风险：94 个里有未验证的成功路径
+
+已知未在真机验证成功路径的包括：彩票兑奖、市场委托交货、陈酿多日品质、Barter 成交、部分升级与售货机联动。
+
+所以剧本第 5.2 节要求“**探路**”：第一次用某系统时先只读、再单步试一次，失败就记下“本版本不可用”并换路线，不在同一个坏系统上反复浪费动作。录像前建议先做一次试跑，把这些挑出来。
+
+### 9.6 `full` 与 `recording` 的差别
+
+`--tools full` 注册 100 个（含 `act`/`press`/`get_ui_snapshot`/`wait_until`/`wine_add_water`/`new_game`），只用于开发调试；**录像一律用 `recording`**。
 
 ---
 
@@ -512,9 +512,9 @@ end_day                  sleep
 1. **只用 `mcp__pawnmind__*`**；宿主工具（shell/文件/网络/子代理）不属于这局。
 2. **单步 + 每步回读**；写动作只用最近一次返回的 `rev`；`action_id` 不可自拟。
 3. **报错纪律**：`stale_rev` 只允许“回读后判断”，禁止换 `action_id` 重放写动作；`outcome_unknown` / `recording_*` 一律停机；`choice_disabled` / `cannot_afford` 这类正常拒绝最多连续两次。
-4. **禁止** `act` / `press` / `new_game` / `load_game` / `save_game`（同时说明：如果真看到它们，说明宿主启错成 `--tools full`，应停机）。
+4. **禁止** `act` / `press` / `new_game`（同时说明：如果真看到它们，说明宿主启错成 `--tools full`，应停机）。`save_game` 只写绑定槽；`load_game` 只读绑定槽且必须由人退回主菜单。
 5. **开局流程**：`get_state` → `get_new_game_options` → `get_recording_save_status`（必须 `armed`）→ `open_new_game_menu` → 选场景 → `new_game_continue` → 选特质 → `new_game_continue` → 选难度 → 用户明确同意 → **只调一次** `confirm_new_game` → 轮询 `get_recording_save_status` 到 `bound/slot_matches/run_matches` → `get_state` 核对 `day=1`、起始现金、租金。
-6. **首周经营**：`list_goods` → `confirm_trade(buy)` → 回读 → `list_inventory` → `confirm_trade(sell)` → 回读；顾客对话用 `choose_dialogue` / `advance_dialogue`；`end_day`（只关店）+ `sleep`（跨日 + 自动保存）；每天对账，单日 ≤ 40 次调用、单笔 ≤ 现金 30%、始终预留租金。
+6. **经营**：先盘点（`list_inventory` / `list_containers` / `list_goods` / `list_machines` / `list_upgrades` / `list_services`），公开说出走哪条路线，再用任意系统赚钱（柜台买卖、净水、酿酒、机器、夜间、委托、彩票……）；每个系统第一次用先“探路”（只读 → 单步 → 回读），失败就换路；`end_day`（只关店）+ `sleep`（跨日 + 自动保存）；每天对账，单日 ≤ 60 次调用、单笔 ≤ 现金 40%、始终预留租金。
 7. **付租**：`rent.can_pay=false` 时付租选项 `enabled=false`，**不要点**（要做“拒绝演示”只允许一次并回读证伪）；付租后用 `last_rent_payment` 回执核对 `amount` / `cash_before`→`cash_after` / `rent_days_left_after`，连读两次 `rent.last_payment` 不能出现第二张回执。
 8. **停机求助**：录制状态不对、槽不符、结果未知、对账不平、连续无进展、工具列表异常、时间/额度到限。
 9. **收尾报告**：槽号、场景/难度、逐日现金、付租回执、对账公式、异常码、未验证项。
@@ -528,7 +528,7 @@ end_day                  sleep
 | # | 检查 | 方法 | 通过条件 |
 |---|---|---|---|
 | 1 | DSH 加载了 patch | `dsh --profile web --patch ... --dump-config` | 出现 `mcp-pawnmind` 与 `provider: opencode-go`（§8.1） |
-| 2 | MCP 子进程起来了 | 工具列表里有 `mcp__pawnmind__*` | 恰好 28 个；无 `act`/`press` |
+| 2 | MCP 子进程起来了 | 工具列表里有 `mcp__pawnmind__*` | 94 个；无 `act`/`press`/`new_game` |
 | 3 | 解释器/依赖 | `.venv/bin/python -V`、`-c "import mcp"` | ≥3.11，能 import |
 | 4 | 桥可达 + token 正确 | `.venv/bin/python -m agent.mcp_server --config "<conf>" --probe` | 打印 `health:`、`state:`、`ping:`，无 traceback，无 token |
 | 5 | `ping` | `mcp__pawnmind__ping` | `{"ok": true, "pong": true}` |
@@ -606,7 +606,7 @@ S8 现场按 [runbook](pawnmind-s8-runbook.zh-CN.md) 走；本文件覆盖其中
 
 1. 先 `dsh --dump-config` 复核组合（§8.1）。
 2. 设 `PAWNMIND_HOME` / `PAWNMIND_BRIDGE_CONF`，确认模型认证。
-3. 从 `PawnMind/play` 启动，确认工具面是 28 个 `mcp__pawnmind__*`。
+3. 从 `PawnMind/play` 启动，确认工具面是 94 个 `mcp__pawnmind__*`。
 4. 让模型先只读自检（`ping` / `get_state` / `get_new_game_options` / `get_recording_save_status`）。
 5. 用户批准后，才允许 `confirm_new_game` 那一次写盘。
 6. 全程录像；出现 §12 任一条件立即停。
@@ -615,7 +615,7 @@ S8 现场按 [runbook](pawnmind-s8-runbook.zh-CN.md) 走；本文件覆盖其中
 
 ## 15. 未验证清单（全部留给 S8）
 
-1. **DSH 真正启动**并加载 patch：`dsh-mcp-client` spawn 子进程、工具出现在模型列表、UI 显示 28 个——本轮只做了 dump。
+1. **DSH 真正启动**并加载 patch：`dsh-mcp-client` spawn 子进程、工具出现在模型列表、UI 显示 94 个——本轮只做了 dump 与 headless 冒烟。
 2. **真实模型调用**：`opencode-go` 路由是否挂上 `deepseek-v4.1-flash`、账号可用性/地区/额度/计费/条款；`OPENCODE_API_KEY` vs 本机 profile 的 `OPENCODE_GO_API_KEY` 覆盖（§5.2）。
 3. **真实桥**：`/health`、长轮询、超时、断线重连、MCP 被 DSH 重启后的行为。
 4. **真实游戏**：新局菜单文本/分页/禁用态、首局确认弹窗、`confirm_new_game` 的原生写盘时序、`sleep` 的黑屏协程与自动保存。

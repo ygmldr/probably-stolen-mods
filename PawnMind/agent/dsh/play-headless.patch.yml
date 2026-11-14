@@ -1,0 +1,92 @@
+# PawnMind × DSH：headless 试玩覆盖层（认证 + 宿主工具收紧）
+#
+# 与 pawnmind.patch.yml 一起用（两个 --patch 叠加）：
+#   dsh --profile headless \
+#       --patch PawnMind/agent/dsh/pawnmind.patch.yml \
+#       --patch PawnMind/agent/dsh/play-headless.patch.yml \
+#       "按 PawnMind/play/AGENTS.md 开始"
+#
+# 这个文件做两件事：
+#   1. 让 headless profile 也能用 opencode-go（它默认没有 web profile 里的
+#      provider 覆盖与凭据插件）。认证仍走本机凭据库里的 OPENCODE_GO_API_KEY，
+#      本文件不含任何 key。
+#   2. 关掉所有与游戏无关的宿主工具（shell/文件/网页/子代理/工作流……），
+#      让模型只剩 mcp__pawnmind__* 可用。DSH 的 MCP 插件没有 per-tool
+#      allowlist，所以这里用 profile 的 disabled 行做硬隔离。
+#
+# 注意：--permission-mode / --approval-policy 仍需按 S8 实际情况选择；
+# 本文件不改权限策略。
+
+# --- 1) 认证与 provider（headless 默认没有这一层）---------------------------
+- id: credentials
+  name: '@deepseek-ai/dsh-credentials-local'
+  disabled: false
+
+- id: llm-pi-ai
+  name: '@deepseek-ai/dsh-llm-pi-ai'
+  config:
+    providers:
+      opencode-go:
+        models: []
+        apiKeyEnv: OPENCODE_GO_API_KEY
+
+# --- 2) 收紧宿主工具：只留 MCP ---------------------------------------------
+- id: tool-plugin-manager
+  name: '@deepseek-ai/dsh-plugin-manager/tools'
+  disabled: true
+
+- id: tool-working-directory
+  name: '@deepseek-ai/dsh-tool-working-directory'
+  disabled: true
+
+- id: tool-bash
+  name: '@deepseek-ai/dsh-tool-bash'
+  disabled: true
+
+- id: tool-pwsh
+  name: '@deepseek-ai/dsh-tool-pwsh'
+  disabled: true
+
+- id: tool-jobs
+  name: '@deepseek-ai/dsh-tool-jobs'
+  disabled: true
+
+- id: tool-fs
+  name: '@deepseek-ai/dsh-tool-fs'
+  disabled: true
+
+- id: tool-fs-search
+  name: '@deepseek-ai/dsh-tool-fs-search'
+  disabled: true
+
+- id: tool-skill
+  name: '@deepseek-ai/dsh-tool-skill'
+  disabled: true
+
+- id: tool-subagent
+  name: '@deepseek-ai/dsh-tool-subagent'
+  disabled: true
+
+- id: tool-subagent-fork
+  name: '@deepseek-ai/dsh-tool-subagent'
+  disabled: true
+
+- id: tool-subagent-control
+  name: '@deepseek-ai/dsh-tool-subagent-control'
+  disabled: true
+
+- id: tool-workflow
+  name: '@deepseek-ai/dsh-tool-workflow'
+  disabled: true
+
+- id: tool-todo
+  name: '@deepseek-ai/dsh-tool-todo'
+  disabled: true
+
+- id: tool-goal
+  name: '@deepseek-ai/dsh-tool-goal'
+  disabled: true
+
+- id: tool-web
+  name: '@deepseek-ai/dsh-tool-web'
+  disabled: true

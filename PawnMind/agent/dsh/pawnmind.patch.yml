@@ -49,8 +49,10 @@
         args:
           - '-m'
           - 'agent.mcp_server'
-          # 录制模式：服务端只注册首周 28 个工具（act/press/new_game/load_game/
-          # save_game 根本不存在）。全量 100 个工具只用于开发，不用于试玩。
+          # 录制模式：服务端注册 94 个“玩家等价”工具——机器、酿酒、彩票、
+          # 电话、夜间、委托、搬运、鉴定等全部保留。只排除 6 个旁路/作弊入口
+          # （act / press / get_ui_snapshot / wait_until / wine_add_water /
+          # new_game），理由写在 mcp_server.py 的 RECORDING_TOOL_NAMES 上方。
           - '--tools'
           - 'recording'
           - '--config'

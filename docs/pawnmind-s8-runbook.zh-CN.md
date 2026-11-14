@@ -6,7 +6,7 @@
 
 | 决策 | 选项 | 影响 / 我的建议 |
 |---|---|---|
-| **运行环境** | A. 全新隔离的 Windows 用户或独立 LocalLow；B. 你现有已游玩配置 + 新专用槽 | A 最安全，但完全空白的配置 `totalRunCount==0`，**首局特质是锁定的**，AI 无法选特质。B 特质已解锁，但你的其它存档与录制同处一个配置，尽管代码只允许绑定槽、仍有人为误操作风险。 |
+| **运行环境** | A. 全新隔离的 Windows 用户或独立 LocalLow；B. 你现有已游玩配置 + 新专用槽 | A 最安全，但完全空白的配置 `totalRunCount==0`，**首局特质是锁定的**，AI 无法选特质。B 特质已解锁，但你的其它存档与录制同处一个配置，尽管代码只允许绑定槽、仍有人为误操作风险。配置里用 `recording_isolation_ack=true` 声明 A，或用 `recording_dedicated_slot_ack=true` 声明 B；两者都只是用户声明，不是安全证明。 |
 | **特质怎么办** | 若选 A：a) 接受首局无特质（诚实记录）；b) 你在隔离环境里先手动跑一局解锁特质，再删除该档，然后开始录制 | b 能同时满足“隔离”和“AI 自由选特质”，但需要你在隔离环境里额外操作并可接受该环境被写过一次；所有操作都在隔离环境内，不接触你原档。 |
 | **录制槽号** | 必须等于游戏**当时的下一个自动分配槽** | 空白隔离环境通常是 `0`。若填错，桥会在开始前用 `recording_slot_not_next_free` 拒绝，不会写盘。 |
 | **AI 宿主** | OpenCode + OpenCode Go + DeepSeek V4.1 Flash | 需要你提供已登录的 OpenCode 环境/额度；模板键名要在 S8 现场对照实际版本核对。 |
@@ -42,11 +42,19 @@ expected_game_version=VERSION 100-Rev13
 expected_assembly_mvid=911508a6-e0eb-4cc0-91e8-e14b16ea28d7
 
 recording_mode=recording
-recording_slot=0
-recording_isolation_ack=true
+recording_slot=40
+
+# 二选一：两种确认方式都只是用户声明，Mod 无法替你验证环境。
+# A. 隔离环境：独立 Windows 用户 / 独立 LocalLow，与本机原档分离
+recording_isolation_ack=false
+# B. 同配置专用槽：沿用现有已游玩配置，但录制只允许绑定这个新专用槽
+recording_dedicated_slot_ack=true
 ```
 
-- `recording_slot` 必须是你确认过的“下一个空闲槽”；`recording_isolation_ack=true` 表示你确认当前是隔离环境。
+- 本次已选 **B：现有已游玩配置 + 新专用槽 40**，因此 `recording_dedicated_slot_ack=true`、`recording_isolation_ack=false`。**不要**为了解锁而把 isolation ack 填 true，那是失实声明。
+- `recording_slot` 必须是你确认过的“下一个空闲槽”，且等于游戏当时的下一个自动分配槽。空白隔离环境通常为 `0`；当前已游玩配置的下一个空闲槽是 `40`。
+- A 选项（隔离环境）用 `recording_isolation_ack=true`；B 选项（同配置专用槽）用 `recording_dedicated_slot_ack=true`。至少需要一个为 true，两者都为 false 时写操作返回 `recording_isolation_unacknowledged` 并保持全锁。
+- 两个都填 true 时仍可 Armed，但状态里的 `acknowledgment` 会优先报 `isolation`；仅在确实同时满足隔离声明时才这样填。
 - 改完配置必须重启 Mod/游戏，门禁只在 `OnEnable` 计算一次。
 - 不确定就先留空：所有写操作会被拒绝，读操作仍可用。
 
@@ -55,7 +63,7 @@ recording_isolation_ack=true
 **P0 启动与身份**
 1. 启动游戏，进入主菜单，不点新游戏。
 2. `curl -s http://127.0.0.1:15528/health`：确认 `game_version`、`game_assembly_mvid`、`write_gate=open`、`latest=UNVERIFIED`。
-3. MCP 侧：`ping`、`get_state`（应显示 `in_game=false`）、`get_new_game_options`（`phase=closed`）。
+3. MCP 侧：`ping`、`get_state`（应显示 `in_game=false`）、`get_new_game_options`（`phase=closed`）、`get_recording_save_status`（`recording_mode=armed`、`acknowledgment=dedicated_slot`；本次选 B）。
 
 **P1 菜单只读**
 4. `open_new_game_menu`（写，带 rev）：应只打开原生菜单，不写盘。
@@ -87,6 +95,7 @@ recording_isolation_ack=true
 ## 5. 立即中止条件
 
 - `/health` 的 `write_gate` 不是 `open`，或版本/MVID 与预填不符。
+- `get_recording_save_status.acknowledgment` 与配置声明不符：本次应报 `dedicated_slot`，若报 `isolation`/`null` 或与 `bridge.conf` 不一致，停机核对。
 - `get_new_game_options` 与画面不一致（选项、分页、可用性任一项）。
 - `confirm_new_game` 后 `binding.slot` 不是配置槽，或画面槽号不符。
 - 任何 `outcome_unknown`、`recording_locked`、`stale_rev` 连续出现。

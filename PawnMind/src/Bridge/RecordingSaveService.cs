@@ -47,6 +47,7 @@ namespace PawnMind.Bridge
             if (policy == null)
             {
                 row["recording_mode"] = "disabled";
+                row["acknowledgment"] = JValue.CreateNull();
                 row["configured_slot"] = null;
                 WriteSlotPrediction(row, InspectForStatus(), null);
                 row["bound"] = false;
@@ -60,6 +61,9 @@ namespace PawnMind.Bridge
             Refresh();
             RecordingStatus status = policy.Snapshot();
             row["recording_mode"] = StateText(status.State);
+            row["acknowledgment"] = status.Acknowledgment == RecordingAcknowledgment.None
+                ? JValue.CreateNull()
+                : new JValue(AcknowledgmentText(status.Acknowledgment));
             row["configured_slot"] = status.ConfiguredSlot.HasValue
                 ? new JValue(status.ConfiguredSlot.Value)
                 : JValue.CreateNull();
@@ -691,6 +695,16 @@ namespace PawnMind.Bridge
                 case RecordingSlotState.Bound: return "bound";
                 case RecordingSlotState.Locked: return "locked";
                 default: return "disabled";
+            }
+        }
+
+        private static string AcknowledgmentText(RecordingAcknowledgment acknowledgment)
+        {
+            switch (acknowledgment)
+            {
+                case RecordingAcknowledgment.Isolation: return "isolation";
+                case RecordingAcknowledgment.DedicatedSlot: return "dedicated_slot";
+                default: return null;
             }
         }
     }
