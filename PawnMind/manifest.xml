@@ -25,5 +25,6 @@ customer identity, real water composition) and never calls AddCredit.
   </Assemblies>
   <Capabilities>
     <Capability>network</Capability>
+    <Capability>reflection-external</Capability>
   </Capabilities>
 </ModManifest>
