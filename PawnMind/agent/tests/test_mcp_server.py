@@ -91,7 +91,7 @@ class McpServerTests(unittest.TestCase):
                         "confirm_trade", "save_game", "load_game", "new_game", "sleep",
                         "get_legal_actions", "get_run_summary", "get_action_history",
                         "act", "wait_for_events", "wait_until", "get_ui_snapshot", "press",
-                        "list_interactions", "dispatch_expedition", "advance_expedition", "contraband_status", "security_status", "list_services", "toggle_service", "husbandry_status", "expedition_status", "events_status", "list_signs", "report_client", "deliver_request", "barter_accept", "arrest_wanted", "list_factions", "health_status", "list_requests", "wanted_status", "barter_status", "list_wine", "wine_add_water", "wine_add_ingredient", "wine_status", "start_fermentation", "list_machines", "machine_grow_status", "machine_status", "machine_insert", "machine_collect", "list_upgrades", "buy_upgrade", "lottery_status", "list_tickets", "inspect_ticket", "redeem_ticket", "list_contacts", "call", "phone_state", "phone_advance", "phone_choose", "end_call", "list_labels", "set_label", "list_analyzers", "analyze_item", "set_pen_mode", "list_marks", "activate_item", "toggle_item", "use_tool", "list_goods", "buy_wholesale", "list_books", "read_book", "read_item", "list_locations", "go_out", "scavenge", "return_home", "commissary_buy", "list_containers", "list_inventory", "get_item", "move_item", "get_layout", "wait_for_change",
+                        "list_interactions", "dispatch_expedition", "advance_expedition", "contraband_status", "security_status", "list_services", "toggle_service", "husbandry_status", "expedition_status", "events_status", "list_signs", "report_client", "deliver_request", "barter_accept", "arrest_wanted", "list_factions", "health_status", "list_requests", "wanted_status", "barter_status", "list_wine", "wine_add_water", "wine_add_ingredient", "wine_status", "start_fermentation", "list_machines", "machine_grow_status", "machine_status", "machine_insert", "machine_collect", "list_upgrades", "buy_upgrade", "lottery_status", "list_tickets", "inspect_ticket", "redeem_ticket", "list_contacts", "call", "phone_state", "phone_advance", "phone_choose", "end_call", "list_labels", "set_label", "list_analyzers", "analyze_item", "set_pen_mode", "list_marks", "activate_item", "toggle_item", "use_tool", "list_goods", "buy_wholesale", "list_books", "read_book", "read_item", "list_locations", "go_out", "scavenge", "return_home", "commissary_buy", "list_containers", "list_inventory", "get_item", "move_item", "get_layout", "wait_for_change", "get_pending_prompt", "answer_prompt",
                     ):
                         self.assertIn(expected, names)
 
@@ -134,6 +134,43 @@ class McpServerTests(unittest.TestCase):
             if item.get("op") == "list_contacts" and item.get("include_hidden") is True
         ]
         self.assertEqual(1, len(calls))
+
+
+    def test_prompt_tools_reject_invalid_arguments_before_the_bridge(self):
+        before = len(RECEIVED)
+
+        async def scenario():
+            async with stdio_client(self.params) as (read, write):
+                async with ClientSession(read, write) as session:
+                    await session.initialize()
+
+                    pending = await session.call_tool("get_pending_prompt", {})
+                    pending_payload = json.loads(pending.content[0].text)
+                    self.assertTrue(pending_payload["ok"])
+                    self.assertEqual("get_pending_prompt", pending_payload["op"])
+
+                    bad_choice = await session.call_tool(
+                        "answer_prompt", {"choice": "maybe", "rev": 3})
+                    bad_choice_payload = json.loads(bad_choice.content[0].text)
+                    self.assertFalse(bad_choice_payload["ok"])
+                    self.assertEqual("invalid_argument", bad_choice_payload["error"])
+                    self.assertEqual("choice", bad_choice_payload["field"])
+                    self.assertEqual(["confirm", "cancel"], bad_choice_payload["allowed"])
+
+                    bad_rev = await session.call_tool(
+                        "answer_prompt", {"choice": "confirm", "rev": -1})
+                    bad_rev_payload = json.loads(bad_rev.content[0].text)
+                    self.assertFalse(bad_rev_payload["ok"])
+                    self.assertEqual("invalid_argument", bad_rev_payload["error"])
+                    self.assertEqual("rev", bad_rev_payload["field"])
+
+        asyncio.run(scenario())
+
+        prompt_writes = [
+            item for item in RECEIVED[before:] if item.get("op") == "answer_prompt"
+        ]
+        self.assertEqual([], prompt_writes,
+                         "invalid answer_prompt arguments must never reach the bridge")
 
 
 if __name__ == "__main__":

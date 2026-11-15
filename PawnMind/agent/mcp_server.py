@@ -88,6 +88,8 @@ RECORDING_TOOL_NAMES = frozenset({
     "wine_add_ingredient", "wine_status",
     "capture_screenshot",
     "list_screenshots",
+    "get_pending_prompt",
+    "answer_prompt",
 })
 
 NEW_GAME_OPTION_KINDS = ("scenario", "perk", "difficulty")
@@ -196,6 +198,30 @@ def build_server(client, tool_set=TOOL_SET_FULL):
     def capture_screenshot(reason: str = "manual") -> dict:
         """Capture the current game frame as evidence (JPEG, short side 768) and return its path relative to ModData/pawnmind/screenshots/. Use it right before stopping on a hard failure, or when the screen disagrees with what the bridge reports. Server-side throttling applies; returns screenshot_unavailable when capture is off."""
         return client.action("capture_screenshot", reason=reason)
+
+    @tool()
+    def get_pending_prompt() -> dict:
+        """Read the native confirmation modal that currently owns the input, if any: {ok, prompt:{body, confirm_text, cancel_text, single_button}|null}. Read-only, no rev. Call it whenever state.prompt is not null or a write returns confirmation_required, and read the text before deciding."""
+        return client.action("get_pending_prompt")
+
+    @tool()
+    def answer_prompt(
+        choice: Annotated[str, Field(
+            description="'confirm' or 'cancel'.",
+            json_schema_extra={"enum": ["confirm", "cancel"]})],
+        rev: StrictInt,
+    ) -> dict:
+        """Press exactly one button of the open modal. choice is 'confirm' or 'cancel'. Destructive confirmations (discarding ground items, leaving) default to 'cancel' unless you understand the consequence; always read get_pending_prompt first and re-read state afterwards."""
+        # Validate here instead of in the JSON schema: a schema-level enum makes
+        # the SDK reject with free text, while the model needs a structured
+        # error it can act on (and the bridge must never see the bad call).
+        if not isinstance(choice, str) or choice not in ("confirm", "cancel"):
+            return {"ok": False, "op": "answer_prompt", "error": "invalid_argument",
+                    "field": "choice", "allowed": ["confirm", "cancel"]}
+        if isinstance(rev, bool) or not isinstance(rev, int) or rev < 0:
+            return {"ok": False, "op": "answer_prompt", "error": "invalid_argument",
+                    "field": "rev"}
+        return client.action("answer_prompt", choice=choice, rev=rev)
 
     @tool()
     def list_screenshots(limit: int = 20) -> dict:

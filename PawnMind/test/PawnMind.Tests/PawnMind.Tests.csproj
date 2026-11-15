@@ -65,6 +65,10 @@
     <Compile Include="FirstWeekServiceTests.cs" />
     <Compile Include="FirstWeekJsonTests.cs" />
     <Compile Include="FirstWeekSleepTests.cs" />
+    <Compile Include="PendingPromptTests.cs" />
+    <Compile Include="PromptTestFakes.cs" />
+    <Compile Include="PromptServiceTests.cs" />
+    <Compile Include="NightReturnServiceTests.cs" />
     <Compile Include="../../src/Core/*.cs" />
     <Compile Include="../../src/Bridge/BridgeServer.cs" />
     <Compile Include="../../src/Bridge/ActionRouter.cs" />
@@ -76,6 +80,9 @@
     <Compile Include="../../src/Bridge/RecordingDispatchGuard.cs" />
     <Compile Include="../../src/Bridge/FirstWeekService.cs" />
     <Compile Include="../../src/Bridge/FirstWeekJson.cs" />
+    <Compile Include="../../src/Bridge/PromptJson.cs" />
+    <Compile Include="../../src/Bridge/PromptService.cs" />
+    <Compile Include="../../src/Bridge/NightReturnService.cs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Newtonsoft.Json">

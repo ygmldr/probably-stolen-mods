@@ -23,7 +23,7 @@
 
 ---
 
-## 2. 工具面：96 个工具（94 个玩家等价 + 2 个取证）
+## 2. 工具面：98 个工具（94 个玩家等价 + 2 个取证 + 2 个弹窗）
 
 工具名统一带前缀：模型侧叫 **`mcp__pawnmind__<短名>`**。下面用短名。
 
@@ -35,6 +35,7 @@
 | 新局菜单 | `get_new_game_options` `open_new_game_menu` `select_new_game_option` `new_game_next_page` `new_game_continue` `focus_new_game_selected_perk` `blur_new_game_option` `confirm_new_game` | 原生 UI 单步 |
 | 专用槽 | `get_recording_save_status` `save_recording_game` `load_recording_game` | 只认绑定槽 |
 | 取证 | `capture_screenshot` `list_screenshots` | 抓当前画面当证据；服务端节流 |
+| 弹窗 | `get_pending_prompt` `answer_prompt` | 读/答原生确认框；必须先读后答 |
 | 开店与客流 | `open_shop` `call_next_customer` `advance_dialogue` `choose_dialogue` `end_day` `sleep` | 日常循环 |
 | 交易与议价 | `confirm_trade` `list_goods` `get_item` `buy_wholesale` `commissary_buy` `bargain_preview` `bargain` | 低买高卖、砍价、批发、补给站 |
 | 背包与搬运 | `list_containers` `list_inventory` `move_item` `get_layout` `read_item` `list_interactions` `activate_item` `toggle_item` `use_tool` | 形状摆放、容器整理、使用道具 |
@@ -209,6 +210,7 @@
 |---|---|---|
 | `stale_rev` | `rev` 过期（别人/游戏改了状态） | **停这一步**。只读回读 `get_state` 拿新 `rev`；判断上一个动作是否已生效。**禁止**换新 `action_id` 重放同一个写动作；判断不了就停机问人。 |
 | `outcome_unknown` / `recording_outcome_unknown` | 结果未知（可能已扣款/已写盘） | **立即停止所有写动作**。只用只读工具核对，把看到的东西原样报告；**禁止**重试。 |
+| `confirmation_required` | 原生确认框挂起了动作（如离开时地上有物品） | 按 8.3 读弹窗再答；**不要**当成功继续下一步。 |
 | `recording_locked` / `recording_unconfigured` / `recording_not_bound` / `recording_slot_mismatch` / `recording_run_mismatch` | 录制门禁拒绝 | 停机。交用户核对专用槽；不得换槽、不得重试。 |
 | `bridge unavailable` / `unauthorized` / MCP 工具整体报错 | 游戏没开、Mod 没加载、端口/token 不对 | 停机。不要反复重试。 |
 | `choice_disabled` / `cannot_afford` / `option_locked` / `insufficient_points` / `perk_limit_reached` / `menu_closed` / `wrong_phase` / `page_out_of_range` / `no_dialogue` / `continue_unavailable` / `no_client` / `not_fillable` / `cannot_report` / `not_enough_cash` | 正常拒绝（状态不满足） | 回读，换合法动作或等条件；**同一个拒绝连续两次 → 停机**。 |
@@ -237,6 +239,23 @@ Mod 会自动在**每个写动作之后**抓一张 JPEG 截图（短边 768）�
 3. **需要核对时可列出来**：`list_screenshots(limit=20)` 会给出最近的截图、总数、占用与是否超预算。
 4. **不要在主菜单的存档列表处截图**——那会拍到其它存档名。读档核对画面请在进入游戏后拍。
 5. 截图只是证据，不是许可：**拍完照仍然不许重试未知结果**。
+
+### 8.3 原生确认框（模态）
+
+游戏会弹只有"确认/取消"的模态框，**它会挡住后续所有操作**。桥里可见可答：
+
+1. `get_state` 的 `prompt` 非空，或某个写工具返回 `confirmation_required` → **先读**：`get_pending_prompt()`。
+2. 读 `body` 原文，判断它在问什么；`cancel_text` 为空（`single_button=true`）表示只有确认一个选项。
+3. 用当前 `rev` 调 `answer_prompt(choice, rev)`：
+   - `choice="cancel"` 是**默认选择**，尤其涉及"丢弃/失去物品/离开"时；
+   - 只有你**确实理解后果并要执行**时才用 `"confirm"`。
+4. 答完回读 `get_state`，确认 `prompt=null`；返回 `prompt_readback_mismatch` → 停机，不要连点。
+
+**禁止**：忽略弹窗继续下一步；连续答两次；把 `confirmation_required` 当作动作成功。
+
+### 8.4 夜间外出的代价
+
+夜间出去（`go_out` / `scavenge`）会消耗体力并影响次日：**没有"短眠者"类特质时，第二天开店迟到，会错过顾客**，早间报告里会写出来。所以夜里出去前先想清楚当天现金够不够租金，别为了捡垃圾误了正事。
 
 ---
 

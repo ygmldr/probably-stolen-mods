@@ -37,6 +37,12 @@ namespace PawnMind.Bridge
             GameFlags flags = BuildFlags();
             state["legal_actions"] = DescribeLegalActions(LegalActionBuilder.Build(flags));
 
+            // A native confirmation owns the input while it is open. Exposing it
+            // here means the model can never silently ignore a modal (losing
+            // ground items, discarding a trade) because the prompt is part of the
+            // state it reads before every action.
+            state["prompt"] = PromptJson.ForState(PromptPolicy.ReadSafe(PromptAdapter.Instance));
+
             if (!inGame)
             {
                 state["client"] = null;

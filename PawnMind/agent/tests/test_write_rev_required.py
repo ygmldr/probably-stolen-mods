@@ -23,6 +23,7 @@ READ_ONLY = {
     "get_action_history", "wait_for_events", "wait_for_change", "wait_until",
     "bargain_preview", "contraband_status", "events_status", "expedition_status",
     "get_item", "get_layout", "get_new_game_options", "get_recording_save_status",
+    "get_pending_prompt",
     "get_ui_snapshot", "health_status", "husbandry_status", "inspect_ticket",
     "list_analyzers", "list_books", "list_contacts", "list_containers",
     "list_factions", "list_goods", "list_interactions", "list_inventory",

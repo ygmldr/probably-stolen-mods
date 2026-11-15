@@ -22,6 +22,8 @@ public sealed class PawnMindMod : IMod
     private static RecordingDispatchGuard _recordingGuard;
     private static FirstWeekService _firstWeekService;
     private static ScreenshotService _screenshotService;
+    private static PromptService _promptService;
+    private static NightReturnService _nightReturnService;
     private BridgeServer _server;
     private ActionRouter _router;
     private GameObject _pumpObject;
@@ -103,6 +105,11 @@ public sealed class PawnMindMod : IMod
             _screenshotService = _pumpObject.AddComponent<ScreenshotService>();
             _screenshotService.Initialize();
 
+            // Modal prompts: a native confirmation owns the input while it is
+            // open, so the bridge must be able to read it and answer it once.
+            _promptService = new PromptService(PromptAdapter.Instance, PromptAdapter.Instance);
+            _nightReturnService = new NightReturnService(PromptAdapter.Instance, PromptAdapter.Instance);
+
             _router = new ActionRouter(
                 new ActionGate(),
                 delegate { return StateSnapshot.CurrentRevision; },
@@ -183,6 +190,8 @@ public sealed class PawnMindMod : IMod
         _screenshotService = null;
         _recordingArmed = false;
         _newGameService = null;
+        _promptService = null;
+        _nightReturnService = null;
         _recordingService = null;
         _recordingGuard = null;
         FirstWeekService.SetCurrent(null);
@@ -388,7 +397,34 @@ public sealed class PawnMindMod : IMod
                 return ActionResult.SuccessRaw("scavenge", NightService.ScavengeJson());
 
             case "return_home":
-                return ActionResult.SuccessRaw("return_home", NightService.ReturnHomeJson());
+            {
+                NightReturnService service = _nightReturnService;
+                if (service == null)
+                {
+                    return ActionResult.Failure("return_home", "not_initialized");
+                }
+                return service.ReturnHome();
+            }
+
+            case "get_pending_prompt":
+            {
+                PromptService service = _promptService;
+                if (service == null)
+                {
+                    return ActionResult.Failure("get_pending_prompt", "not_initialized");
+                }
+                return service.GetPending();
+            }
+
+            case "answer_prompt":
+            {
+                PromptService service = _promptService;
+                if (service == null)
+                {
+                    return ActionResult.Failure("answer_prompt", "not_initialized");
+                }
+                return service.AnswerPrompt((string)request["choice"]);
+            }
 
             case "buy_wholesale":
                 return GameActions.BuyWholesale();

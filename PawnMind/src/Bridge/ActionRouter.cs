@@ -26,6 +26,7 @@ namespace PawnMind.Bridge
                 "get_item",
                 "get_layout",
                 "get_new_game_options",
+                "get_pending_prompt",
                 "get_recording_save_status",
                 "get_ui_snapshot",
                 "health_status",

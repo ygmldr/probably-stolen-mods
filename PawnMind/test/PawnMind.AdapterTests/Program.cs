@@ -569,6 +569,19 @@ namespace PawnMind.AdapterTests
 
             CheckType(assembly, "StoreClientList");
             CheckMethod(assembly, "StoreClientList", "CreateLandlordClient", "StoreClient", true);
+
+            // ---------------------------------------------------------- S10
+            // Native generic confirmation modal: the bridge reads its text and
+            // presses exactly one of its two callbacks.
+            CheckType(assembly, "GenericConfirmationUIManager");
+            CheckProperty(assembly, "GenericConfirmationUIManager", "Instance");
+            CheckField(assembly, "GenericConfirmationUIManager", "panel");
+            CheckField(assembly, "GenericConfirmationUIManager", "bodyTMP");
+            CheckField(assembly, "GenericConfirmationUIManager", "confirmButtonTMP");
+            CheckField(assembly, "GenericConfirmationUIManager", "cancelButtonTMP");
+            CheckField(assembly, "GenericConfirmationUIManager", "cancelButton");
+            CheckMethod(assembly, "GenericConfirmationUIManager", "ConfirmButtonPressed");
+            CheckMethod(assembly, "GenericConfirmationUIManager", "CancelButtonPressed");
         }
 
         private static string ResolveGameAssembly(string[] args)

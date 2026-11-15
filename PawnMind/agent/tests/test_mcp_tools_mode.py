@@ -1,6 +1,6 @@
 """S7A: server-side tool trimming for recording (`--tools full|recording`).
 
-The full server exposes 102 tools. The recording entrypoint must expose only the
+The full server exposes 104 tools. The recording entrypoint must expose only the
 minimum first-week surface, so a host-side allowlist is no longer the only thing
 keeping `act`/`press`/`new_game` away from a model. These tests pin the mode
 switch, the exact recording surface, the explicit exclusions, the demo
@@ -35,13 +35,14 @@ import mcp_server  # noqa: E402
 #: widen the recorded attack surface.
 EXPECTED_RECORDING_TOOLS = frozenset({
     "activate_item", "advance_dialogue", "advance_expedition", "analyze_item",
-    "arrest_wanted", "bargain", "bargain_preview", "barter_accept",
+    "answer_prompt", "arrest_wanted", "bargain", "bargain_preview", "barter_accept",
     "barter_status", "blur_new_game_option", "buy_upgrade", "buy_wholesale",
     "call", "call_next_customer", "choose_dialogue", "commissary_buy",
     "confirm_new_game", "confirm_trade", "contraband_status", "deliver_request",
     "dispatch_expedition", "end_call", "end_day", "events_status",
     "expedition_status", "focus_new_game_selected_perk", "get_action_history", "get_item",
-    "get_layout", "get_legal_actions", "get_new_game_options", "get_recording_save_status",
+    "get_layout", "get_legal_actions", "get_new_game_options", "get_pending_prompt",
+    "get_recording_save_status",
     "get_run_summary", "get_state", "go_out", "health_status",
     "husbandry_status", "inspect_ticket", "list_analyzers", "list_books",
     "list_contacts", "list_containers", "list_factions", "list_goods",
@@ -87,7 +88,7 @@ class ToolsModeTests(unittest.TestCase):
         if os.path.exists(cls.config_path):
             os.unlink(cls.config_path)
 
-    def _list_tool_names(self, *extra_args):
+    def _list_tools(self, *extra_args):
         params = StdioServerParameters(
             command=sys.executable,
             args=[MCP_SERVER, "--config", self.config_path] + list(extra_args),
@@ -98,15 +99,18 @@ class ToolsModeTests(unittest.TestCase):
                 async with ClientSession(read, write) as session:
                     await session.initialize()
                     tools = await session.list_tools()
-                    return {tool.name for tool in tools.tools}
+                    return {tool.name: tool for tool in tools.tools}
 
         return asyncio.run(scenario())
+
+    def _list_tool_names(self, *extra_args):
+        return set(self._list_tools(*extra_args))
 
     def test_full_mode_is_the_default_and_keeps_the_whole_surface(self):
         default_names = self._list_tool_names()
         explicit_names = self._list_tool_names("--tools", "full")
 
-        self.assertEqual(102, len(default_names))
+        self.assertEqual(104, len(default_names))
         self.assertEqual(default_names, explicit_names,
                          "omitting --tools must behave exactly like --tools full")
         for expected in ("act", "press", "get_ui_snapshot", "new_game", "save_game"):
@@ -119,6 +123,45 @@ class ToolsModeTests(unittest.TestCase):
         self.assertEqual(EXPECTED_RECORDING_TOOLS, mcp_server.RECORDING_TOOL_NAMES)
         for required in EXPECTED_RECORDING_TOOLS:
             self.assertIn(required, names, "missing recording tool: " + required)
+
+    def test_prompt_tools_are_registered_with_closed_choices(self):
+        tools = self._list_tools("--tools", "recording")
+
+        pending = tools["get_pending_prompt"]
+        answer = tools["answer_prompt"]
+
+        self.assertEqual(
+            set(),
+            set(pending.input_schema.get("properties", {})),
+            "get_pending_prompt must take no parameters (read-only)",
+        )
+        self.assertEqual(
+            {"choice", "rev"},
+            set(answer.input_schema.get("properties", {})),
+            "answer_prompt exposes only choice and rev",
+        )
+        self.assertEqual(
+            {"choice", "rev"},
+            set(answer.input_schema.get("required", [])),
+            "answer_prompt requires both choice and rev",
+        )
+        self.assertEqual(
+            ["confirm", "cancel"],
+            answer.input_schema["properties"]["choice"]["enum"],
+            "answer_prompt choice is a closed set",
+        )
+        self.assertEqual(
+            "integer",
+            answer.input_schema["properties"]["rev"]["type"],
+            "answer_prompt rev type",
+        )
+
+        pending_text = (pending.description or "").lower()
+        answer_text = (answer.description or "").lower()
+        self.assertIn("read", pending_text)
+        self.assertIn("prompt", pending_text)
+        self.assertIn("re-read", answer_text)
+        self.assertIn("prompt", answer_text)
 
     def test_recording_mode_withholds_the_high_risk_surface(self):
         full_names = self._list_tool_names("--tools", "full")
