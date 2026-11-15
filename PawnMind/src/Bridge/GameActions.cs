@@ -366,6 +366,14 @@ namespace PawnMind.Bridge
             }
         }
 
+        /// <summary>
+        /// Accepts the offer on the negotiation table by pressing the game's own
+        /// accept button. Moving cash/items directly (the old implementation)
+        /// left the client's business incomplete and never started the closing
+        /// dialogue, so the customer stayed in the shop forever and the queue
+        /// stalled. The native click completes the business, plays the accept
+        /// dialogue and lets the client walk out once that dialogue ends.
+        /// </summary>
         public static ActionResult ConfirmTrade(int itemId, string side)
         {
             PlayerStore store;
@@ -374,25 +382,43 @@ namespace PawnMind.Bridge
             GameItem item = GameState.FindItem(itemId);
             if (item == null) return ActionResult.Failure("confirm_trade", "item_not_found");
 
+            if (!GameState.IsNegotiationOpen())
+            {
+                return ActionResult.Failure("confirm_trade", "no_negotiation");
+            }
+
+            GameItem staged = GameState.GetNegotiatedItem();
+            if (staged == null || staged.GetUniqueID() != itemId)
+            {
+                // The player can only accept the item that is on the table.
+                return ActionResult.Failure("confirm_trade", "item_not_staged");
+            }
+
             bool owned = GameState.IsOwned(item);
-            long price = item.GetNegociatedValue();
-
-            if (string.Equals(side, "buy", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(side, "buy", StringComparison.OrdinalIgnoreCase) && owned)
             {
-                if (owned) return ActionResult.Failure("confirm_trade", "already_owned");
-                if (store.GetCash() < price) return ActionResult.Failure("confirm_trade", "cannot_afford");
-                store.BuyItem(item);
-                return ActionResult.Success("confirm_trade");
+                return ActionResult.Failure("confirm_trade", "already_owned");
+            }
+            if (string.Equals(side, "sell", StringComparison.OrdinalIgnoreCase) && !owned)
+            {
+                return ActionResult.Failure("confirm_trade", "not_owned");
+            }
+            if (!string.Equals(side, "buy", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(side, "sell", StringComparison.OrdinalIgnoreCase))
+            {
+                return ActionResult.Failure("confirm_trade", "bad_side");
             }
 
-            if (string.Equals(side, "sell", StringComparison.OrdinalIgnoreCase))
+            try
             {
-                if (!owned) return ActionResult.Failure("confirm_trade", "not_owned");
-                store.SellItem(item);
-                return ActionResult.Success("confirm_trade");
+                GameState.AcceptNegotiationOffer();
+            }
+            catch (Exception)
+            {
+                return ActionResult.Failure("confirm_trade", "confirm_failed");
             }
 
-            return ActionResult.Failure("confirm_trade", "bad_side");
+            return ActionResult.Success("confirm_trade");
         }
 
         private static NegociationUIManager GetNegotiationUi()

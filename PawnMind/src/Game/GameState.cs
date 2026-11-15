@@ -705,6 +705,39 @@ namespace PawnMind.Game
             }
         }
 
+        /// <summary>
+        /// Runs the player's own "accept offer" button. Going through the native
+        /// click (instead of moving money/items by hand) is what completes the
+        /// client's business and starts the closing dialogue, so the customer
+        /// can leave and the queue keeps moving.
+        /// </summary>
+        public static void AcceptNegotiationOffer()
+        {
+            NegociationUIManager ui = NegociationUIManager.Instance;
+            if (ui == null || !ui.IsOpen)
+            {
+                throw new InvalidOperationException("no_negotiation");
+            }
+
+            ui.OnOfferAcceptClick();
+        }
+
+        /// <summary>True once the current client's deal is recorded as done.</summary>
+        public static bool IsCurrentClientBusinessComplete()
+        {
+            try
+            {
+                PlayerStore store = PlayerStore.Instance;
+                if (store == null || store.currentClientInstance == null) return false;
+                StoreClient blueprint = store.currentClientInstance.GetClientBlueprint();
+                return blueprint != null && blueprint.isBusinessComplete;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         public static GameItem GetNegotiatedItem()
         {
             try

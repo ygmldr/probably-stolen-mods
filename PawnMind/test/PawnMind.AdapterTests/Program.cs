@@ -664,6 +664,13 @@ namespace PawnMind.AdapterTests
             CheckMethod(assembly, "WindowsHandler", "HideAllMovable", "System.Void", true);
             CheckMethod(assembly, "PixelWindow", "IsVisible");
 
+            // confirm_trade presses the native accept button, so the client
+            // completes its business and can leave.
+            CheckMethod(assembly, "NegociationUIManager", "OnOfferAcceptClick");
+            CheckProperty(assembly, "NegociationUIManager", "IsOpen");
+            CheckField(assembly, "StoreClient", "isBusinessComplete");
+            CheckField(assembly, "PlayerStore", "currentClientInstance");
+
             // Extra containers and the waiting-customer queue.
             CheckProperty(assembly, "EmporiumEntry", "vendingMachineElement");
             CheckProperty(assembly, "EmporiumEntry", "vendingFountainElement");
