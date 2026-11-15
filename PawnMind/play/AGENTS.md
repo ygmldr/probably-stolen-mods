@@ -175,7 +175,8 @@
    - `waiting_customers` 是**已经排队还在等你招待的顾客数**；`get_clientele().normal_customer_count` 是**今天的总配额**（每天缓存，读它不会扰动随机流）。两者结合就知道今天还剩多少活干。
 3. 决定今天做哪件事（见 5.1 路线），一次一件事。
 4. `list_goods` / `list_inventory` 找机会；`confirm_trade` 买卖时回读：现金差额必须正好等于 `value`，库存数对得上。
-   - `confirm_trade` 按的是游戏自己的"接受报价"按钮：**谈价面板必须开着**（`negotiation_open=true`），而且只接受**摆在台面上的那件物品**，否则返回 `no_negotiation` / `item_not_staged`。
+   - `confirm_trade` 按的是游戏自己的"接受报价"按钮：**谈价面板必须开着**（`negotiation_open=true`），而且只接受**摆在台面上（后台 back）的那件物品**。
+   - **"台面"就是后台容器**：顾客把货放前台时 `negotiation_open=false`，`confirm_trade` 会返回 `no_negotiation`；必须先用 `move_item(item_id, target="back")` 把它搬到谈判台，面板才会打开，此时才轮到你接受/砍价。这是游戏原本的"把货拖到柜台"动作，没有别的专用工具。
    - 成交后客户会进入告别对话：用 `advance_dialogue(rev)` 走到 `no_dialogue`，客户才会离店；`client` 仍是那个人时不要 `call_next_customer`（会返回 `cannot_call_next`）。
 5. 顾客/房东出现（`client` 非空或 `dialogue.available=true`）：
    - **先确认台面上有货**：`client_item_count` 与 `back_counter_count` 都为 0、且 `front_counter` 里没有 `owned=false` 的物品时，这位顾客**没带东西可交易**。此时 `call_next_customer`、`end_day` 都会被它挡住——用一次 `dismiss_current_client(rev)` 送客，再继续（这是唯一被允许的"放弃顾客"场景）。

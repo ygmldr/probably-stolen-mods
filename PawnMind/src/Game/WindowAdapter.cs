@@ -135,6 +135,10 @@ namespace PawnMind.Game
             {
                 PixelWindow window = handler.visibleWindows[i];
                 if (window == null) continue;
+                // HideAllMovable only hides canMove windows, so a non-movable
+                // window must not be counted here: otherwise the readback claims
+                // the screen is still dirty and the op reports a false mismatch.
+                if (!window.canMove) continue;
                 bool visible;
                 try
                 {

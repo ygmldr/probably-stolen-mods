@@ -97,7 +97,12 @@ class BridgeClient:
 
     def wait_events(self, since_rev=-1, timeout_ms=25000):
         path = "/events?since=%d&timeout_ms=%d" % (int(since_rev), int(timeout_ms))
-        return self.request("GET", path, timeout=timeout_ms / 1000.0 + 5.0)
+        try:
+            return self.request("GET", path, timeout=timeout_ms / 1000.0 + 5.0)
+        except BridgeError as error:
+            # A long poll that dies must come back as data, not as a transport
+            # exception: hosts render those as "Error: [object Object]".
+            return {"ok": False, "error": "wait_failed", "detail": str(error)}
 
     def action(self, op, **args):
         payload = {"op": op, "action_id": args.pop("action_id", str(uuid.uuid4()))}

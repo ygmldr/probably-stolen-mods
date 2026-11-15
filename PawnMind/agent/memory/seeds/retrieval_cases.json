@@ -1,0 +1,245 @@
+{
+  "schema": 1,
+  "test_data": true,
+  "notice": "TEST DATA ONLY. These 30 scenarios and their gold memories come from agent/memory/seeds/verified_rules.json, not from a real recording. They measure retrieval mechanics only.",
+  "scope_presets": {
+    "save40_runA": {
+      "game_id": "probably_stolen",
+      "game_version": "VERSION 100-Rev13",
+      "save_id": "slot:40",
+      "run_id": "run-seed-a",
+      "timeline_id": "tl_seed_main"
+    },
+    "save41_runB": {
+      "game_id": "probably_stolen",
+      "game_version": "VERSION 100-Rev13",
+      "save_id": "slot:41",
+      "run_id": "run-seed-b",
+      "timeline_id": "tl_seed_other"
+    },
+    "old_version": {
+      "game_id": "probably_stolen",
+      "game_version": "VERSION 100-Rev12",
+      "save_id": "slot:40",
+      "run_id": "run-seed-old",
+      "timeline_id": "tl_seed_old"
+    }
+  },
+  "cases": [
+    {
+      "case_id": "zh_inventory_both_rules",
+      "category": "chinese",
+      "query": "库存快满了，还要继续进货吗？",
+      "scope": "save40_runA",
+      "state": {"inventory_occupancy": 0.95},
+      "expected": ["mem_seed_inv_capacity", "mem_seed_inventory_condition"]
+    },
+    {
+      "case_id": "zh_inventory_without_state",
+      "category": "chinese",
+      "query": "进货前要检查库存空间吗？",
+      "scope": "save40_runA",
+      "expected": ["mem_seed_inv_capacity"]
+    },
+    {
+      "case_id": "zh_inventory_condition_high",
+      "category": "chinese",
+      "query": "库存占用 95% 时买入要注意什么？",
+      "scope": "save40_runA",
+      "state": {"inventory_occupancy": 0.95},
+      "expected": ["mem_seed_inv_capacity", "mem_seed_inventory_condition"]
+    },
+    {
+      "case_id": "zh_inventory_condition_low",
+      "category": "chinese",
+      "query": "库存占用 30% 时买入要注意什么？",
+      "scope": "save40_runA",
+      "state": {"inventory_occupancy": 0.3},
+      "expected": ["mem_seed_inv_capacity"]
+    },
+    {
+      "case_id": "zh_empty_gibberish",
+      "category": "empty",
+      "query": "量子香蕉曲率引擎",
+      "scope": "save40_runA",
+      "expected": []
+    },
+    {
+      "case_id": "zh_cash_rent",
+      "category": "chinese",
+      "query": "现金不够付租金还能进货吗？",
+      "scope": "save40_runA",
+      "expected": ["mem_seed_cash_rent"]
+    },
+    {
+      "case_id": "zh_rent_only",
+      "category": "chinese",
+      "query": "租金不够怎么办？",
+      "scope": "save40_runA",
+      "expected": ["mem_seed_cash_rent"]
+    },
+    {
+      "case_id": "en_cash_rent",
+      "category": "english",
+      "query": "cash below weekly rent, should I buy stock?",
+      "scope": "save40_runA",
+      "expected": ["mem_seed_cash_rent", "mem_seed_english_warning"]
+    },
+    {
+      "case_id": "en_never_purchase",
+      "category": "english",
+      "query": "never confirm purchase when cash below rent",
+      "scope": "save40_runA",
+      "expected": ["mem_seed_cash_rent", "mem_seed_english_warning"]
+    },
+    {
+      "case_id": "en_rent_only",
+      "category": "english",
+      "query": "weekly rent cash",
+      "scope": "save40_runA",
+      "expected": ["mem_seed_cash_rent", "mem_seed_english_warning"]
+    },
+    {
+      "case_id": "zh_trade_rev",
+      "category": "chinese",
+      "query": "交易前要不要先查 rev 和状态？",
+      "scope": "save40_runA",
+      "expected": ["mem_seed_trade_getstate"]
+    },
+    {
+      "case_id": "en_trade_rev",
+      "category": "english",
+      "query": "check rev before trade with get_state",
+      "scope": "save40_runA",
+      "expected": ["mem_seed_trade_getstate"]
+    },
+    {
+      "case_id": "zh_contraband",
+      "category": "chinese",
+      "query": "卖违禁品之前要检查什么？",
+      "scope": "save40_runA",
+      "expected": ["mem_seed_contraband_check"]
+    },
+    {
+      "case_id": "en_contraband",
+      "category": "english",
+      "query": "contraband status before selling",
+      "scope": "save40_runA",
+      "expected": ["mem_seed_contraband_check"]
+    },
+    {
+      "case_id": "zh_water_wholesale",
+      "category": "entity",
+      "query": "纯水批发价怎么样？",
+      "scope": "save40_runA",
+      "expected": ["mem_seed_water_price"]
+    },
+    {
+      "case_id": "zh_water_entity_only",
+      "category": "entity",
+      "query": "纯水",
+      "scope": "save40_runA",
+      "expected": ["mem_seed_water_price"]
+    },
+    {
+      "case_id": "en_water_entity",
+      "category": "entity",
+      "query": "water wholesale price",
+      "scope": "save40_runA",
+      "expected": ["mem_seed_water_price"]
+    },
+    {
+      "case_id": "zh_landlord_same_save",
+      "category": "cross_save",
+      "query": "房东催租怎么回答？",
+      "scope": "save40_runA",
+      "expected": ["mem_seed_landlord"]
+    },
+    {
+      "case_id": "zh_landlord_other_save",
+      "category": "cross_save",
+      "query": "房东催租怎么回答？",
+      "scope": "save41_runB",
+      "expected": []
+    },
+    {
+      "case_id": "run_private_same_run",
+      "category": "cross_run",
+      "query": "ALPHA-7",
+      "scope": "save40_runA",
+      "expected": ["mem_seed_run_private"]
+    },
+    {
+      "case_id": "run_private_other_run",
+      "category": "cross_run",
+      "query": "ALPHA-7",
+      "scope": "save41_runB",
+      "expected": []
+    },
+    {
+      "case_id": "save_private_same_save",
+      "category": "cross_save",
+      "query": "BETA-9",
+      "scope": "save40_runA",
+      "expected": ["mem_seed_landlord"]
+    },
+    {
+      "case_id": "save_private_other_save",
+      "category": "cross_save",
+      "query": "BETA-9",
+      "scope": "save41_runB",
+      "expected": []
+    },
+    {
+      "case_id": "version_old_rule_current_scope",
+      "category": "version",
+      "query": "旧版本 sleep 后怎么判断跨日？",
+      "scope": "save40_runA",
+      "expected": []
+    },
+    {
+      "case_id": "version_old_rule_old_scope",
+      "category": "version",
+      "query": "旧版本 sleep 后怎么判断跨日？",
+      "scope": "old_version",
+      "expected": ["mem_seed_old_version"]
+    },
+    {
+      "case_id": "conflict_high_query",
+      "category": "conflict",
+      "query": "陈酿葡萄酒应该报高价吗？",
+      "scope": "save40_runA",
+      "expected": []
+    },
+    {
+      "case_id": "conflict_low_query",
+      "category": "conflict",
+      "query": "陈酿葡萄酒报价策略",
+      "scope": "save40_runA",
+      "expected": []
+    },
+    {
+      "case_id": "deprecated_rule_hidden",
+      "category": "status",
+      "query": "每天结束前要清空货架吗？",
+      "scope": "save40_runA",
+      "expected": []
+    },
+    {
+      "case_id": "candidate_rule_hidden",
+      "category": "status",
+      "query": "连续两天降价会提升成交率吗？",
+      "scope": "save40_runA",
+      "expected": []
+    },
+    {
+      "case_id": "budget_keeps_top_warning_only",
+      "category": "budget",
+      "query": "库存快满了，还要继续进货吗？",
+      "scope": "save40_runA",
+      "state": {"inventory_occupancy": 0.95},
+      "token_budget": 30,
+      "expected": ["mem_seed_inv_capacity"]
+    }
+  ]
+}
