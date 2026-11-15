@@ -52,6 +52,11 @@ namespace PawnMind.Bridge
         {
             DialogUIManager ui = GetDialogUi();
             if (ui == null) return ActionResult.Failure("advance_dialogue", "no_dialogue");
+
+            // A manager without an active dialogue still answers OnAdvancePressed
+            // with a silent no-op, which looked like success while nothing moved.
+            Dialogue current = ui.GetCurrentDialog();
+            if (current == null) return ActionResult.Failure("advance_dialogue", "no_dialogue");
             if (ui.IsChoice()) return ActionResult.Failure("advance_dialogue", "choice_required");
 
             ui.OnAdvancePressed();

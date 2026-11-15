@@ -170,6 +170,7 @@
 1. **每天醒来先读 report**：`get_day_report()`。先读 `source`/`readable`，再逐条看昨晚发生了什么（电费、保险、清洁、被盗、迟到错过顾客、租金提醒）。
    - `readable=false, reason="morning_pending"`：异步黑屏还没走完。用 `wait_for_events` 等到 `day` 变化，再读一次；**不要**重复 `sleep`。
    - `sleep` 返回里也带 `report`，但通常只是 `morning_pending`，以醒来后的 `get_day_report` 为准。
+   - `sleep` 的返回里 `saved=false`、`day_advanced=false` 是**正常的**（游戏异步跨日）：以 `last_save_time` 是否更新、以及跨日后再读的 `day` 为准，不要因此重发 `sleep`。
 2. `get_state`：`day`、`cash`、`shop_state`、`inventory_count`、`client`、`dialogue`、`rent.days_left`、`can_end_day`、`rev`、`report`、`calendar_next`。
    - `waiting_customers` 是**已经排队还在等你招待的顾客数**；`get_clientele().normal_customer_count` 是**今天的总配额**（每天缓存，读它不会扰动随机流）。两者结合就知道今天还剩多少活干。
 3. 决定今天做哪件事（见 5.1 路线），一次一件事。
