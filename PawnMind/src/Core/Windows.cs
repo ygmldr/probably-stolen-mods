@@ -20,6 +20,7 @@ namespace PawnMind.Core
         public const string Paper = "paper";
         public const string Contract = "contract";
         public const string Deed = "deed";
+        public const string Tablet = "tablet";
         public const string Movable = "movable";
     }
 
@@ -38,13 +39,16 @@ namespace PawnMind.Core
         public bool DeedOpen;
         public int MovableVisible;
 
+        /// <summary>Any tablet panel is open (calendar, clientele, notebook, reputation).</summary>
+        public bool TabletOpen;
+
         /// <summary>True when nothing this op can close is on screen.</summary>
         public bool Clean
         {
             get
             {
                 return !BookOpen && !PaperOpen && !ContractOpen && !DeedOpen
-                    && MovableVisible <= 0;
+                    && !TabletOpen && MovableVisible <= 0;
             }
         }
     }
@@ -77,6 +81,7 @@ namespace PawnMind.Core
             if (snapshot.PaperOpen) plan.Add(WindowKinds.Paper);
             if (snapshot.ContractOpen) plan.Add(WindowKinds.Contract);
             if (snapshot.DeedOpen) plan.Add(WindowKinds.Deed);
+            if (snapshot.TabletOpen) plan.Add(WindowKinds.Tablet);
             if (snapshot.MovableVisible > 0) plan.Add(WindowKinds.Movable);
             return plan;
         }

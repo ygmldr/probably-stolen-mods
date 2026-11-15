@@ -1,4 +1,4 @@
-# PawnMind 录制工具表（103 个）
+# PawnMind 录制工具表（99 个）
 
 本表由 `agent/mcp_server.py --tools recording` 实际注册的集合生成；
 「真机」列取自试跑事件库（113 条事件 / 44 个不同 op），`✅ n` 表示真机成功调用过 n 次。
@@ -39,15 +39,15 @@
             description, json_schema_extra, "cancel"]})], rev | Press exactly one button of the open modal | — | 默认 cancel；先读 get_pending_prompt |
 
 | **界面** | | | | | | |
-| 23 | `close_windows` | 写 | rev | Close the note/book/contract/deed panels and hide floating … | — | 读完笔记/书就调；end_day 前必调 |
+| 23 | `close_windows` | 写 | rev | Close the note/book/contract/deed panels and hide floating … | — | 读完笔记/书、看过平板就调 |
 
 | **开店与客流** | | | | | | |
 | 24 | `open_shop` | 写 | rev | Open the shop shutter | ✅ 2 | 可用；未真机验证 → 首次按探路规则单步试 |
 | 25 | `call_next_customer` | 写 | rev | Call the next customer to the counter | ✅ 2 | 可用；未真机验证 → 首次按探路规则单步试 |
 | 26 | `advance_dialogue` | 写 | rev | Advance the current non-choice dialogue line | ✅ 11 | 可用；未真机验证 → 首次按探路规则单步试 |
 | 27 | `choose_dialogue` | 写 | index, rev | Pick a dialogue choice by index (0-based) | — | 可用；未真机验证 → 首次按探路规则单步试 |
-| 28 | `end_day` | 写 | rev | Close the day when the game allows it | ✅ 1 | 可用；未真机验证 → 首次按探路规则单步试 |
-| 29 | `sleep` | 写 | rev | End the day: close the shutter, settle night services, save… | ✅ 4 | 可用；未真机验证 → 首次按探路规则单步试 |
+| 28 | `end_day` | 写 | rev, dismiss_waiting | Close the shop for the day | ✅ 1 | ⚠️ 房东在队列时会拒绝；sleep 必须在 end_day 之后 |
+| 29 | `sleep` | 写 | rev, dismiss_waiting | Sleep into the next morning: settles night services, autosa… | ✅ 4 | ⚠️ 房东在队列时会拒绝；sleep 必须在 end_day 之后 |
 
 | **交易与议价** | | | | | | |
 | 30 | `confirm_trade` | 写 | item_id, side, rev | Buy (side=buy) or sell (side=sell) one item currently on th… | ✅ 1 | 可用；未真机验证 → 首次按探路规则单步试 |
@@ -137,19 +137,15 @@
 | 90 | `toggle_service` | 写 | id, on, rev | Toggle a nightly service on/off | — | 可用；未真机验证 → 首次按探路规则单步试 |
 | 91 | `husbandry_status` | 读 | — | Owned animals/fish with health/dead state | — | 可用 |
 | 92 | `expedition_status` | 读 | — | Expedition unlock, locations, hirelings and ongoing runs | — | 可用 |
-| 93 | `dispatch_expedition` | 写 | hireling_id, location_id, rev | Send a hireling to an unlocked expedition location | — | 可用；未真机验证 → 首次按探路规则单步试 |
-| 94 | `advance_expedition` | 写 | expedition_id, rev | Advance an ongoing expedition one step | — | 可用；未真机验证 → 首次按探路规则单步试 |
-| 95 | `events_status` | 读 | — | Active and queued store events | — | 可用 |
-| 96 | `list_signs` | 读 | — | Owned marketing signs | — | 可用 |
-| 97 | `health_status` | 读 | — | Player wounds, luck, addiction timers | — | 可用 |
+| 93 | `events_status` | 读 | — | Active and queued store events | — | 可用 |
+| 94 | `list_signs` | 读 | — | Owned marketing signs | — | 可用 |
+| 95 | `health_status` | 读 | — | Player wounds, luck, addiction timers | — | 可用 |
 
 | **新局与存档** | | | | | | |
-| 98 | `get_recording_save_status` | 读 | — | Read-only status for the dedicated recording slot | ✅ 3 | 可用 |
-| 99 | `save_recording_game` | 写 | rev | Save once through the native save | — | ⚠️ 真写盘；UI 无手动存档，日常靠 sleep 自动存；只在要固定检查点时用 |
-| 100 | `load_recording_game` | 写 | rev | Load the bound dedicated recording slot once | — | ⚠️ 必须人工先退回主菜单；只读绑定槽 |
-| 101 | `save_game` | 写 | rev | Save the current run | — | ⚠️ 真写盘；UI 无手动存档，日常靠 sleep 自动存；只在要固定检查点时用 |
-| 102 | `load_game` | 写 | slot, rev | Load a save slot from the main menu (slot ids are listed in… | — | ⚠️ 必须人工先退回主菜单；只读绑定槽 |
+| 96 | `get_recording_save_status` | 读 | — | Read-only status for the dedicated recording slot | ✅ 3 | 可用 |
+| 97 | `load_game` | 写 | slot, rev | Load a save slot from the main menu (slot ids are listed in… | — | ⚠️ 必须人工先退回主菜单；只读绑定槽 |
+| 98 | `load_recording_game` | 写 | rev | Load the bound dedicated recording slot once | — | ⚠️ 必须人工先退回主菜单；只读绑定槽 |
 
 | **开局辅助** | | | | | | |
-| 103 | `dismiss_tutorial_hints` | 写 | rev | Hide the tutorial hint bubbles only: turns PlayerStore.tuto… | — | 开局调一次 |
+| 99 | `dismiss_tutorial_hints` | 写 | rev | Hide the tutorial hint bubbles only: turns PlayerStore.tuto… | — | 开局调一次 |
 

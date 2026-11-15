@@ -23,7 +23,7 @@
 
 ---
 
-## 2. 工具面：103 个工具（98 个玩家等价 + 2 个取证 + 2 个弹窗 + 1 个关窗）
+## 2. 工具面：99 个工具（94 个玩家等价 + 2 个取证 + 2 个弹窗 + 1 个关窗）
 
 工具名统一带前缀：模型侧叫 **`mcp__pawnmind__<短名>`**。下面用短名。
 
@@ -34,13 +34,13 @@
 | 观察 | `ping` `get_state` `get_legal_actions` `get_run_summary` `get_action_history` `wait_for_events` `wait_for_change` | 只读；`rev` 从这里取 |
 | 情报 | `get_day_report` `get_calendar` `get_clientele` | 只读：早间报告、本周事件与租金日、展示柜会吸引哪些顾客 |
 | 新局菜单 | `get_new_game_options` `open_new_game_menu` `select_new_game_option` `new_game_next_page` `new_game_continue` `focus_new_game_selected_perk` `blur_new_game_option` `confirm_new_game` | 原生 UI 单步 |
-| 专用槽 | `get_recording_save_status` `save_recording_game` `load_recording_game` | 只认绑定槽 |
+| 专用槽 | `get_recording_save_status` `load_game` `load_recording_game` | **没有手动存档**：游戏只在睡觉时自动存档；这两个读档只用于核对 |
 | 取证 | `capture_screenshot` `list_screenshots` | 抓当前画面当证据；服务端节流 |
 | 弹窗 | `get_pending_prompt` `answer_prompt` | 读/答原生确认框；必须先读后答 |
 | 界面 | `close_windows` | 关掉挡屏的纸页/书/合同/浮窗；读完就关 |
 | 开店与客流 | `open_shop` `call_next_customer` `advance_dialogue` `choose_dialogue` `end_day` `sleep` | 日常循环 |
 | 交易与议价 | `confirm_trade` `list_goods` `get_item` `buy_wholesale` `commissary_buy` `bargain_preview` `bargain` | 低买高卖、砍价、批发、补给站 |
-| 背包与搬运 | `list_containers` `list_inventory` `move_item` `get_layout` `read_item` `list_interactions` `activate_item` `toggle_item` `use_tool` | 形状摆放、容器整理、使用道具 |
+| 背包与搬运 | `list_containers` `list_inventory` `move_item` `get_layout` `read_item` `list_interactions` `activate_item` `toggle_item` `use_tool` | 形状摆放、容器整理、使用道具；容器含背包/前台/后台/展示柜/暗格/售货机/售水机/雇员 |
 | 鉴定与标签 | `list_analyzers` `analyze_item` `set_pen_mode` `list_marks` `list_labels` `set_label` | 测水质/化扫/植物/基因、标记、贴标签 |
 | 书本 | `list_books` `read_book` | 读已拥有的说明书/指南（有实际机制内容） |
 | 机器与生产 | `list_machines` `machine_status` `machine_grow_status` `machine_insert` `machine_collect` | 熔炉、水培、加工 |
@@ -51,7 +51,7 @@
 | 夜间 | `list_locations` `go_out` `scavenge` `return_home` | 关店后外出搜刮 |
 | 治安与违禁 | `contraband_status` `security_status` `wanted_status` `report_client` `arrest_wanted` | 藏货、检查、举报/逮捕 |
 | 委托与声望 | `list_requests` `deliver_request` `list_factions` `barter_status` `barter_accept` | 市场委托、派系、物物交换 |
-| 其它 | `list_services` `toggle_service` `husbandry_status` `expedition_status` `dispatch_expedition` `advance_expedition` `events_status` `list_signs` `health_status` | 保险/清洁/电力、养殖、远征、事件、招牌、健康 |
+| 其它 | `list_services` `toggle_service` `husbandry_status` `expedition_status` `events_status` `list_signs` `health_status` | 保险/清洁/电力、养殖、远征、事件、招牌、健康 |
 
 **等待用 `wait_for_events` / `wait_for_change`，不要用连续 `get_state` 空转。** 超时不是失败，只是“这段时间内没变化”。
 
@@ -171,6 +171,7 @@
    - `readable=false, reason="morning_pending"`：异步黑屏还没走完。用 `wait_for_events` 等到 `day` 变化，再读一次；**不要**重复 `sleep`。
    - `sleep` 返回里也带 `report`，但通常只是 `morning_pending`，以醒来后的 `get_day_report` 为准。
 2. `get_state`：`day`、`cash`、`shop_state`、`inventory_count`、`client`、`dialogue`、`rent.days_left`、`can_end_day`、`rev`、`report`、`calendar_next`。
+   - `waiting_customers` 是**已经排队还在等你招待的顾客数**；`get_clientele().normal_customer_count` 是**今天的总配额**（每天缓存，读它不会扰动随机流）。两者结合就知道今天还剩多少活干。
 3. 决定今天做哪件事（见 5.1 路线），一次一件事。
 4. `list_goods` / `list_inventory` 找机会；`confirm_trade` 买卖时回读：现金差额必须正好等于 `value`，库存数对得上。
 5. 顾客/房东出现（`client` 非空或 `dialogue.available=true`）：
@@ -206,7 +207,7 @@
 
 ## 7. 存读档
 
-- **存**：`save_game(rev)` 或 `save_recording_game(rev)` 都只会写已绑定的专用槽。存完回读 `get_recording_save_status`：`binding` 不变、`last_save_time` 非空。
+- **存**：**这一局没有手动存档工具**。游戏每天 `sleep` 时自动写绑定槽；`get_recording_save_status` 里的 `last_save_time` 就是它的时间。
 - **读**：`load_game(slot, rev)` / `load_recording_game(rev)` 只允许绑定槽，且**必须由人先把游戏退回主菜单**（这是本流程唯一的人工步骤）。读档后核对 `day`、`cash`、`rent.rent_paid_total`、`rent.days_left` 与保存时一致；`rent.last_payment` 被清空属预期。
 - 任何 `recording_not_in_game` / `recording_not_bound` / `recording_slot_not_bound` / `recording_locked` → 停机，不要换槽。
 - **不要**用存档来“重开一局”逃避亏损：亏损也要如实记录。
@@ -220,6 +221,7 @@
 | `stale_rev` | `rev` 过期（别人/游戏改了状态） | **停这一步**。只读回读 `get_state` 拿新 `rev`；判断上一个动作是否已生效。**禁止**换新 `action_id` 重放同一个写动作；判断不了就停机问人。 |
 | `outcome_unknown` / `recording_outcome_unknown` | 结果未知（可能已扣款/已写盘） | **立即停止所有写动作**。只用只读工具核对，把看到的东西原样报告；**禁止**重试。 |
 | `confirmation_required` | 原生确认框挂起了动作（如离开时地上有物品） | 按 8.3 读弹窗再答；**不要**当成功继续下一步。 |
+| `cannot_end_day` / `customers_waiting` / `not_closed` | 关店/睡觉被游戏规则挡住 | `cannot_end_day`＝重要客户（房东）在等，必须招待；`customers_waiting`＝还有顾客，先招待或明确 `dismiss_waiting=true`；`not_closed`＝先 `end_day`。**不换路、不重试**。 |
 | `recording_locked` / `recording_unconfigured` / `recording_not_bound` / `recording_slot_mismatch` / `recording_run_mismatch` | 录制门禁拒绝 | 停机。交用户核对专用槽；不得换槽、不得重试。 |
 | `bridge unavailable` / `unauthorized` / MCP 工具整体报错 | 游戏没开、Mod 没加载、端口/token 不对 | 停机。不要反复重试。 |
 | `choice_disabled` / `cannot_afford` / `option_locked` / `insufficient_points` / `perk_limit_reached` / `menu_closed` / `wrong_phase` / `page_out_of_range` / `no_dialogue` / `continue_unavailable` / `no_client` / `not_fillable` / `cannot_report` / `not_enough_cash` | 正常拒绝（状态不满足） | 回读，换合法动作或等条件；**同一个拒绝连续两次 → 停机**。 |
@@ -251,10 +253,11 @@ Mod 会自动在**每个写动作之后**抓一张 JPEG 截图（短边 768）�
 
 ### 8.2.1 关掉挡屏的窗口（每个视频画面都要干净）
 
-笔记、书、合同、契约、机器面板都会以浮窗形式**一直留在屏幕上**，挡住柜台和库存。读完必须收掉：
+纸页笔记、书、合同、契约、机器面板、以及**平板上的日历/夜间报告/顾客群体/笔记本/声望**面板都会一直留在屏幕上，挡住柜台和库存。读完必须收掉（`close_windows` 一次全关）：
 
 - 读完 `read_book` / `read_item` 之后：立刻 `close_windows(rev)`。
 - 打开过机器/分析仪面板后：同样收掉。
+- 看过日历 / 顾客群体 / 夜间报告 / 声望之后：立刻 `close_windows(rev)`。
 - `end_day` 之前：必须 `close_windows(rev)`，确保跨日画面干净。
 - 返回 `closed: []` 且 `dispatched:false` 表示本来就没有窗口，正常。
 - 返回 `window_readback_mismatch` → 停机，不要连点（说明原生关闭没生效）。

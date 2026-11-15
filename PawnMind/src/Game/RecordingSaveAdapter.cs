@@ -72,6 +72,9 @@ namespace PawnMind.Game
                         state.Day = station.dayCounter;
                         state.RentDaysLeft = store.dayUntilRent;
                         state.Cash = store.playerCash;
+                        state.WaitingCustomers = GameState.GetWaitingCustomerCount();
+                        state.ShopState = store.storeState.ToString();
+                        state.CanEndDay = store.CanEndDay();
                         state.DayCycleReadable = true;
                     }
                     catch (Exception)

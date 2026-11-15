@@ -27,16 +27,18 @@ namespace PawnMind.Tests
                 PaperOpen = true,
                 ContractOpen = true,
                 DeedOpen = true,
+                TabletOpen = true,
                 MovableVisible = 2
             };
 
             var plan = WindowRules.PlanClosures(snapshot);
-            Equal(5, plan.Count, "all five closes planned");
+            Equal(6, plan.Count, "all six closes planned");
             Equal(WindowKinds.Book, plan[0], "book first");
             Equal(WindowKinds.Paper, plan[1], "paper second");
             Equal(WindowKinds.Contract, plan[2], "contract third");
             Equal(WindowKinds.Deed, plan[3], "deed fourth");
-            Equal(WindowKinds.Movable, plan[4], "movable last");
+            Equal(WindowKinds.Tablet, plan[4], "tablet fifth");
+            Equal(WindowKinds.Movable, plan[5], "movable last");
         }
 
         [Test]
@@ -47,6 +49,15 @@ namespace PawnMind.Tests
 
             Equal(1, plan.Count, "one close planned");
             Equal(WindowKinds.Paper, plan[0], "only paper");
+        }
+
+        [Test]
+        public static void Plan_Closes_The_Tablet_Panel()
+        {
+            var plan = WindowRules.PlanClosures(new WindowSnapshot { TabletOpen = true });
+
+            Equal(1, plan.Count, "tablet planned");
+            Equal(WindowKinds.Tablet, plan[0], "tablet kind");
         }
 
         [Test]

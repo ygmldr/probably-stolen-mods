@@ -39,6 +39,7 @@ namespace PawnMind.Game
                     snapshot.BookOpen = IsActive(paper.bookPanel);
                 }
 
+                snapshot.TabletOpen = AnyTabletOpen();
                 snapshot.MovableVisible = CountVisibleMovable();
                 return snapshot;
             }
@@ -74,6 +75,9 @@ namespace PawnMind.Game
                 case WindowKinds.Deed:
                     paper.CloseDeed();
                     return;
+                case WindowKinds.Tablet:
+                    CloseTablets();
+                    return;
                 default:
                     throw new ArgumentException("unexpected window kind", "kind");
             }
@@ -82,6 +86,43 @@ namespace PawnMind.Game
         public void HideMovableWindows()
         {
             WindowsHandler.HideAllMovable();
+        }
+
+        /// <summary>
+        /// The tablet panels (calendar, clientele, notebook, reputation) each own
+        /// their own manager, so "close the tablet" means asking whichever ones
+        /// are open to close themselves.
+        /// </summary>
+        private static bool AnyTabletOpen()
+        {
+            AdvCalendarUIManager calendar = AdvCalendarUIManager.Instance;
+            if (calendar != null && IsActive(calendar.UIPanel)) return true;
+
+            ClienteleUIManager clientele = ClienteleUIManager.Instance;
+            if (clientele != null && IsActive(clientele.panel)) return true;
+
+            NotebookUIManager notebook = NotebookUIManager.Instance;
+            if (notebook != null && IsActive(notebook.panelObject)) return true;
+
+            ReputationUIManager reputation = ReputationUIManager.Instance;
+            if (reputation != null && IsActive(reputation.uiPanel)) return true;
+
+            return false;
+        }
+
+        private static void CloseTablets()
+        {
+            AdvCalendarUIManager calendar = AdvCalendarUIManager.Instance;
+            if (calendar != null && IsActive(calendar.UIPanel)) calendar.CloseUI();
+
+            ClienteleUIManager clientele = ClienteleUIManager.Instance;
+            if (clientele != null && IsActive(clientele.panel)) clientele.CloseUI();
+
+            NotebookUIManager notebook = NotebookUIManager.Instance;
+            if (notebook != null && IsActive(notebook.panelObject)) notebook.CloseUI();
+
+            ReputationUIManager reputation = ReputationUIManager.Instance;
+            if (reputation != null && IsActive(reputation.uiPanel)) reputation.CloseUI();
         }
 
         private static int CountVisibleMovable()

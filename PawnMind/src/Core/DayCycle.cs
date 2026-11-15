@@ -96,6 +96,9 @@ namespace PawnMind.Core
         public int Cash;
         public int RentDaysLeft;
         public int RentDue;
+
+        /// <summary>Customers already queued (the game asks before dismissing them).</summary>
+        public int WaitingCustomers;
     }
 
     public interface IShopDayPort

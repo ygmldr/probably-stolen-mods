@@ -94,7 +94,7 @@ namespace PawnMind.Bridge
                     return true;
 
                 case "sleep":
-                    result = service.Sleep();
+                    result = service.Sleep(ReadBool(args, "dismiss_waiting"));
                     return true;
 
                 case "press":
@@ -148,6 +148,22 @@ namespace PawnMind.Bridge
                     return true;
                 default:
                     return false;
+            }
+        }
+
+        private static bool ReadBool(JObject request, string name)
+        {
+            if (request == null) return false;
+            JToken token = request[name];
+            if (token == null) return false;
+
+            try
+            {
+                return token.Type == JTokenType.Boolean && (bool)token;
+            }
+            catch (Exception)
+            {
+                return false;
             }
         }
 

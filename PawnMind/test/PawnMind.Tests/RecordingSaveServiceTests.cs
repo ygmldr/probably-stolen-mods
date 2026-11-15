@@ -375,6 +375,34 @@ namespace PawnMind.Tests
         }
 
         [Test]
+        public static void Service_Sleep_Refuses_While_The_Landlord_Waits()
+        {
+            RecordingHarness h = RecordingHarness.Create();
+            h.Bind();
+            var state = RecordingTestData.InGame(day: 5);
+            state.CanEndDay = false;   // the landlord is not dismissable
+            state.ShopState = "OPEN";
+            h.StatePort.State = state;
+
+            AssertDenied(h.Service.Sleep(), "cannot_end_day");
+            Assert.Equal(0, h.NativePort.SleepCalls, "native sleep must not run");
+        }
+
+        [Test]
+        public static void Service_Sleep_Refuses_While_The_Shop_Is_Open()
+        {
+            RecordingHarness h = RecordingHarness.Create();
+            h.Bind();
+            var state = RecordingTestData.InGame(day: 5);
+            state.CanEndDay = true;
+            state.ShopState = "OPEN";
+            h.StatePort.State = state;
+
+            AssertDenied(h.Service.Sleep(), "not_closed");
+            Assert.Equal(0, h.NativePort.SleepCalls, "native sleep must not run");
+        }
+
+        [Test]
         public static void Service_Sleep_Attaches_The_New_Morning_Report()
         {
             RecordingHarness h = RecordingHarness.Create();

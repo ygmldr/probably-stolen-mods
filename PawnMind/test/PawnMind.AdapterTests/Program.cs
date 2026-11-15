@@ -663,6 +663,22 @@ namespace PawnMind.AdapterTests
             CheckProperty(assembly, "WindowsHandler", "visibleWindows");
             CheckMethod(assembly, "WindowsHandler", "HideAllMovable", "System.Void", true);
             CheckMethod(assembly, "PixelWindow", "IsVisible");
+
+            // Extra containers and the waiting-customer queue.
+            CheckProperty(assembly, "EmporiumEntry", "vendingMachineElement");
+            CheckProperty(assembly, "EmporiumEntry", "vendingFountainElement");
+            CheckField(assembly, "EmporiumEntry", "hirelingInv");
+            CheckField(assembly, "StoreClientManager", "clientStack");
+
+            // Tablet panels: the calendar/night report screen stays open otherwise.
+            CheckField(assembly, "AdvCalendarUIManager", "UIPanel");
+            CheckMethod(assembly, "AdvCalendarUIManager", "CloseUI");
+            CheckField(assembly, "ClienteleUIManager", "panel");
+            CheckMethod(assembly, "ClienteleUIManager", "CloseUI");
+            CheckField(assembly, "NotebookUIManager", "panelObject");
+            CheckMethod(assembly, "NotebookUIManager", "CloseUI");
+            CheckField(assembly, "ReputationUIManager", "uiPanel");
+            CheckMethod(assembly, "ReputationUIManager", "CloseUI");
         }
 
         private static string ResolveGameAssembly(string[] args)

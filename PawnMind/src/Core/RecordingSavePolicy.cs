@@ -241,6 +241,16 @@ namespace PawnMind.Core
         public string LastSaveTime;
         public bool DayCycleReadable;
         public int Day;
+
+        /// <summary>Customers queued; sleeping with them is what skipped the landlord.</summary>
+        public int WaitingCustomers;
+
+        /// <summary>PlayerStore.storeState name; sleep requires CLOSED.</summary>
+        public string ShopState;
+
+        /// <summary>PlayerStore.CanEndDay(): false while a non-dismissable client waits.</summary>
+        public bool CanEndDay;
+
         public int RentDaysLeft;
         public int Cash;
         public string NewGameStartType = string.Empty;

@@ -275,7 +275,8 @@ public sealed class PawnMindMod : IMod
                 {
                     return ActionResult.Failure("end_day", "not_initialized");
                 }
-                return service.EndDay(StateSnapshot.CurrentRevision);
+                return service.EndDay(
+                    StateSnapshot.CurrentRevision, ReadBool(request, "dismiss_waiting", false));
             }
 
             case "get_new_game_options":
@@ -886,6 +887,22 @@ public sealed class PawnMindMod : IMod
     private static bool IsTrue(JToken token)
     {
         return token != null && token.Type == JTokenType.Boolean && (bool)token;
+    }
+
+    private static bool ReadBool(JObject request, string name, bool fallback)
+    {
+        JToken token = request[name];
+        if (token == null || token.Type == JTokenType.Null || token.Type == JTokenType.Undefined)
+            return fallback;
+
+        try
+        {
+            return token.Type == JTokenType.Boolean ? (bool)token : fallback;
+        }
+        catch (Exception)
+        {
+            return fallback;
+        }
     }
 
     private static int ReadInt(JObject request, string name, int fallback)

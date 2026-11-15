@@ -186,6 +186,11 @@ namespace PawnMind.Tests
                 Day = day,
                 RentDaysLeft = rentDaysLeft,
                 Cash = cash,
+                // The shop is closed for the day and nothing blocks ending it:
+                // sleep tests exercise the transition, not the day-end gate.
+                ShopState = "CLOSED",
+                CanEndDay = true,
+                WaitingCustomers = 0,
                 NewGameStartType = "APPRENTICE",
                 NewGameStartScenarioId = "apprentice",
                 NewGameDifficultyId = "normal"

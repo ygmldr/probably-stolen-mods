@@ -312,6 +312,26 @@ namespace PawnMind.Game
             }
         }
 
+        /// <summary>
+        /// Customers already queued and still waiting to be served. The daily
+        /// quota is deliberately not computed here: GetNormalCustomerCount rolls
+        /// the RNG, so it is only read by the cached get_clientele op.
+        /// </summary>
+        public static int GetWaitingCustomerCount()
+        {
+            try
+            {
+                PlayerStore store = PlayerStore.HasInstance ? PlayerStore.Instance : null;
+                StoreClientManager manager = store == null ? null : store.storeClientManager;
+                if (manager == null || manager.clientStack == null) return 0;
+                return manager.clientStack.Count;
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
         public static string GetShopState()
         {
             try
@@ -368,6 +388,9 @@ namespace PawnMind.Game
                     case "afterhour": return entry.afterhourInventory;
                     case "trash": return entry.trashcanInvElement;
                     case "sold": return entry.soldElement;
+                    case "vending": return entry.vendingMachineElement;
+                    case "fountain": return entry.vendingFountainElement;
+                    case "hireling": return entry.hirelingInv;
                     default: return null;
                 }
             }
@@ -427,7 +450,11 @@ namespace PawnMind.Game
 
         public static List<string> GetContainerIds()
         {
-            return new List<string> { "main", "front", "back", "showcase", "hidden", "afterhour", "trash", "sold" };
+            return new List<string>
+            {
+                "main", "front", "back", "showcase", "hidden", "afterhour", "trash", "sold",
+                "vending", "fountain", "hireling"
+            };
         }
 
         public static List<GameItem> GetInventoryItems()
@@ -606,7 +633,8 @@ namespace PawnMind.Game
                     Day = station.dayCounter,
                     Cash = store.playerCash,
                     RentDaysLeft = store.dayUntilRent,
-                    RentDue = store.GetRentValue()
+                    RentDue = store.GetRentValue(),
+                    WaitingCustomers = GetWaitingCustomerCount()
                 };
             }
             catch

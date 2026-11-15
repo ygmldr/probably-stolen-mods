@@ -159,12 +159,13 @@ class DemoAgentEndToEndTests(unittest.TestCase):
         self.assertEqual("apprentice", summary["start_type"])
         self.assertEqual(17, self.fake.snapshot()["save_slot"])
         self.assertEqual(100, self.fake.snapshot()["rent_paid_total"])
+        # The recording surface no longer exposes a manual save (the game only
+        # autosaves when sleeping), so the demo skips the host-side save/load
+        # round trip and its after-load fields stay unset.
         self.assertIsNone(summary["rent_last_payment_after_load"],
-                          "a controlled load resets the live receipt tracker")
-        self.assertEqual(100, summary["rent_paid_total_after_load"])
-        self.assertEqual(9, summary["day_after_load"])
-        self.assertEqual(5, summary["cash_after_load"])
-        self.assertEqual(summary["binding_before_save"], summary["binding_after_load"])
+                          "no save/load round trip runs any more")
+        self.assertIsNone(summary["binding_after_load"],
+                         "no save/load round trip runs any more")
 
         # The fake only ever saw authenticated, allowlisted, single-step writes.
         actions = [row for row in self.fake.requests if row["path"] == "/action"]

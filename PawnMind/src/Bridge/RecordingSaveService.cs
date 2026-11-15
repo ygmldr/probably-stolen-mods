@@ -228,7 +228,7 @@ namespace PawnMind.Bridge
             return Load("load_recording_game", slot);
         }
 
-        public ActionResult Sleep()
+        public ActionResult Sleep(bool dismissWaiting = false)
         {
             const string op = "sleep";
             if (policy == null) return Failure(op, RecordingSaveErrors.ServiceUnavailable);
@@ -246,6 +246,16 @@ namespace PawnMind.Bridge
                 // A sleep whose day/cash/rent cannot be compared must not be
                 // dispatched: afterwards success cannot be verified.
                 return Failure(op, RecordingSaveErrors.ReadbackUnavailable);
+            }
+
+            // The game only advances the day from CLOSED, and only when no
+            // non-dismissable client (the landlord) is queued. Checking here as
+            // well is what stops a sleep from skipping the rent collection.
+            string blocked = DayEndPolicy.EvaluateSleep(
+                true, game.CanEndDay, game.WaitingCustomers, dismissWaiting, game.ShopState);
+            if (blocked != null)
+            {
+                return Failure(op, blocked);
             }
 
             RecordingNativeResult call;

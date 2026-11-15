@@ -62,37 +62,105 @@ TOOL_SET_CHOICES = (TOOL_SET_FULL, TOOL_SET_RECORDING)
 #                   flow (get_new_game_options .. confirm_new_game) is the only
 #                   start path that preserves that choice
 RECORDING_TOOL_NAMES = frozenset({
-    "activate_item", "advance_dialogue", "advance_expedition", "analyze_item",
-    "arrest_wanted", "bargain", "bargain_preview", "barter_accept",
-    "barter_status", "blur_new_game_option", "buy_upgrade", "buy_wholesale",
-    "call", "call_next_customer", "choose_dialogue", "commissary_buy",
-    "confirm_new_game", "confirm_trade", "contraband_status", "deliver_request",
-    "dismiss_tutorial_hints", "dispatch_expedition", "end_call", "end_day",
-    "events_status", "expedition_status", "focus_new_game_selected_perk",
-    "get_action_history", "get_calendar", "get_clientele", "get_day_report",
-    "get_item", "get_layout", "get_legal_actions", "get_new_game_options",
-    "get_recording_save_status", "get_run_summary", "get_state", "go_out",
-    "health_status",
-    "husbandry_status", "inspect_ticket", "list_analyzers", "list_books",
-    "list_contacts", "list_containers", "list_factions", "list_goods",
-    "list_interactions", "list_inventory", "list_labels", "list_locations",
-    "list_machines", "list_marks", "list_requests", "list_services",
-    "list_signs", "list_tickets", "list_upgrades", "list_wine",
-    "load_game", "load_recording_game", "lottery_status", "machine_collect",
-    "machine_grow_status", "machine_insert", "machine_status", "move_item",
-    "new_game_continue", "new_game_next_page", "open_new_game_menu", "open_shop",
-    "phone_advance", "phone_choose", "phone_state", "ping",
-    "read_book", "read_item", "redeem_ticket", "report_client",
-    "return_home", "save_game", "save_recording_game", "scavenge",
-    "security_status", "select_new_game_option", "set_label", "set_pen_mode",
-    "sleep", "start_fermentation", "toggle_item", "toggle_service",
-    "use_tool", "wait_for_change", "wait_for_events", "wanted_status",
-    "wine_add_ingredient", "wine_status",
-    "capture_screenshot",
-    "list_screenshots",
-    "get_pending_prompt",
+    "activate_item",
+    "advance_dialogue",
+    "analyze_item",
     "answer_prompt",
+    "arrest_wanted",
+    "bargain",
+    "bargain_preview",
+    "barter_accept",
+    "barter_status",
+    "blur_new_game_option",
+    "buy_upgrade",
+    "buy_wholesale",
+    "call",
+    "call_next_customer",
+    "capture_screenshot",
+    "choose_dialogue",
     "close_windows",
+    "commissary_buy",
+    "confirm_new_game",
+    "confirm_trade",
+    "contraband_status",
+    "deliver_request",
+    "dismiss_tutorial_hints",
+    "end_call",
+    "end_day",
+    "events_status",
+    "expedition_status",
+    "focus_new_game_selected_perk",
+    "get_action_history",
+    "get_calendar",
+    "get_clientele",
+    "get_day_report",
+    "get_item",
+    "get_layout",
+    "get_legal_actions",
+    "get_new_game_options",
+    "get_pending_prompt",
+    "get_recording_save_status",
+    "get_run_summary",
+    "get_state",
+    "go_out",
+    "health_status",
+    "husbandry_status",
+    "inspect_ticket",
+    "list_analyzers",
+    "list_books",
+    "list_contacts",
+    "list_containers",
+    "list_factions",
+    "list_goods",
+    "list_interactions",
+    "list_inventory",
+    "list_labels",
+    "list_locations",
+    "list_machines",
+    "list_marks",
+    "list_requests",
+    "list_screenshots",
+    "list_services",
+    "list_signs",
+    "list_tickets",
+    "list_upgrades",
+    "list_wine",
+    "load_game",
+    "load_recording_game",
+    "lottery_status",
+    "machine_collect",
+    "machine_grow_status",
+    "machine_insert",
+    "machine_status",
+    "move_item",
+    "new_game_continue",
+    "new_game_next_page",
+    "open_new_game_menu",
+    "open_shop",
+    "phone_advance",
+    "phone_choose",
+    "phone_state",
+    "ping",
+    "read_book",
+    "read_item",
+    "redeem_ticket",
+    "report_client",
+    "return_home",
+    "scavenge",
+    "security_status",
+    "select_new_game_option",
+    "set_label",
+    "set_pen_mode",
+    "sleep",
+    "start_fermentation",
+    "toggle_item",
+    "toggle_service",
+    "use_tool",
+    "wait_for_change",
+    "wait_for_events",
+    "wanted_status",
+    "wine_add_ingredient",
+    "wine_status",
 })
 
 CALENDAR_MIN_DAYS = 1
@@ -668,9 +736,9 @@ def build_server(client, tool_set=TOOL_SET_FULL):
         return client.action("choose_dialogue", index=index, rev=rev)
 
     @tool()
-    def end_day(rev: int) -> dict:
-        """Close the day when the game allows it. Re-read get_state afterwards."""
-        return client.action("end_day", rev=rev)
+    def end_day(rev: int, dismiss_waiting: bool = False) -> dict:
+        """Close the shop for the day. Refused with cannot_end_day while an important client (the landlord) is queued, and with customers_waiting when ordinary customers are still queued: the game asks before throwing them out, so pass dismiss_waiting=true only when you deliberately give up on them. Re-read get_state afterwards."""
+        return client.action("end_day", rev=rev, dismiss_waiting=dismiss_waiting)
 
     @tool()
     def bargain_preview(direction: str, percent: int) -> dict:
@@ -783,9 +851,9 @@ def build_server(client, tool_set=TOOL_SET_FULL):
         return client.action("load_game", slot=slot, rev=rev)
 
     @tool()
-    def sleep(rev: int) -> dict:
-        """End the day: close the shutter, settle night services, save, advance to next morning."""
-        return client.action("sleep", rev=rev)
+    def sleep(rev: int, dismiss_waiting: bool = False) -> dict:
+        """Sleep into the next morning: settles night services, autosaves and advances the day. Only legal after the shop is CLOSED for the day (call end_day first): otherwise not_closed. It never skips the landlord: cannot_end_day while an important client waits, customers_waiting unless dismiss_waiting=true."""
+        return client.action("sleep", rev=rev, dismiss_waiting=dismiss_waiting)
 
     @tool()
     def save_game(rev: int) -> dict:

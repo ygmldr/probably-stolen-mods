@@ -60,7 +60,6 @@ WRITE_OPS = frozenset({
     "blur_new_game_option",
     "new_game_continue",
     "confirm_new_game",
-    "save_recording_game",
     "load_recording_game",
     "confirm_trade",
     "choose_dialogue",
@@ -85,7 +84,6 @@ REQUIRED_TOOLS = (
     "new_game_continue",
     "confirm_new_game",
     "get_recording_save_status",
-    "save_recording_game",
     "load_recording_game",
     "list_goods",
     "list_inventory",
@@ -656,6 +654,10 @@ class ScriptedShopkeeper:
     # ------------------------------------------------------------- save/load
 
     async def _verify_save_load(self):
+        # The recording surface no longer offers a manual save (the game only
+        # autosaves when sleeping), so this host-side round trip is skipped.
+        self.loaded_state = None
+        return
         state = self.final_state
         status = await self.tools.call("get_recording_save_status")
         self._require(status.get("bound") is True,

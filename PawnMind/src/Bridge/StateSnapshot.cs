@@ -71,6 +71,7 @@ namespace PawnMind.Bridge
             state["rent_value"] = GameState.GetRentValue();
             state["starting_day"] = GameState.GetStartingDay();
             state["client_arrived"] = GameState.IsClientArrived();
+            state["waiting_customers"] = GameState.GetWaitingCustomerCount();
 
             System.Collections.Generic.List<GameItem> backItems = GameState.GetBackCounterItems();
             state["back_counter_count"] = backItems.Count;

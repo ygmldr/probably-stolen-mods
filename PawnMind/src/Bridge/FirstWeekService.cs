@@ -146,7 +146,7 @@ namespace PawnMind.Bridge
             return ActionResult.SuccessRaw(op, row.ToString(Formatting.None));
         }
 
-        public ActionResult EndDay(long revision)
+        public ActionResult EndDay(long revision, bool dismissWaiting = false)
         {
             const string op = "end_day";
 
@@ -159,9 +159,11 @@ namespace PawnMind.Bridge
             {
                 return Failure(op, DayCycleErrors.NotInGame, false, null, null, null, null);
             }
-            if (!before.CanEndDay)
+            string blocked = DayEndPolicy.EvaluateEndDay(
+                before.Readable, before.CanEndDay, before.WaitingCustomers, dismissWaiting);
+            if (blocked != null)
             {
-                return Failure(op, DayCycleErrors.CannotEndDay, false, null, null, null, null);
+                return Failure(op, blocked, false, null, null, null, null);
             }
 
             ShopDaySnapshot after;

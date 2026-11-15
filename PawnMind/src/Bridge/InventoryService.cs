@@ -17,7 +17,10 @@ namespace PawnMind.Bridge
             { "hidden", "暗格" },
             { "afterhour", "夜间背包" },
             { "trash", "垃圾桶" },
-            { "sold", "已售" }
+            { "sold", "已售" },
+            { "vending", "自动售货机" },
+            { "fountain", "售水机" },
+            { "hireling", "雇员背包" }
         };
 
         public static string ListContainersJson()
