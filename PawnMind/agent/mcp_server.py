@@ -92,6 +92,7 @@ RECORDING_TOOL_NAMES = frozenset({
     "list_screenshots",
     "get_pending_prompt",
     "answer_prompt",
+    "close_windows",
 })
 
 CALENDAR_MIN_DAYS = 1
@@ -217,6 +218,14 @@ def build_server(client, tool_set=TOOL_SET_FULL):
     def get_pending_prompt() -> dict:
         """Read the native confirmation modal that currently owns the input, if any: {ok, prompt:{body, confirm_text, cancel_text, single_button}|null}. Read-only, no rev. Call it whenever state.prompt is not null or a write returns confirmation_required, and read the text before deciding."""
         return client.action("get_pending_prompt")
+
+    @tool()
+    def close_windows(rev: StrictInt) -> dict:
+        """Close the note/book/contract/deed panels and hide floating windows so the shop is visible again. Use it right after read_book/read_item/analyze_item and before ending the day; returns what was closed and what (if anything) is still open. One shot: if the screen is still dirty it reports window_readback_mismatch and you must stop, not retry."""
+        if isinstance(rev, bool) or not isinstance(rev, int) or rev < 0:
+            return {"ok": False, "op": "close_windows", "error": "invalid_argument",
+                    "field": "rev"}
+        return client.action("close_windows", rev=rev)
 
     @tool()
     def answer_prompt(

@@ -648,6 +648,21 @@ namespace PawnMind.AdapterTests
             CheckField(assembly, "GenericConfirmationUIManager", "cancelButton");
             CheckMethod(assembly, "GenericConfirmationUIManager", "ConfirmButtonPressed");
             CheckMethod(assembly, "GenericConfirmationUIManager", "CancelButtonPressed");
+
+            // close_windows: the paper panel and the floating window handler.
+            CheckProperty(assembly, "PaperUIManager", "Instance");
+            CheckField(assembly, "PaperUIManager", "panel");
+            CheckField(assembly, "PaperUIManager", "contractPanel");
+            CheckField(assembly, "PaperUIManager", "deedPanel");
+            CheckField(assembly, "PaperUIManager", "bookPanel");
+            CheckMethod(assembly, "PaperUIManager", "CloseUI");
+            CheckMethod(assembly, "PaperUIManager", "CloseContract");
+            CheckMethod(assembly, "PaperUIManager", "CloseDeed");
+            CheckMethod(assembly, "PaperUIManager", "CloseBook");
+            CheckField(assembly, "WindowsHandler", "current");
+            CheckProperty(assembly, "WindowsHandler", "visibleWindows");
+            CheckMethod(assembly, "WindowsHandler", "HideAllMovable", "System.Void", true);
+            CheckMethod(assembly, "PixelWindow", "IsVisible");
         }
 
         private static string ResolveGameAssembly(string[] args)

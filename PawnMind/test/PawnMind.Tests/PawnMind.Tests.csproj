@@ -52,6 +52,8 @@
     <Compile Include="DayReportRulesTests.cs" />
     <Compile Include="CalendarRulesTests.cs" />
     <Compile Include="ClienteleRulesTests.cs" />
+    <Compile Include="WindowRulesTests.cs" />
+    <Compile Include="WindowServiceTests.cs" />
     <Compile Include="FactionPerkRulesTests.cs" />
     <Compile Include="TutorialRulesTests.cs" />
     <Compile Include="IntelTestFakes.cs" />
@@ -92,6 +94,7 @@
     <Compile Include="../../src/Bridge/FirstWeekJson.cs" />
     <Compile Include="../../src/Bridge/PromptJson.cs" />
     <Compile Include="../../src/Bridge/PromptService.cs" />
+    <Compile Include="../../src/Bridge/WindowService.cs" />
     <Compile Include="../../src/Bridge/NightReturnService.cs" />
     <Compile Include="../../src/Bridge/ReportService.cs" />
     <Compile Include="../../src/Bridge/CalendarService.cs" />

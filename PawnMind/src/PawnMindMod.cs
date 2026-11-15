@@ -23,6 +23,7 @@ public sealed class PawnMindMod : IMod
     private static FirstWeekService _firstWeekService;
     private static ScreenshotService _screenshotService;
     private static PromptService _promptService;
+    private static WindowService _windowService;
     private static NightReturnService _nightReturnService;
     private static ReportService _reportService;
     private static CalendarService _calendarService;
@@ -123,6 +124,7 @@ public sealed class PawnMindMod : IMod
             // Modal prompts: a native confirmation owns the input while it is
             // open, so the bridge must be able to read it and answer it once.
             _promptService = new PromptService(PromptAdapter.Instance, PromptAdapter.Instance);
+            _windowService = new WindowService(WindowAdapter.Instance);
             _nightReturnService = new NightReturnService(PromptAdapter.Instance, PromptAdapter.Instance);
 
             _router = new ActionRouter(
@@ -206,6 +208,7 @@ public sealed class PawnMindMod : IMod
         _recordingArmed = false;
         _newGameService = null;
         _promptService = null;
+        _windowService = null;
         _nightReturnService = null;
         _reportService = null;
         _calendarService = null;
@@ -466,6 +469,16 @@ public sealed class PawnMindMod : IMod
                     return ActionResult.Failure("get_pending_prompt", "not_initialized");
                 }
                 return service.GetPending();
+            }
+
+            case "close_windows":
+            {
+                WindowService service = _windowService;
+                if (service == null)
+                {
+                    return ActionResult.Failure("close_windows", "not_initialized");
+                }
+                return service.Close();
             }
 
             case "answer_prompt":

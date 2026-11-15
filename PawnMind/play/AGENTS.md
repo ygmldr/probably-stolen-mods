@@ -23,7 +23,7 @@
 
 ---
 
-## 2. 工具面：102 个工具（98 个玩家等价 + 2 个取证 + 2 个弹窗）
+## 2. 工具面：103 个工具（98 个玩家等价 + 2 个取证 + 2 个弹窗 + 1 个关窗）
 
 工具名统一带前缀：模型侧叫 **`mcp__pawnmind__<短名>`**。下面用短名。
 
@@ -37,6 +37,7 @@
 | 专用槽 | `get_recording_save_status` `save_recording_game` `load_recording_game` | 只认绑定槽 |
 | 取证 | `capture_screenshot` `list_screenshots` | 抓当前画面当证据；服务端节流 |
 | 弹窗 | `get_pending_prompt` `answer_prompt` | 读/答原生确认框；必须先读后答 |
+| 界面 | `close_windows` | 关掉挡屏的纸页/书/合同/浮窗；读完就关 |
 | 开店与客流 | `open_shop` `call_next_customer` `advance_dialogue` `choose_dialogue` `end_day` `sleep` | 日常循环 |
 | 交易与议价 | `confirm_trade` `list_goods` `get_item` `buy_wholesale` `commissary_buy` `bargain_preview` `bargain` | 低买高卖、砍价、批发、补给站 |
 | 背包与搬运 | `list_containers` `list_inventory` `move_item` `get_layout` `read_item` `list_interactions` `activate_item` `toggle_item` `use_tool` | 形状摆放、容器整理、使用道具 |
@@ -247,6 +248,16 @@ Mod 会自动在**每个写动作之后**抓一张 JPEG 截图（短边 768）�
 3. **需要核对时可列出来**：`list_screenshots(limit=20)` 会给出最近的截图、总数、占用与是否超预算。
 4. **不要在主菜单的存档列表处截图**——那会拍到其它存档名。读档核对画面请在进入游戏后拍。
 5. 截图只是证据，不是许可：**拍完照仍然不许重试未知结果**。
+
+### 8.2.1 关掉挡屏的窗口（每个视频画面都要干净）
+
+笔记、书、合同、契约、机器面板都会以浮窗形式**一直留在屏幕上**，挡住柜台和库存。读完必须收掉：
+
+- 读完 `read_book` / `read_item` 之后：立刻 `close_windows(rev)`。
+- 打开过机器/分析仪面板后：同样收掉。
+- `end_day` 之前：必须 `close_windows(rev)`，确保跨日画面干净。
+- 返回 `closed: []` 且 `dispatched:false` 表示本来就没有窗口，正常。
+- 返回 `window_readback_mismatch` → 停机，不要连点（说明原生关闭没生效）。
 
 ### 8.3 原生确认框（模态）
 
