@@ -213,6 +213,72 @@ namespace PawnMind.AdapterTests
             CheckMethod(assembly, "WantedUIManager", "OnArrested");
             CheckMethod(assembly, "StoreReputation", "GetReputationExact");
             CheckMethod(assembly, "HealthData", "IsSeriouslyWounded");
+
+            // Intel reads: morning report, calendar, clientele, faction perks.
+            CheckField(assembly, "PlayerStore", "nightLogs",
+                "System.Collections.Generic.List<System.String>", false);
+            CheckField(assembly, "PlayerStore", "tutorialEnable", "System.Boolean", false);
+            CheckType(assembly, "StoreUIManager");
+            CheckProperty(assembly, "StoreUIManager", "Instance");
+            CheckField(assembly, "StoreUIManager", "tutorialGroup", "UnityEngine.GameObject", false);
+            CheckType(assembly, "TutorialUIManager");
+            CheckProperty(assembly, "TutorialUIManager", "Instance");
+            CheckMethod(assembly, "TutorialUIManager", "CloseAllTutorial");
+            CheckType(assembly, "StartOfDayUIManager");
+            CheckProperty(assembly, "StartOfDayUIManager", "Instance");
+            CheckField(assembly, "StartOfDayUIManager", "UIPanel", "UnityEngine.GameObject", false);
+            CheckField(assembly, "StartOfDayUIManager", "contentGroupObject", "UnityEngine.GameObject", false);
+            CheckField(assembly, "StoreStation", "storeEventManager", "StoreEventManager", false);
+            CheckMethod(assembly, "StoreEventManager", "GetActiveEventOnDay",
+                "System.Collections.Generic.List<StoreEvent>", false,
+                "System.Int32", "System.Boolean", "System.Boolean");
+            CheckType(assembly, "StoreEvent");
+            CheckField(assembly, "StoreEvent", "identifier", "System.String", false);
+            CheckField(assembly, "StoreEvent", "displayName", "System.String", false);
+            CheckField(assembly, "StoreEvent", "newsName", "System.String", false);
+            CheckField(assembly, "StoreEvent", "eventType", "StoreEvent.EventType", false);
+            CheckField(assembly, "StoreEvent", "eventArea", "StoreEvent.EventArea", false);
+            CheckField(assembly, "StoreEvent", "startDay", "System.Int32", false);
+            CheckField(assembly, "StoreEvent", "currentDay", "System.Int32", false);
+            CheckField(assembly, "StoreEvent", "totalDuration", "System.Int32", false);
+            CheckField(assembly, "StoreEvent", "importance", "System.Int32", false);
+            CheckField(assembly, "StoreEvent", "IsKnown", "System.Boolean", false);
+            CheckMethod(assembly, "PlayerStore", "GetRentDayCounter", "System.Int32", false);
+            CheckField(assembly, "PlayerStore", "rentValue", "System.Int32", false);
+            CheckField(assembly, "PlayerStore", "temporaryRent", "System.Int32", false);
+            CheckField(assembly, "PlayerStore", "IsPropertyPaid", "System.Boolean", false);
+            CheckField(assembly, "PlayerStore", "isPayingMortgage", "System.Boolean", false);
+            CheckField(assembly, "PlayerStore", "mortgageWeeklyPayment", "System.Int32", false);
+            CheckMethod(assembly, "PlayerStore", "IsPayingRent", "System.Boolean", false);
+            CheckMethod(assembly, "ShowcaseHelper", "GetDisplayCaseType",
+                "System.Collections.Generic.List<System.String>", true);
+            CheckMethod(assembly, "ShowcaseHelper", "GetDiscerningShopperChance",
+                "System.Int32", true);
+            CheckMethod(assembly, "ShowcaseHelper", "GetDiscerningShopperCooldownOpenings",
+                "System.Int32", true);
+            CheckMethod(assembly, "ShowcaseHelper", "GetDisplayCasePrediction",
+                "System.Collections.Generic.List<System.ValueTuple<System.String,System.Int32,System.String>>", true);
+            CheckMethod(assembly, "StoreClientManager", "GetNormalCustomerCount",
+                "System.Int32", false);
+            CheckMethod(assembly, "StoreClientListDict", "GetClientDisplayName",
+                "System.String", true, "System.String");
+            CheckMethod(assembly, "TypeHelper", "GetTypeDisplayName",
+                "System.String", true, "System.String");
+            CheckMethod(assembly, "GeneralHelper", "GetDisplayNameFromID",
+                "System.String", true, "System.String");
+            CheckField(assembly, "StoreReputation", "perks",
+                "System.Collections.Generic.List<StoreReputationPerk>", false);
+            CheckMethod(assembly, "StoreReputation", "GetReputation", "System.Int32", false);
+            CheckField(assembly, "StoreReputation", "strength", "System.Int32", false);
+            CheckField(assembly, "StoreReputation", "influence", "System.Int32", false);
+            CheckField(assembly, "StoreReputation", "maxInfluence", "System.Int32", false);
+            CheckType(assembly, "StoreReputationPerk");
+            CheckField(assembly, "StoreReputationPerk", "perkId", "System.String", false);
+            CheckField(assembly, "StoreReputationPerk", "perkThreshold", "System.Int32", false);
+            CheckField(assembly, "StoreReputationPerk", "perkType", "System.Int32", false);
+            CheckField(assembly, "StoreReputationPerk", "isUnlocked", "System.Boolean", false);
+            CheckField(assembly, "StoreReputationPerk", "iconName", "System.String", false);
+            CheckField(assembly, "StoreReputationPerk", "isAlwaysActive", "System.Boolean", false);
             CheckField(assembly, "PlayerStore", "storeRequests");
             CheckField(assembly, "PlayerStore", "wantedStatus");
             CheckField(assembly, "StoreClient", "barterOffer");

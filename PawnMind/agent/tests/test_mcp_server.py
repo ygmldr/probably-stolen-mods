@@ -92,6 +92,8 @@ class McpServerTests(unittest.TestCase):
                         "get_legal_actions", "get_run_summary", "get_action_history",
                         "act", "wait_for_events", "wait_until", "get_ui_snapshot", "press",
                         "list_interactions", "dispatch_expedition", "advance_expedition", "contraband_status", "security_status", "list_services", "toggle_service", "husbandry_status", "expedition_status", "events_status", "list_signs", "report_client", "deliver_request", "barter_accept", "arrest_wanted", "list_factions", "health_status", "list_requests", "wanted_status", "barter_status", "list_wine", "wine_add_water", "wine_add_ingredient", "wine_status", "start_fermentation", "list_machines", "machine_grow_status", "machine_status", "machine_insert", "machine_collect", "list_upgrades", "buy_upgrade", "lottery_status", "list_tickets", "inspect_ticket", "redeem_ticket", "list_contacts", "call", "phone_state", "phone_advance", "phone_choose", "end_call", "list_labels", "set_label", "list_analyzers", "analyze_item", "set_pen_mode", "list_marks", "activate_item", "toggle_item", "use_tool", "list_goods", "buy_wholesale", "list_books", "read_book", "read_item", "list_locations", "go_out", "scavenge", "return_home", "commissary_buy", "list_containers", "list_inventory", "get_item", "move_item", "get_layout", "wait_for_change", "get_pending_prompt", "answer_prompt",
+                        "get_day_report", "get_calendar", "get_clientele",
+                        "dismiss_tutorial_hints",
                     ):
                         self.assertIn(expected, names)
 
@@ -135,6 +137,56 @@ class McpServerTests(unittest.TestCase):
         ]
         self.assertEqual(1, len(calls))
 
+
+    def test_intel_tools_roundtrip_and_validate_days(self):
+        before = len(RECEIVED)
+
+        async def scenario():
+            async with stdio_client(self.params) as (read, write):
+                async with ClientSession(read, write) as session:
+                    await session.initialize()
+
+                    report = await session.call_tool("get_day_report", {})
+                    report_payload = json.loads(report.content[0].text)
+                    self.assertTrue(report_payload["ok"])
+                    self.assertEqual("get_day_report", report_payload["op"])
+
+                    calendar = await session.call_tool("get_calendar", {"days": 14})
+                    calendar_payload = json.loads(calendar.content[0].text)
+                    self.assertTrue(calendar_payload["ok"])
+                    self.assertEqual("get_calendar", calendar_payload["op"])
+
+                    clientele = await session.call_tool("get_clientele", {})
+                    clientele_payload = json.loads(clientele.content[0].text)
+                    self.assertTrue(clientele_payload["ok"])
+                    self.assertEqual("get_clientele", clientele_payload["op"])
+
+                    too_many = await session.call_tool("get_calendar", {"days": 15})
+                    too_many_payload = json.loads(too_many.content[0].text)
+                    self.assertFalse(too_many_payload["ok"])
+                    self.assertEqual("invalid_argument", too_many_payload["error"])
+                    self.assertEqual("days", too_many_payload["field"])
+
+                    zero = await session.call_tool("get_calendar", {"days": 0})
+                    zero_payload = json.loads(zero.content[0].text)
+                    self.assertEqual("invalid_argument", zero_payload["error"])
+
+                    bad_rev = await session.call_tool(
+                        "dismiss_tutorial_hints", {"rev": -1})
+                    bad_rev_payload = json.loads(bad_rev.content[0].text)
+                    self.assertEqual("invalid_argument", bad_rev_payload["error"])
+                    self.assertEqual("rev", bad_rev_payload["field"])
+
+        asyncio.run(scenario())
+
+        calls = RECEIVED[before:]
+        calendar_calls = [item for item in calls if item.get("op") == "get_calendar"]
+        self.assertEqual(1, len(calendar_calls), "only the valid calendar call reaches the bridge")
+        self.assertEqual(14, calendar_calls[0]["days"])
+        self.assertEqual(1, len([c for c in calls if c.get("op") == "get_day_report"]))
+        self.assertEqual(1, len([c for c in calls if c.get("op") == "get_clientele"]))
+        self.assertEqual([], [c for c in calls if c.get("op") == "dismiss_tutorial_hints"],
+                         "invalid rev must never reach the bridge")
 
     def test_prompt_tools_reject_invalid_arguments_before_the_bridge(self):
         before = len(RECEIVED)

@@ -49,6 +49,16 @@
     <Compile Include="SecurityRulesTests.cs" />
     <Compile Include="ContrabandRulesTests.cs" />
     <Compile Include="ReportRulesTests.cs" />
+    <Compile Include="DayReportRulesTests.cs" />
+    <Compile Include="CalendarRulesTests.cs" />
+    <Compile Include="ClienteleRulesTests.cs" />
+    <Compile Include="FactionPerkRulesTests.cs" />
+    <Compile Include="TutorialRulesTests.cs" />
+    <Compile Include="IntelTestFakes.cs" />
+    <Compile Include="ReportServiceTests.cs" />
+    <Compile Include="CalendarServiceTests.cs" />
+    <Compile Include="ClienteleServiceTests.cs" />
+    <Compile Include="TutorialServiceTests.cs" />
     <Compile Include="BridgeServerTests.cs" />
     <Compile Include="BridgeTransportTests.cs" />
     <Compile Include="HiddenInfoGuardTests.cs" />
@@ -83,6 +93,10 @@
     <Compile Include="../../src/Bridge/PromptJson.cs" />
     <Compile Include="../../src/Bridge/PromptService.cs" />
     <Compile Include="../../src/Bridge/NightReturnService.cs" />
+    <Compile Include="../../src/Bridge/ReportService.cs" />
+    <Compile Include="../../src/Bridge/CalendarService.cs" />
+    <Compile Include="../../src/Bridge/ClienteleService.cs" />
+    <Compile Include="../../src/Bridge/TutorialService.cs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Newtonsoft.Json">

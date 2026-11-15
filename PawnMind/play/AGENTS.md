@@ -23,15 +23,16 @@
 
 ---
 
-## 2. 工具面：98 个工具（94 个玩家等价 + 2 个取证 + 2 个弹窗）
+## 2. 工具面：102 个工具（98 个玩家等价 + 2 个取证 + 2 个弹窗）
 
 工具名统一带前缀：模型侧叫 **`mcp__pawnmind__<短名>`**。下面用短名。
 
-服务端刻意**不**提供 6 个旁路/作弊入口（`act`、`press`、`get_ui_snapshot`、`wait_until`、`wine_add_water`、`new_game`），**其余 94 个全部可用**，包括机器、酿酒、彩票、电话、夜间搜刮、市场委托、派系、鉴定、搬运等整块玩法；另有 `capture_screenshot` / `list_screenshots` 两个取证工具。
+服务端刻意**不**提供 6 个旁路/作弊入口（`act`、`press`、`get_ui_snapshot`、`wait_until`、`wine_add_water`、`new_game`），**其余 98 个全部可用**，包括机器、酿酒、彩票、电话、夜间搜刮、市场委托、派系、鉴定、搬运等整块玩法；另有 `capture_screenshot` / `list_screenshots` 两个取证工具。
 
 | 系统 | 工具 | 用途 |
 |---|---|---|
 | 观察 | `ping` `get_state` `get_legal_actions` `get_run_summary` `get_action_history` `wait_for_events` `wait_for_change` | 只读；`rev` 从这里取 |
+| 情报 | `get_day_report` `get_calendar` `get_clientele` | 只读：早间报告、本周事件与租金日、展示柜会吸引哪些顾客 |
 | 新局菜单 | `get_new_game_options` `open_new_game_menu` `select_new_game_option` `new_game_next_page` `new_game_continue` `focus_new_game_selected_perk` `blur_new_game_option` `confirm_new_game` | 原生 UI 单步 |
 | 专用槽 | `get_recording_save_status` `save_recording_game` `load_recording_game` | 只认绑定槽 |
 | 取证 | `capture_screenshot` `list_screenshots` | 抓当前画面当证据；服务端节流 |
@@ -104,6 +105,7 @@
 ### 4.4 难度
 
 11. `select_new_game_option(kind="difficulty", id=..., rev)`，只选 `enabled=true` 的；回读确认 `selected_id`。
+    - **第一局固定选列表里的第二档**（`order` 第二、通常是 `normal` 普通）。不要选最上面那档，也不要选挑战档。
 12. **不要**在这一页调 `new_game_continue`：这一页的 Continue 就是原生 Start，桥会返回 `difficulty_start_forbidden`。这是预期拒绝。
 
 ### 4.5 唯一一次启动
@@ -116,7 +118,8 @@
 
 15. `get_recording_save_status` 轮询到 `bound=true` 且 `slot_matches=true`、`run_matches=true`（用 `wait_for_change` 节流）。
 16. `get_state`：`in_game=true`、`day=1`、`rent.readable=true`、`rent.rent_paid_total=0`。
-17. 大声报出：`binding.slot`、场景、难度、起始现金、`rent.due`、`rent.days_left`、当前 `rev`。任一不符 → **立刻停机**。
+17. `get_state` 里 `tutorial_hints` 必须是 `false`。若为 `true`，用当前 `rev` 调一次 `dismiss_tutorial_hints(rev)`，回读确认 `tutorial_enabled=false`、`hints_hidden=true`；返回 `tutorial_hints_readback_mismatch` → 停机，不要重试。**永远不要**碰 `skip_intro` / `endless` 两个 toggle：它们会改变开局玩法（跳剧情/无尽模式），不是“隐藏提示”。
+18. 大声报出：`binding.slot`、场景、难度、起始现金、`rent.due`、`rent.days_left`、当前 `rev`、`tutorial_hints`。任一不符 → **立刻停机**。
 
 ---
 
@@ -126,11 +129,13 @@
 
 ### 5.1 先盘点，再决定路线
 
-开局后先做三件事，然后公开说出你要走哪条路线：
+开局后先做四件事，然后公开说出你要走哪条路线：
 
 1. `get_state` + `list_inventory(container="main")` + `list_containers()`：你手上有什么、背包多大、有哪些容器。
-2. `list_goods(scope="all")`：台面上有什么可买。
-3. `list_services()` / `list_upgrades()` / `list_machines()`：看有哪些已解锁的赚钱系统。
+2. `get_calendar(days=7)` + `get_clientele()`：先看本周哪天是租金日、有哪些事件，再看展示柜现在会吸引哪类顾客。**开局先看日历和顾客群体**，再决定进货和展示柜摆什么。
+   - 顾客群体是**每天缓存**的（`cached=true`）：同一天再问同样的结果；换了展示柜或跨天后会自动重算。
+3. `list_goods(scope="all")`：台面上有什么可买。
+4. `list_services()` / `list_upgrades()` / `list_machines()`：看有哪些已解锁的赚钱系统。
 
 然后选一条**能在租期内回本**的路线，例如：
 
@@ -161,18 +166,21 @@
 
 每个“天”按同一顺序：
 
-1. `get_state`：`day`、`cash`、`shop_state`、`inventory_count`、`client`、`dialogue`、`rent.days_left`、`can_end_day`、`rev`。
-2. 决定今天做哪件事（见 5.1 路线），一次一件事。
-3. `list_goods` / `list_inventory` 找机会；`confirm_trade` 买卖时回读：现金差额必须正好等于 `value`，库存数对得上。
-4. 顾客/房东出现（`client` 非空或 `dialogue.available=true`）：
+1. **每天醒来先读 report**：`get_day_report()`。先读 `source`/`readable`，再逐条看昨晚发生了什么（电费、保险、清洁、被盗、迟到错过顾客、租金提醒）。
+   - `readable=false, reason="morning_pending"`：异步黑屏还没走完。用 `wait_for_events` 等到 `day` 变化，再读一次；**不要**重复 `sleep`。
+   - `sleep` 返回里也带 `report`，但通常只是 `morning_pending`，以醒来后的 `get_day_report` 为准。
+2. `get_state`：`day`、`cash`、`shop_state`、`inventory_count`、`client`、`dialogue`、`rent.days_left`、`can_end_day`、`rev`、`report`、`calendar_next`。
+3. 决定今天做哪件事（见 5.1 路线），一次一件事。
+4. `list_goods` / `list_inventory` 找机会；`confirm_trade` 买卖时回读：现金差额必须正好等于 `value`，库存数对得上。
+5. 顾客/房东出现（`client` 非空或 `dialogue.available=true`）：
    - 先 `get_state` 读 `dialogue.text` 和 `choices`（含 `enabled`）；
    - 非选项行用 `advance_dialogue(rev)`，选项用 `choose_dialogue(index, rev)`；
    - `choices[i].enabled=false` 的**不要点**；
    - `no_dialogue` 表示没得回应，回读后停下，不要连点。
-5. 关店跨日：`end_day(rev)` → 回读（`day_advanced` 应为 `false`）；`sleep(rev)` → 回读 `slept=true`，`get_state` 确认 `day` +1、`shop_state="OPEN"`。
+6. 关店跨日：`end_day(rev)` → 回读（`day_advanced` 应为 `false`）；`sleep(rev)` → 回读 `slept=true`，`get_state` 确认 `day` +1、`shop_state="OPEN"`。
    - `sleep` 是异步黑屏 + 自动保存：`day` 没立刻变就用 `wait_for_events` 等一次再读，**不要重复 `sleep`**。
    - 返回 `outcome_unknown` → 按第 8 节**停机核对**，不要重发。
-6. `open_shop` / `call_next_customer` 只在需要时用，每次回读。
+7. `open_shop` / `call_next_customer` 只在需要时用，每次回读。
 
 **对账**：每天结束核对 `现金 = 起始现金 - 买入 + 卖出 - 已付租金 - 其它已确认支出`。对不上就停机报告差额，不要“继续玩到对得上”。
 

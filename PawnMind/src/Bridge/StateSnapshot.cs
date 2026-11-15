@@ -49,8 +49,17 @@ namespace PawnMind.Bridge
                 state["negotiated_item"] = null;
                 state["run_summary"] = null;
                 state["rent"] = null;
+                state["report"] = Unreadable();
+                state["calendar_next"] = Unreadable();
+                state["tutorial_hints"] = null;
                 return state;
             }
+
+            // Read-only intel: both projections tolerate a failed read. They
+            // must never make the state snapshot itself unavailable.
+            state["report"] = SafeReport();
+            state["calendar_next"] = SafeCalendarNext();
+            state["tutorial_hints"] = SafeTutorialHints();
 
             state["day"] = GameState.GetDay();
             state["shop_state"] = GameState.GetShopState();
@@ -93,6 +102,51 @@ namespace PawnMind.Bridge
 
             state["run_summary"] = BuildRunSummary(state);
             return state;
+        }
+
+        private static Dictionary<string, object> Unreadable()
+        {
+            return new Dictionary<string, object> { { "readable", false } };
+        }
+
+        private static Dictionary<string, object> SafeReport()
+        {
+            try
+            {
+                ReportService service = ReportService.Current;
+                return service == null ? Unreadable() : service.State();
+            }
+            catch (Exception)
+            {
+                return Unreadable();
+            }
+        }
+
+        private static Dictionary<string, object> SafeCalendarNext()
+        {
+            try
+            {
+                CalendarService service = CalendarService.Current;
+                return service == null ? Unreadable() : service.StateNext();
+            }
+            catch (Exception)
+            {
+                return Unreadable();
+            }
+        }
+
+        private static object SafeTutorialHints()
+        {
+            try
+            {
+                TutorialSnapshot snapshot = TutorialAdapter.Instance.ReadTutorial();
+                if (snapshot == null || !snapshot.Readable) return null;
+                return snapshot.Enabled;
+            }
+            catch (Exception)
+            {
+                return null;
+            }
         }
 
         private static GameFlags BuildFlags()

@@ -13,11 +13,23 @@ namespace PawnMind.Bridge
             var rows = new List<Dictionary<string, object>>();
             try
             {
+                // Perk details are projected by the game adapter so this layer
+                // never touches StoreReputationPerk directly.
+                Dictionary<string, List<FactionPerkView>> perkDetails =
+                    FactionPerkAdapter.ReadDetails();
+
                 List<StoreReputation> reps = PlayerStore.Instance.storeReputations;
                 for (int i = 0; i < reps.Count; i++)
                 {
                     StoreReputation rep = reps[i];
                     if (rep == null) continue;
+
+                    List<FactionPerkView> perks = null;
+                    if (!string.IsNullOrEmpty(rep.factionId))
+                    {
+                        perkDetails.TryGetValue(rep.factionId, out perks);
+                    }
+
                     rows.Add(new Dictionary<string, object>
                     {
                         { "id", rep.factionId },
@@ -25,6 +37,7 @@ namespace PawnMind.Bridge
                         { "amount", rep.GetReputation() },
                         { "exact", Math.Round(rep.GetReputationExact(), 2) },
                         { "perks", rep.perks == null ? 0 : rep.perks.Count },
+                        { "perks_detail", PerksJson(perks) },
                         { "strength", rep.strength },
                         { "influence", rep.influence },
                         { "max_influence", rep.maxInfluence }
@@ -37,6 +50,31 @@ namespace PawnMind.Bridge
             }
 
             return JsonConvert.SerializeObject(new Dictionary<string, object> { { "ok", true }, { "factions", rows } });
+        }
+
+        private static List<Dictionary<string, object>> PerksJson(List<FactionPerkView> perks)
+        {
+            var rows = new List<Dictionary<string, object>>();
+            if (perks == null) return rows;
+
+            for (int i = 0; i < perks.Count; i++)
+            {
+                FactionPerkView perk = perks[i];
+                rows.Add(new Dictionary<string, object>
+                {
+                    { "id", perk.Id },
+                    { "threshold", perk.Threshold },
+                    { "direction", perk.Direction },
+                    { "unlocked", perk.Unlocked },
+                    { "remaining", perk.Remaining },
+                    { "remaining_to_unlock", perk.RemainingToUnlock },
+                    { "type", perk.Type },
+                    { "icon", perk.Icon },
+                    { "always_active", perk.AlwaysActive }
+                });
+            }
+
+            return rows;
         }
 
         public static string HealthJson()

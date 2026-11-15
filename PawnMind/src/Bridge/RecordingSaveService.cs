@@ -22,6 +22,8 @@ namespace PawnMind.Bridge
         private readonly IRecordingNativeSavePort nativePort;
         private readonly INewGameMenuPort menuPort;
         private readonly IRecordingSaveMetadataPort metadataPort;
+        // Optional read-only intel: a missing service never affects sleep.
+        private readonly ReportService reportService;
 
         public RecordingSaveService(
             RecordingSlotPolicy policy,
@@ -29,7 +31,8 @@ namespace PawnMind.Bridge
             IRecordingSlotInventoryPort inventoryPort,
             IRecordingNativeSavePort nativePort,
             INewGameMenuPort menuPort,
-            IRecordingSaveMetadataPort metadataPort = null)
+            IRecordingSaveMetadataPort metadataPort = null,
+            ReportService reportService = null)
         {
             this.policy = policy;
             this.gamePort = gamePort;
@@ -37,6 +40,7 @@ namespace PawnMind.Bridge
             this.nativePort = nativePort;
             this.menuPort = menuPort;
             this.metadataPort = metadataPort;
+            this.reportService = reportService;
         }
 
         /// <summary>
@@ -293,7 +297,8 @@ namespace PawnMind.Bridge
                 return Failure(op, RecordingSaveErrors.OutcomeUnknown, true, true, readback);
             }
 
-            return SaveSuccess(op, status, false, readback);
+            return SaveSuccess(op, status, false, readback,
+                SleepReport(game.Day, afterSleep.Day));
         }
 
         public ActionResult NewGame()
@@ -509,7 +514,8 @@ namespace PawnMind.Bridge
             string op,
             RecordingStatus status,
             bool saved,
-            DayCycleReadback readback = null)
+            DayCycleReadback readback = null,
+            JObject report = null)
         {
             JObject row = new JObject();
             row["ok"] = true;
@@ -518,6 +524,7 @@ namespace PawnMind.Bridge
             row["saved"] = saved;
             if (!saved) row["slept"] = true;
             if (readback != null) row["readback"] = JObject.FromObject(FirstWeekJson.Readback(readback));
+            if (report != null) row["report"] = report;
             row["state"] = StateText(status.State);
             row["bound"] = status.Bound;
             row["slot_matches"] = status.SlotMatches;
@@ -528,6 +535,39 @@ namespace PawnMind.Bridge
                 : new JValue(lastSaveTime);
             if (status.Binding != null) row["binding"] = BindingJson(status.Binding);
             return ActionResult.SuccessRaw(op, row.ToString(Formatting.None));
+        }
+
+        /// <summary>
+        /// Sleep returns before the game's asynchronous black screen advances
+        /// the day. The report therefore degrades to an explicit pending row
+        /// instead of attaching yesterday's lines; a failed report read must
+        /// never change the sleep result.
+        /// </summary>
+        private JObject SleepReport(int dayBefore, int dayAfter)
+        {
+            if (reportService == null)
+            {
+                return PendingReport(dayAfter <= dayBefore ? dayBefore : dayAfter);
+            }
+
+            try
+            {
+                return JObject.FromObject(reportService.SleepReport(dayBefore, dayAfter));
+            }
+            catch (Exception)
+            {
+                return PendingReport(dayAfter <= dayBefore ? dayBefore : dayAfter);
+            }
+        }
+
+        private static JObject PendingReport(int day)
+        {
+            JObject row = new JObject();
+            row["readable"] = false;
+            row["reason"] = DayReportErrors.Unavailable;
+            row["day"] = day;
+            row["lines"] = new JArray();
+            return row;
         }
 
         private string BoundSaveTime(RecordingStatus status)

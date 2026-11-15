@@ -375,6 +375,72 @@ namespace PawnMind.Tests
         }
 
         [Test]
+        public static void Service_Sleep_Attaches_The_New_Morning_Report()
+        {
+            RecordingHarness h = RecordingHarness.Create();
+            h.Bind();
+
+            h.ReportPort.Raw = new DayReportRaw
+            {
+                Readable = true,
+                Day = 4,
+                NightLogs = new System.Collections.Generic.List<string>
+                {
+                    "<color=#5c6f46>Power restored.</color>"
+                }
+            };
+            h.NativePort.SleepEffect = delegate
+            {
+                h.StatePort.State = RecordingTestData.InGame(day: 4);
+            };
+
+            ActionResult result = h.Service.Sleep();
+            JObject json = Json(result);
+
+            Assert.True(result.Ok, "sleep still succeeds");
+            Assert.NotNull(json["report"], "sleep carries a report");
+            Assert.Equal(true, (bool)json["report"]["readable"], "report is readable");
+            Assert.Equal(4, (int)json["report"]["day"], "report belongs to the new day");
+            Assert.Equal("Power restored.", (string)json["report"]["lines"][0], "line text");
+        }
+
+        [Test]
+        public static void Service_Sleep_Report_Failure_Never_Changes_The_Result()
+        {
+            RecordingHarness h = RecordingHarness.Create();
+            h.Bind();
+            h.ReportPort.Throw = true;
+            h.NativePort.SleepEffect = delegate
+            {
+                h.StatePort.State = RecordingTestData.InGame(day: 4);
+            };
+
+            ActionResult result = h.Service.Sleep();
+            JObject json = Json(result);
+
+            Assert.True(result.Ok, "sleep is unaffected by the report read");
+            Assert.Equal(true, (bool)json["slept"], "slept flag unchanged");
+            Assert.Equal(false, (bool)json["report"]["readable"], "report degrades explicitly");
+            Assert.Equal("report_unavailable", (string)json["report"]["reason"], "stable reason");
+        }
+
+        [Test]
+        public static void Service_Sleep_Report_Is_Pending_Before_The_Async_Day_Change()
+        {
+            RecordingHarness h = RecordingHarness.Create();
+            h.Bind();
+
+            ActionResult result = h.Service.Sleep();
+            JObject json = Json(result);
+
+            Assert.True(result.Ok, "sleep succeeds");
+            Assert.Equal(false, (bool)json["report"]["readable"], "no new report yet");
+            Assert.Equal("morning_pending", (string)json["report"]["reason"], "stable pending reason");
+            Assert.Equal(3, (int)json["report"]["day"], "old day");
+            Assert.Equal(0, h.ReportPort.Calls, "the report is not read before the day advances");
+        }
+
+        [Test]
         public static void Service_Native_Error_After_Save_Is_Treated_As_Unknown()
         {
             RecordingHarness h = RecordingHarness.Create();

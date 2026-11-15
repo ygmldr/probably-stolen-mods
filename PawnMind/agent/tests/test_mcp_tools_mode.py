@@ -1,6 +1,6 @@
 """S7A: server-side tool trimming for recording (`--tools full|recording`).
 
-The full server exposes 104 tools. The recording entrypoint must expose only the
+The full server exposes 108 tools. The recording entrypoint must expose only the
 minimum first-week surface, so a host-side allowlist is no longer the only thing
 keeping `act`/`press`/`new_game` away from a model. These tests pin the mode
 switch, the exact recording surface, the explicit exclusions, the demo
@@ -39,10 +39,11 @@ EXPECTED_RECORDING_TOOLS = frozenset({
     "barter_status", "blur_new_game_option", "buy_upgrade", "buy_wholesale",
     "call", "call_next_customer", "choose_dialogue", "commissary_buy",
     "confirm_new_game", "confirm_trade", "contraband_status", "deliver_request",
-    "dispatch_expedition", "end_call", "end_day", "events_status",
-    "expedition_status", "focus_new_game_selected_perk", "get_action_history", "get_item",
-    "get_layout", "get_legal_actions", "get_new_game_options", "get_pending_prompt",
-    "get_recording_save_status",
+    "dismiss_tutorial_hints", "dispatch_expedition", "end_call", "end_day",
+    "events_status", "expedition_status", "focus_new_game_selected_perk",
+    "get_action_history", "get_calendar", "get_clientele", "get_day_report",
+    "get_item", "get_layout", "get_legal_actions", "get_new_game_options",
+    "get_pending_prompt", "get_recording_save_status",
     "get_run_summary", "get_state", "go_out", "health_status",
     "husbandry_status", "inspect_ticket", "list_analyzers", "list_books",
     "list_contacts", "list_containers", "list_factions", "list_goods",
@@ -110,7 +111,7 @@ class ToolsModeTests(unittest.TestCase):
         default_names = self._list_tool_names()
         explicit_names = self._list_tool_names("--tools", "full")
 
-        self.assertEqual(104, len(default_names))
+        self.assertEqual(108, len(default_names))
         self.assertEqual(default_names, explicit_names,
                          "omitting --tools must behave exactly like --tools full")
         for expected in ("act", "press", "get_ui_snapshot", "new_game", "save_game"):
@@ -162,6 +163,55 @@ class ToolsModeTests(unittest.TestCase):
         self.assertIn("prompt", pending_text)
         self.assertIn("re-read", answer_text)
         self.assertIn("prompt", answer_text)
+
+    def test_intel_tools_are_read_only_and_calendar_days_is_bounded(self):
+        tools = self._list_tools("--tools", "recording")
+
+        for name in ("get_day_report", "get_clientele"):
+            self.assertEqual(
+                set(),
+                set(tools[name].input_schema.get("properties", {})),
+                name + " must take no parameters (read-only)",
+            )
+
+        calendar = tools["get_calendar"]
+        self.assertEqual(
+            {"days"},
+            set(calendar.input_schema.get("properties", {})),
+            "get_calendar exposes only days",
+        )
+        self.assertEqual(
+            7,
+            calendar.input_schema["properties"]["days"].get("default"),
+            "get_calendar defaults to one week",
+        )
+        self.assertEqual(
+            [],
+            calendar.input_schema.get("required", []),
+            "get_calendar days is optional",
+        )
+
+        dismiss = tools["dismiss_tutorial_hints"]
+        self.assertEqual(
+            {"rev"},
+            set(dismiss.input_schema.get("properties", {})),
+            "dismiss_tutorial_hints exposes only rev",
+        )
+        self.assertEqual(
+            {"rev"},
+            set(dismiss.input_schema.get("required", [])),
+            "dismiss_tutorial_hints requires rev",
+        )
+        text = (dismiss.description or "").lower()
+        self.assertIn("hint", text)
+        self.assertIn("rev", text)
+        self.assertIn("skip the intro", text)
+
+        self.assertIsNone(mcp_server._check_days(7))
+        self.assertIsNone(mcp_server._check_days(14))
+        self.assertEqual("invalid_argument", mcp_server._check_days(0)["error"])
+        self.assertEqual("invalid_argument", mcp_server._check_days(15)["error"])
+        self.assertEqual("invalid_argument", mcp_server._check_days(True)["error"])
 
     def test_recording_mode_withholds_the_high_risk_surface(self):
         full_names = self._list_tool_names("--tools", "full")

@@ -50,8 +50,8 @@
 ## 当前版本与架构（2026-11-11）
 
 - Git tag：`v1.0.1`；`manifest.xml` 仍是 0.2.1（发版前同步）。
-- 测试：以 `./test.sh` 与 `agent/tests` 实际输出为准（2026-11-14：C# 462 + 脚本门禁 53 + 适配器契约 392、Python 81，均 0 skip）。
-- 100 个 MCP 工具（`--tools recording` 只注册首周录制用 28 个）；入口 `agent/mcp_server.py`，HTTP 客户端 `agent/pawnmind_client.py`。
+- 测试：以 `./test.sh` 与 `agent/tests` 实际输出为准（2026-11-15：C# 627 + 脚本门禁 53 + 适配器契约 453、Python 143，均 0 skip）。
+- 108 个 MCP 工具（`--tools recording` 只注册首周录制用 102 个）；入口 `agent/mcp_server.py`，HTTP 客户端 `agent/pawnmind_client.py`。
 - `agent/orchestrator.py` 只有确定性 `RulePolicy`，还不是 LLM agent。
 
 ```

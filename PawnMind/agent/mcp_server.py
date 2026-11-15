@@ -67,10 +67,12 @@ RECORDING_TOOL_NAMES = frozenset({
     "barter_status", "blur_new_game_option", "buy_upgrade", "buy_wholesale",
     "call", "call_next_customer", "choose_dialogue", "commissary_buy",
     "confirm_new_game", "confirm_trade", "contraband_status", "deliver_request",
-    "dispatch_expedition", "end_call", "end_day", "events_status",
-    "expedition_status", "focus_new_game_selected_perk", "get_action_history", "get_item",
-    "get_layout", "get_legal_actions", "get_new_game_options", "get_recording_save_status",
-    "get_run_summary", "get_state", "go_out", "health_status",
+    "dismiss_tutorial_hints", "dispatch_expedition", "end_call", "end_day",
+    "events_status", "expedition_status", "focus_new_game_selected_perk",
+    "get_action_history", "get_calendar", "get_clientele", "get_day_report",
+    "get_item", "get_layout", "get_legal_actions", "get_new_game_options",
+    "get_recording_save_status", "get_run_summary", "get_state", "go_out",
+    "health_status",
     "husbandry_status", "inspect_ticket", "list_analyzers", "list_books",
     "list_contacts", "list_containers", "list_factions", "list_goods",
     "list_interactions", "list_inventory", "list_labels", "list_locations",
@@ -91,6 +93,9 @@ RECORDING_TOOL_NAMES = frozenset({
     "get_pending_prompt",
     "answer_prompt",
 })
+
+CALENDAR_MIN_DAYS = 1
+CALENDAR_MAX_DAYS = 14
 
 NEW_GAME_OPTION_KINDS = ("scenario", "perk", "difficulty")
 NEW_GAME_PAGE_ROWS = ("available", "selected")
@@ -132,6 +137,15 @@ def _check_choice(field, value, allowed, expected_type):
 def _check_rev(rev):
     if type(rev) is not int or rev < 0:
         return _invalid_argument("rev")
+    return None
+
+
+def _check_days(days):
+    if (type(days) is not int
+            or days < CALENDAR_MIN_DAYS
+            or days > CALENDAR_MAX_DAYS):
+        return _invalid_argument(
+            "days", range(CALENDAR_MIN_DAYS, CALENDAR_MAX_DAYS + 1))
     return None
 
 
@@ -371,6 +385,32 @@ def build_server(client, tool_set=TOOL_SET_FULL):
         return client.action("events_status")
 
     @tool()
+    def get_day_report() -> dict:
+        """Read this morning's report lines: power/electricity, insurance, security, storefront cleaning, rent warnings and the after-hours "opened late, missed a customer" line. Read-only, no rev. Call it after waking up (after sleep + wait_for_events) before deciding the day. `source` says which path was used: structured night_logs, the visible morning panel, or the bridge cache. `readable:false` with `reason:"morning_pending"` means the async day transition has not finished; wait for the day to change and read again instead of sleeping twice."""
+        return client.action("get_day_report")
+
+    @tool()
+    def get_calendar(days: int = 7) -> dict:
+        """Read the store calendar for the next `days` days (default 7, max 14; it may cross the week boundary). Each day lists the active/queued events for that day plus `rent_due`; `rent` gives the next rent day, the amount and whether it falls in the current week. Day numbers come from the live day counter, not from guesses. Read-only, no rev. Use it at the start of a run to plan around rent day, inspections and threats."""
+        error = _check_days(days)
+        if error is not None:
+            return error
+        return client.action("get_calendar", days=days)
+
+    @tool()
+    def get_clientele() -> dict:
+        """What kind of customers the display case attracts: showcase types, the discerning-shopper chance and cooldown, the predicted (client, chance %, item) rows shown by the clientele panel, and the number of random normal customers. Read-only, no rev. Use it to decide what to put in the showcase and whether to expect a rich buyer before opening. The reading is cached for the rest of the game day (cached=true), so repeated calls return the same snapshot instead of re-rolling the game's RNG."""
+        return client.action("get_clientele")
+
+    @tool()
+    def dismiss_tutorial_hints(rev: StrictInt) -> dict:
+        """Hide the tutorial hint bubbles only: turns PlayerStore.tutorialEnable off once, closes the visible hints and hides the tutorial group. It does not unlock services, skip the intro, or change items, story clients, toggles or endless mode. Requires rev. Returns changed/tutorial_enabled/hints_hidden; re-read get_state.tutorial_hints afterwards. A tutorial_hints_readback_mismatch means stop, do not retry."""
+        error = _check_rev(rev)
+        if error is not None:
+            return error
+        return client.action("dismiss_tutorial_hints", rev=rev)
+
+    @tool()
     def list_signs() -> dict:
         """Owned marketing signs."""
         return client.action("list_signs")
@@ -397,7 +437,7 @@ def build_server(client, tool_set=TOOL_SET_FULL):
 
     @tool()
     def list_factions() -> dict:
-        """Faction reputation amounts, perks and influence."""
+        """Faction reputation amounts, influence and every reputation perk with threshold, unlock state, remaining points and direction (positive thresholds unlock by gaining reputation, negative ones by losing it)."""
         return client.action("list_factions")
 
     @tool()

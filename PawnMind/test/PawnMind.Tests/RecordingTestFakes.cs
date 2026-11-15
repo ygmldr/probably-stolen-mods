@@ -282,6 +282,7 @@ namespace PawnMind.Tests
         public readonly FakeRecordingSaveMetadataPort MetadataPort =
             new FakeRecordingSaveMetadataPort();
         public readonly FakeNewGameMenuPort MenuPort;
+        public readonly FakeDayReportPort ReportPort = new FakeDayReportPort();
         public readonly RecordingSlotPolicy Policy;
         public readonly RecordingSaveService Service;
 
@@ -295,7 +296,8 @@ namespace PawnMind.Tests
                 InventoryPort,
                 NativePort,
                 MenuPort,
-                MetadataPort);
+                MetadataPort,
+                new ReportService(ReportPort));
         }
 
         public static RecordingHarness Create(

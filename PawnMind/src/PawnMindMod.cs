@@ -24,6 +24,10 @@ public sealed class PawnMindMod : IMod
     private static ScreenshotService _screenshotService;
     private static PromptService _promptService;
     private static NightReturnService _nightReturnService;
+    private static ReportService _reportService;
+    private static CalendarService _calendarService;
+    private static ClienteleService _clienteleService;
+    private static TutorialService _tutorialService;
     private BridgeServer _server;
     private ActionRouter _router;
     private GameObject _pumpObject;
@@ -43,6 +47,16 @@ public sealed class PawnMindMod : IMod
 
             RecordingSettings recordingSettings = RecordingSettings.From(config);
             _recordingArmed = recordingSettings.Error == null;
+
+            // Read-only intel services are created before the recording service
+            // because sleep attaches their morning report to its response.
+            _reportService = new ReportService(ReportAdapter.Instance);
+            ReportService.SetCurrent(_reportService);
+            _calendarService = new CalendarService(CalendarAdapter.Instance);
+            CalendarService.SetCurrent(_calendarService);
+            _clienteleService = new ClienteleService(ClienteleAdapter.Instance);
+            _tutorialService = new TutorialService(TutorialAdapter.Instance);
+
             RecordingSlotPolicy recordingPolicy = new RecordingSlotPolicy(recordingSettings);
             _recordingService = new RecordingSaveService(
                 recordingPolicy,
@@ -50,7 +64,8 @@ public sealed class PawnMindMod : IMod
                 RecordingSaveAdapter.Instance,
                 RecordingSaveAdapter.Instance,
                 NewGameMenuAdapter.Instance,
-                RecordingSaveAdapter.Instance);
+                RecordingSaveAdapter.Instance,
+                _reportService);
             _recordingGuard = new RecordingDispatchGuard(_recordingService);
 
             // S5: one service instance owns the receipt tracker for both /state
@@ -192,6 +207,12 @@ public sealed class PawnMindMod : IMod
         _newGameService = null;
         _promptService = null;
         _nightReturnService = null;
+        _reportService = null;
+        _calendarService = null;
+        _clienteleService = null;
+        _tutorialService = null;
+        ReportService.SetCurrent(null);
+        CalendarService.SetCurrent(null);
         _recordingService = null;
         _recordingGuard = null;
         FirstWeekService.SetCurrent(null);
@@ -405,6 +426,37 @@ public sealed class PawnMindMod : IMod
                 }
                 return service.ReturnHome();
             }
+
+            case "get_day_report":
+                if (_reportService == null)
+                {
+                    return ActionResult.Failure("get_day_report", "not_initialized");
+                }
+                return ActionResult.SuccessRaw(
+                    "get_day_report", _reportService.Json(DayReportRules.MaxLines));
+
+            case "get_calendar":
+                if (_calendarService == null)
+                {
+                    return ActionResult.Failure("get_calendar", "not_initialized");
+                }
+                return ActionResult.SuccessRaw(
+                    "get_calendar",
+                    _calendarService.Json(ReadInt(request, "days", CalendarRules.DefaultDays)));
+
+            case "get_clientele":
+                if (_clienteleService == null)
+                {
+                    return ActionResult.Failure("get_clientele", "not_initialized");
+                }
+                return ActionResult.SuccessRaw("get_clientele", _clienteleService.Json());
+
+            case "dismiss_tutorial_hints":
+                if (_tutorialService == null)
+                {
+                    return ActionResult.Failure("dismiss_tutorial_hints", "not_initialized");
+                }
+                return _tutorialService.Dismiss();
 
             case "get_pending_prompt":
             {
