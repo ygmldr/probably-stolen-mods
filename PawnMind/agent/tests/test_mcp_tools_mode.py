@@ -56,6 +56,7 @@ EXPECTED_RECORDING_TOOLS = frozenset({
     "confirm_trade",
     "contraband_status",
     "deliver_request",
+    "dismiss_current_client",
     "dismiss_tutorial_hints",
     "end_call",
     "end_day",
@@ -182,7 +183,7 @@ class ToolsModeTests(unittest.TestCase):
         default_names = self._list_tool_names()
         explicit_names = self._list_tool_names("--tools", "full")
 
-        self.assertEqual(109, len(default_names))
+        self.assertEqual(110, len(default_names))
         self.assertEqual(default_names, explicit_names,
                          "omitting --tools must behave exactly like --tools full")
         for expected in ("act", "press", "get_ui_snapshot", "new_game", "save_game"):

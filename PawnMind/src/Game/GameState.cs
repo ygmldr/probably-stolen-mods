@@ -232,6 +232,24 @@ namespace PawnMind.Game
             }
         }
 
+        /// <summary>
+        /// Makes the current client leave through the game's own dismissal path.
+        /// This is the escape hatch for a client the bridge cannot serve (for
+        /// example a seller who arrived with nothing on the table): without it the
+        /// shop is hard-stuck, because both call_next_customer and end_day require
+        /// an empty client slot.
+        /// </summary>
+        public static void DismissCurrentClient()
+        {
+            PlayerStore store = PlayerStore.Instance;
+            if (store == null || store.currentClientInstance == null)
+            {
+                throw new InvalidOperationException("no_client");
+            }
+
+            store.DismissCurrentClient(callNextWhenPossible: false);
+        }
+
         public static bool IsNegotiationOpen()
         {
             try

@@ -23,7 +23,7 @@
 
 ---
 
-## 2. 工具面：99 个工具（94 个玩家等价 + 2 个取证 + 2 个弹窗 + 1 个关窗）
+## 2. 工具面：100 个工具（95 个玩家等价 + 2 个取证 + 2 个弹窗 + 1 个关窗）
 
 工具名统一带前缀：模型侧叫 **`mcp__pawnmind__<短名>`**。下面用短名。
 
@@ -38,7 +38,7 @@
 | 取证 | `capture_screenshot` `list_screenshots` | 抓当前画面当证据；服务端节流 |
 | 弹窗 | `get_pending_prompt` `answer_prompt` | 读/答原生确认框；必须先读后答 |
 | 界面 | `close_windows` | 关掉挡屏的纸页/书/合同/浮窗；读完就关 |
-| 开店与客流 | `open_shop` `call_next_customer` `advance_dialogue` `choose_dialogue` `end_day` `sleep` | 日常循环 |
+| 开店与客流 | `open_shop` `call_next_customer` `advance_dialogue` `choose_dialogue` `dismiss_current_client` `end_day` `sleep` | 日常循环；送客是服务的**最后手段** |
 | 交易与议价 | `confirm_trade` `list_goods` `get_item` `buy_wholesale` `commissary_buy` `bargain_preview` `bargain` | 低买高卖、砍价、批发、补给站 |
 | 背包与搬运 | `list_containers` `list_inventory` `move_item` `get_layout` `read_item` `list_interactions` `activate_item` `toggle_item` `use_tool` | 形状摆放、容器整理、使用道具；容器含背包/前台/后台/展示柜/暗格/售货机/售水机/雇员 |
 | 鉴定与标签 | `list_analyzers` `analyze_item` `set_pen_mode` `list_marks` `list_labels` `set_label` | 测水质/化扫/植物/基因、标记、贴标签 |
@@ -178,6 +178,7 @@
    - `confirm_trade` 按的是游戏自己的"接受报价"按钮：**谈价面板必须开着**（`negotiation_open=true`），而且只接受**摆在台面上的那件物品**，否则返回 `no_negotiation` / `item_not_staged`。
    - 成交后客户会进入告别对话：用 `advance_dialogue(rev)` 走到 `no_dialogue`，客户才会离店；`client` 仍是那个人时不要 `call_next_customer`（会返回 `cannot_call_next`）。
 5. 顾客/房东出现（`client` 非空或 `dialogue.available=true`）：
+   - **先确认台面上有货**：`client_item_count` 与 `back_counter_count` 都为 0、且 `front_counter` 里没有 `owned=false` 的物品时，这位顾客**没带东西可交易**。此时 `call_next_customer`、`end_day` 都会被它挡住——用一次 `dismiss_current_client(rev)` 送客，再继续（这是唯一被允许的"放弃顾客"场景）。
    - 先 `get_state` 读 `dialogue.text` 和 `choices`（含 `enabled`）；
    - 非选项行用 `advance_dialogue(rev)`，选项用 `choose_dialogue(index, rev)`；
    - `choices[i].enabled=false` 的**不要点**；

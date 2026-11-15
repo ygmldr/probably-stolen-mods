@@ -257,6 +257,9 @@ public sealed class PawnMindMod : IMod
             case "advance_dialogue":
                 return GameActions.AdvanceDialogue();
 
+            case "dismiss_current_client":
+                return GameActions.DismissClient();
+
             case "choose_dialogue":
             {
                 FirstWeekService service = FirstWeekService.Current;

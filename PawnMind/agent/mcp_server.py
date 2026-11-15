@@ -84,6 +84,7 @@ RECORDING_TOOL_NAMES = frozenset({
     "confirm_trade",
     "contraband_status",
     "deliver_request",
+    "dismiss_current_client",
     "dismiss_tutorial_hints",
     "end_call",
     "end_day",
@@ -859,6 +860,11 @@ def build_server(client, tool_set=TOOL_SET_FULL):
     def save_game(rev: int) -> dict:
         """Save the current run. Re-read get_state afterwards; saving is synchronous."""
         return client.action("save_game", rev=rev)
+
+    @tool()
+    def dismiss_current_client(rev: StrictInt) -> dict:
+        """Send the current client away through the game's own dismissal path. Escape hatch for a client you cannot serve (for example a seller who arrived with nothing on the table, so there is no trade to accept): while a client is present, call_next_customer and end_day both refuse. Refused with dialogue_active while a dialogue is running (finish it with advance_dialogue first)."""
+        return client.action("dismiss_current_client", rev=rev)
 
     @tool()
     def confirm_trade(item_id: int, side: str, rev: int) -> dict:

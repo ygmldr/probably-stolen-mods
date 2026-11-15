@@ -48,6 +48,40 @@ namespace PawnMind.Bridge
             return ActionResult.Success("call_next_customer");
         }
 
+        /// <summary>
+        /// Sends the current client away. Only used when the client cannot be
+        /// served (no items, no dialogue): normal service must still go through
+        /// confirm_trade + the closing dialogue.
+        /// </summary>
+        public static ActionResult DismissClient()
+        {
+            PlayerStore store;
+            if (!TryStore(out store)) return ActionResult.Failure("dismiss_current_client", "not_in_game");
+            if (GameState.GetCurrentClient() == null)
+            {
+                return ActionResult.Failure("dismiss_current_client", "no_client");
+            }
+
+            DialogUIManager ui = GetDialogUi();
+            if (ui != null && ui.GetCurrentDialog() != null)
+            {
+                // A live dialogue is the client's turn to speak; advancing it may
+                // still complete the visit. Refuse instead of yanking the client.
+                return ActionResult.Failure("dismiss_current_client", "dialogue_active");
+            }
+
+            try
+            {
+                GameState.DismissCurrentClient();
+            }
+            catch (Exception)
+            {
+                return ActionResult.Failure("dismiss_current_client", "dismiss_failed");
+            }
+
+            return ActionResult.Success("dismiss_current_client");
+        }
+
         public static ActionResult AdvanceDialogue()
         {
             DialogUIManager ui = GetDialogUi();
