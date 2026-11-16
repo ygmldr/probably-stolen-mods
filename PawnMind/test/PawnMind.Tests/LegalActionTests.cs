@@ -47,7 +47,9 @@ namespace PawnMind.Tests
         {
             var actions = Build(new GameFlags { InGame = true, ShopState = "MORNING" });
             Assert.True(Has(actions, "open_shop"), "open shop in the morning");
-            Assert.True(Has(actions, "save_game"), "save is always offered in game");
+            // save_game is not player reachable (the game auto-saves on sleep), so it
+            // must not be advertised as a legal player action.
+            Assert.False(Has(actions, "save_game"), "save is not a player action");
         }
 
         [Test]
@@ -122,20 +124,31 @@ namespace PawnMind.Tests
         }
 
         [Test]
-        public static void Bargain_Offers_Only_Available_Directions()
+        public static void Bargain_Offers_Every_Direction_When_Open()
         {
+            // The per-direction flags come from Refresh()-backed getters, so the
+            // snapshot no longer carries them; the bargain action reports
+            // "unavailable" when a direction is actually spent.
             var flags = new GameFlags
             {
                 InGame = true,
                 HasClient = true,
                 ClientArrived = true,
-                BargainOpen = true,
-                CanSellDiscount = true,
-                CanBuyDiscount = false
+                BargainOpen = true
             };
             var actions = Build(flags);
-            Assert.NotNull(Find(actions, "bargain", "direction", "sell_discount"), "available direction");
-            Assert.Null(Find(actions, "bargain", "direction", "buy_discount"), "unavailable direction");
+
+            foreach (string direction in new[] { "sell_discount", "sell_markup", "buy_markup", "buy_discount" })
+            {
+                Assert.NotNull(Find(actions, "bargain", "direction", direction), direction);
+            }
+        }
+
+        [Test]
+        public static void Closed_Bargain_Offers_Nothing()
+        {
+            var flags = new GameFlags { InGame = true, HasClient = true, ClientArrived = true };
+            Assert.Null(Find(Build(flags), "bargain", "direction", "sell_discount"), "panel closed");
         }
 
         [Test]

@@ -88,6 +88,10 @@ namespace PawnMind.Bridge
         private readonly Func<WriteGateDecision> _writeGate;
         private readonly string _secretToken;
         private readonly Action<ActionOutcome> _onOutcome;
+        // Runs before the cache probe and before any state refresh, so a refused
+        // operation cannot have touched the snapshot (and therefore cannot have
+        // triggered a native getter with side effects).
+        private readonly Func<string, string> _authorize;
 
         public ActionRouter(
             ActionGate gate,
@@ -97,7 +101,8 @@ namespace PawnMind.Bridge
             Func<long> refreshRevision = null,
             string secretToken = null,
             Func<WriteGateDecision> writeGate = null,
-            Action<ActionOutcome> onOutcome = null)
+            Action<ActionOutcome> onOutcome = null,
+            Func<string, string> authorize = null)
         {
             if (gate == null) throw new ArgumentNullException("gate");
             if (revision == null) throw new ArgumentNullException("revision");
@@ -111,6 +116,7 @@ namespace PawnMind.Bridge
             _writeGate = writeGate;
             _secretToken = secretToken;
             _onOutcome = onOutcome;
+            _authorize = authorize;
         }
 
         public string Handle(string body)
@@ -136,6 +142,12 @@ namespace PawnMind.Bridge
             if (op == "ping")
             {
                 return Scrub("{\"ok\":true,\"pong\":true,\"rev\":" + CurrentRevision() + "}");
+            }
+
+            if (_authorize != null)
+            {
+                string refusal = _authorize(op);
+                if (refusal != null) return ProtocolError(refusal);
             }
 
             if (op == "get_action_history")

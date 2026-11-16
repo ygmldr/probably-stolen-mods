@@ -689,6 +689,12 @@ namespace PawnMind.Game
             button.CloseShutter();
         }
 
+        /// <summary>
+        /// Pure snapshot of the bargain panel. Do not expose the offered/used
+        /// flags here: every one of those getters calls BargainUIManager.Refresh(),
+        /// which resets the per-client offer state when the tracked client changes.
+        /// The flags remain available through the bargain action's own result.
+        /// </summary>
         public static Dictionary<string, object> GetBargainSnapshot()
         {
             try
@@ -696,17 +702,7 @@ namespace PawnMind.Game
                 BargainUIManager ui = BargainUIManager.Instance;
                 if (ui == null) return null;
 
-                var snapshot = new Dictionary<string, object>();
-                snapshot["open"] = ui.IsOpen;
-                snapshot["can_sell_discount"] = ui.CanOfferDiscount();
-                snapshot["can_sell_markup"] = ui.CanOfferMarkup();
-                snapshot["can_buy_markup"] = ui.CanOfferBuyingMarkup();
-                snapshot["can_buy_discount"] = ui.CanDemandBuyingDiscount();
-                snapshot["sell_discount_used"] = ui.DiscountOffered;
-                snapshot["sell_markup_used"] = ui.MarkupOffered;
-                snapshot["buy_markup_used"] = ui.BuyingMarkupOffered;
-                snapshot["buy_discount_used"] = ui.BuyingDiscountOffered;
-                return snapshot;
+                return Core.SnapshotRules.Bargain(ui.IsOpen);
             }
             catch
             {

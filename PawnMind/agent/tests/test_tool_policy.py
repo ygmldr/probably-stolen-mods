@@ -10,7 +10,8 @@ MOD_DIR = os.path.dirname(AGENT_DIR)
 sys.path.insert(0, AGENT_DIR)
 
 from tool_policy import (  # noqa: E402
-    allowlist, decision_for, live_ready, load_policy, validate,
+    SNAPSHOT_READERS, allowlist, candidate_allowlist, decision_for, live_ready,
+    load_policy, play_allowlist, validate,
 )
 import mcp_server  # noqa: E402
 
@@ -49,11 +50,13 @@ class ToolPolicyTests(unittest.TestCase):
             self.assertEqual("pure", self.policy["tools"][name]["purity"], name)
         self.assertEqual("write", self.policy["tools"]["confirm_trade"]["purity"])
 
-    def test_get_state_is_blocked_until_d0a(self):
+    def test_get_state_is_candidate_but_not_live_ready(self):
         entry = self.policy["tools"]["get_state"]
-        self.assertFalse(entry["modes"]["play"], "still refreshes the bargain UI")
-        self.assertEqual("needs_evidence", entry["decision"])
-        self.assertEqual([], [n for n in allowlist(self.policy, "play") if n == "get_state"])
+        self.assertEqual("d0a_fixed", entry["status"], "snapshot no longer refreshes")
+        self.assertEqual("allow", entry["decision"], "statically allowed")
+        self.assertIn("get_state", candidate_allowlist(self.policy))
+        self.assertNotIn("get_state", play_allowlist(self.policy),
+                         "live PPT-READ evidence is still missing")
 
     def test_privileged_tools_are_denied(self):
         for name in ("save_game", "new_game", "act", "press"):
@@ -71,7 +74,36 @@ class ToolPolicyTests(unittest.TestCase):
         missing = set(mcp_server.RECORDING_TOOL_NAMES) - set(self.policy["tools"])
         self.assertEqual(set(), missing)
 
+    def test_bootstrap_never_reads_the_snapshot(self):
+        # R3-01: the text used to say "no get_state" while the table said yes.
+        bootstrap = set(allowlist(self.policy, "bootstrap"))
+        self.assertEqual(set(), bootstrap & SNAPSHOT_READERS)
+        self.assertFalse(self.policy["tools"]["get_state"]["modes"]["bootstrap"])
+
+    def test_snapshot_reader_aliases_match_the_server_source(self):
+        # R3-02 / PP-READ-04: get_run_summary, get_legal_actions, wait_until and
+        # the long polls all go through GET /state; a new alias must be registered.
+        import re
+        lines = open(os.path.join(AGENT_DIR, "mcp_server.py"), encoding="utf-8").read().splitlines()
+        found, current, decorated = set(), None, False
+        for line in lines:
+            if line.strip().startswith("@tool("):
+                decorated = True
+                continue
+            match = re.match(r"    def (\w+)\(", line)
+            if match:
+                current = match.group(1) if decorated else None
+                decorated = False
+                continue
+            if current and ("client.get_state(" in line or "client.wait_events(" in line):
+                found.add(current)
+        self.assertEqual(SNAPSHOT_READERS, found,
+                         "snapshot readers drifted from the policy constant")
+
     def test_live_ready_is_empty_until_real_machine_runs(self):
+        self.assertEqual([], play_allowlist(self.policy),
+                         "play requires live evidence, not just a static allow")
+        self.assertTrue(candidate_allowlist(self.policy), "candidates still reported")
         self.assertEqual([], live_ready(self.policy),
                          "no live evidence recorded for this build yet")
 

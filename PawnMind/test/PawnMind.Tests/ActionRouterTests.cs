@@ -541,6 +541,39 @@ namespace PawnMind.Tests
         }
 
         [Test]
+        public static void Mode_Refusal_Happens_Before_Any_State_Refresh()
+        {
+            int refreshes = 0;
+            var router = new ActionRouter(new ActionGate(), delegate { return 5; },
+                delegate(string op, JObject request) { return ActionResult.Success(op); },
+                new ActionHistory(),
+                delegate { refreshes++; return 5; }, null, OpenGateProvider(), null,
+                delegate(string op) { return op == "save_game" ? "mode_forbidden" : null; });
+
+            string response = router.Handle(
+                "{\"op\":\"save_game\",\"rev\":5,\"action_id\":\"m1\"}");
+
+            Assert.Contains(response, "mode_forbidden", "refused by mode");
+            Assert.Equal(0, refreshes, "no snapshot refresh before the refusal");
+        }
+
+        [Test]
+        public static void Mode_Refusal_Also_Covers_Reads()
+        {
+            int refreshes = 0;
+            var router = new ActionRouter(new ActionGate(), delegate { return 5; },
+                delegate(string op, JObject request) { return ActionResult.Success(op); },
+                new ActionHistory(),
+                delegate { refreshes++; return 5; }, null, OpenGateProvider(), null,
+                delegate(string op) { return op == "bargain_preview" ? "mode_forbidden" : null; });
+
+            string response = router.Handle("{\"op\":\"bargain_preview\"}");
+
+            Assert.Contains(response, "mode_forbidden", "reads are policed too");
+            Assert.Equal(0, refreshes, "still no snapshot");
+        }
+
+        [Test]
         public static void Router_Rejects_Write_When_Pre_Refresh_Fails()
         {
             int calls = 0;

@@ -137,7 +137,8 @@ public sealed class PawnMindMod : IMod
                 delegate { StateSnapshot.BuildJson(); return StateSnapshot.CurrentRevision; },
                 config.Token,
                 delegate { return writeGate; },
-                CaptureOutcome);
+                CaptureOutcome,
+                delegate(string op) { return ModePolicy.Refusal(op); });
 
             // S3B menu writes are evaluated by the same S4 slot policy. The
             // default (recording unconfigured) still refuses every write before

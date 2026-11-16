@@ -14,6 +14,18 @@ POLICY_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                            "policy", "tool_policy.json")
 
 MODES = ("bootstrap", "play", "test")
+
+#: Tools whose implementation reads GET /state (or the long-poll that builds it).
+#: D0a removed the Refresh()-backed getters from that path; the list is asserted
+#: against the MCP server source so a new alias cannot be forgotten.
+SNAPSHOT_READERS = frozenset({
+    "get_state",
+    "get_run_summary",
+    "get_legal_actions",
+    "wait_for_change",
+    "wait_for_events",
+    "wait_until",
+})
 DECISIONS = ("allow", "deny", "needs_evidence")
 
 
@@ -44,8 +56,19 @@ def live_ready(policy):
     """Tools with real-machine evidence; empty until live tests are recorded."""
     return sorted(
         name for name, entry in policy.get("tools", {}).items()
-        if entry.get("status") == "verified_live" and entry.get("decision") == "allow"
+        if entry.get("live_evidence") and entry.get("decision") == "allow"
     )
+
+
+def play_allowlist(policy):
+    """Strict-player exposure: allowed *and* backed by live evidence."""
+    live = set(live_ready(policy))
+    return [name for name in allowlist(policy, "play") if name in live]
+
+
+def candidate_allowlist(policy):
+    """Statically allowed set; NOT permission to play. Kept for reporting."""
+    return allowlist(policy, "play")
 
 
 def validate(policy):
@@ -69,6 +92,9 @@ def validate(policy):
             problems.append("%s: allowed write without fixed evidence" % name)
         if entry.get("modes", {}).get("play") is True and decision != "allow":
             problems.append("%s: play mode with non-allow decision" % name)
-    if tools.get("get_state", {}).get("modes", {}).get("play") is True:
-        problems.append("get_state: play mode before D0a purity evidence")
+        if entry.get("modes", {}).get("bootstrap") is True and name in SNAPSHOT_READERS:
+            problems.append("%s: bootstrap must not read the state snapshot" % name)
+    state = tools.get("get_state", {})
+    if state.get("modes", {}).get("play") is True and state.get("status") not in ("d0a_fixed", "verified_live"):
+        problems.append("get_state: play mode without D0a evidence")
     return problems

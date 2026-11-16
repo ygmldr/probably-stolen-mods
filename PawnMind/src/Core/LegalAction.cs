@@ -110,10 +110,13 @@ namespace PawnMind.Core
 
                 if (flags.BargainOpen)
                 {
-                    if (flags.CanSellDiscount) actions.Add(Bargain("sell_discount"));
-                    if (flags.CanSellMarkup) actions.Add(Bargain("sell_markup"));
-                    if (flags.CanBuyMarkup) actions.Add(Bargain("buy_markup"));
-                    if (flags.CanBuyDiscount) actions.Add(Bargain("buy_discount"));
+                    // The per-direction flags live behind Refresh()-backed getters,
+                    // so the read path only reports that bargaining is possible; the
+                    // bargain action itself is the authority on which offers remain.
+                    actions.Add(Bargain("sell_discount"));
+                    actions.Add(Bargain("sell_markup"));
+                    actions.Add(Bargain("buy_markup"));
+                    actions.Add(Bargain("buy_discount"));
                 }
             }
 
@@ -123,7 +126,6 @@ namespace PawnMind.Core
                 actions.Add(new LegalAction("sleep"));
             }
 
-            actions.Add(new LegalAction("save_game"));
             return actions;
         }
 

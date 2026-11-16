@@ -55,11 +55,11 @@
 | 声明式策略源 | `PawnMind/agent/policy/tool_policy.json`，sha256 `4e1ce849…` |
 | 读取器/生成器 | `PawnMind/agent/tool_policy.py` |
 | 条目数 | 114（与 full 一一对应） |
-| 决策分布 | `allow` 72 / `needs_evidence` 31 / `deny` 11 |
-| 纯度分布 | `pure` 52 / `write` 48 / `privileged` 10 / `cached_impure` 3 / `mutating` 1 |
-| 模式可导出 | bootstrap **53** / play **72** / test **114** |
-| **`live_ready`（有真机证据）** | **0** |
-| `get_state` | `cached_impure` + `needs_evidence`，play = 禁止（D0a 待办） |
+| 决策分布 | `allow` 73 / `needs_evidence` 30 / `deny` 11 |
+| 纯度分布 | `pure` 53 / `write` 48 / `privileged` 10 / `cached_impure` 2 / `mutating` 1 |
+| 模式可导出 | bootstrap **48** / play 候选 **73** / test **114** |
+| **`play_allowlist`（静态允许 + live 证据）** | **0** |
+| `get_state` | `d0a_fixed`（快照路径已移除 Refresh 支撑的 getter）；play 需 live 证据，仍为空 |
 | `bargain_preview` | `mutating`，`deny` |
 | `get_clientele` / `barter_status` | `cached_impure`，`needs_evidence` |
 | 特权工具（`save_game`/`new_game`/`act`/`press`/…） | `privileged`，`deny` |
@@ -72,9 +72,9 @@
 
 | 层 | 命令 | 结果 |
 |---|---|---|
-| C# 纯逻辑 + 脚本门禁 | `cd PawnMind && ./test.sh` | `passed=656 failed=0`；`contract gate tests: passed=53`；`adapter contract OK` |
+| C# 纯逻辑 + 脚本门禁 | `cd PawnMind && ./test.sh` | `passed=666 failed=0`；`contract gate tests: passed=53`；`adapter contract OK` |
 | 适配器契约 | 同上 | `contract checks: 491`（只断言成员存在） |
-| Python | `.venv/bin/python -B -m unittest discover -s agent/tests` | `Ran 246 tests … OK` |
+| Python | `.venv/bin/python -B -m unittest discover -s agent/tests` | `Ran 248 tests … OK` |
 | 真机 UI 差分 | — | `NOT_RUN`（无 UI 输入驱动） |
 | Mod Scanner | — | `NOT_RUN`（本环境无官方扫描器） |
 

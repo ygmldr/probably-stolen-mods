@@ -181,11 +181,9 @@ namespace PawnMind.Bridge
             Dictionary<string, object> bargain = GameState.GetBargainSnapshot();
             if (bargain != null)
             {
+                // Only "open" is safe to read; the per-direction flags come from
+                // Refresh()-backed getters and are no longer part of the snapshot.
                 flags.BargainOpen = bargain.ContainsKey("open") && bargain["open"] is bool && (bool)bargain["open"];
-                flags.CanSellDiscount = IsTrue(bargain, "can_sell_discount");
-                flags.CanSellMarkup = IsTrue(bargain, "can_sell_markup");
-                flags.CanBuyMarkup = IsTrue(bargain, "can_buy_markup");
-                flags.CanBuyDiscount = IsTrue(bargain, "can_buy_discount");
             }
 
             List<GameItem> front = GameState.GetFrontCounterItems();

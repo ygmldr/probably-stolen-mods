@@ -1,5 +1,5 @@
 {
- "schema": 1,
+ "schema": 2,
  "game_version": "VERSION 100-Rev13",
  "game_mvid": "911508a6-e0eb-4cc0-91e8-e14b16ea28d7",
  "generated_from": [
@@ -13,17 +13,22 @@
  },
  "tools": {
   "get_state": {
-   "purity": "cached_impure",
+   "purity": "pure",
    "player_reachable": null,
-   "status": "d0a_pending",
-   "decision": "needs_evidence",
+   "status": "d0a_fixed",
+   "decision": "allow",
    "evidence": [],
-   "reason": "snapshot getters call BargainUIManager.Refresh(); blocked until D0a",
+   "reason": "snapshot path no longer reads Refresh()-backed getters (D0a); live PPT-READ evidence still missing",
    "modes": {
-    "bootstrap": true,
-    "play": false,
+    "bootstrap": false,
+    "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": [
+    "SnapshotRulesTests",
+    "ActionRouterTests.Mode_Refusal_Happens_Before_Any_State_Refresh"
+   ]
   },
   "memory_bootstrap": {
    "purity": "pure",
@@ -36,7 +41,9 @@
     "bootstrap": true,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "memory_retrieve": {
    "purity": "pure",
@@ -49,7 +56,9 @@
     "bootstrap": true,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "memory_get": {
    "purity": "pure",
@@ -62,7 +71,9 @@
     "bootstrap": true,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "memory_status": {
    "purity": "pure",
@@ -75,33 +86,39 @@
     "bootstrap": true,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "get_legal_actions": {
    "purity": "pure",
    "player_reachable": null,
-   "status": "implemented",
+   "status": "d0a_fixed",
    "decision": "allow",
    "evidence": [],
-   "reason": "read-only per recorder classification; no known side effect",
+   "reason": "snapshot path no longer reads Refresh()-backed getters (D0a); live PPT-READ evidence still missing",
    "modes": {
-    "bootstrap": true,
+    "bootstrap": false,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "get_run_summary": {
    "purity": "pure",
    "player_reachable": null,
-   "status": "implemented",
+   "status": "d0a_fixed",
    "decision": "allow",
    "evidence": [],
-   "reason": "read-only per recorder classification; no known side effect",
+   "reason": "snapshot path no longer reads Refresh()-backed getters (D0a); live PPT-READ evidence still missing",
    "modes": {
-    "bootstrap": true,
+    "bootstrap": false,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "get_action_history": {
    "purity": "pure",
@@ -114,7 +131,9 @@
     "bootstrap": true,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "capture_screenshot": {
    "purity": "pure",
@@ -127,7 +146,9 @@
     "bootstrap": true,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "get_pending_prompt": {
    "purity": "pure",
@@ -140,7 +161,9 @@
     "bootstrap": true,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "close_windows": {
    "purity": "write",
@@ -153,7 +176,9 @@
     "bootstrap": false,
     "play": false,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "answer_prompt": {
    "purity": "write",
@@ -166,7 +191,9 @@
     "bootstrap": false,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "list_screenshots": {
    "purity": "pure",
@@ -179,7 +206,9 @@
     "bootstrap": true,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "act": {
    "purity": "privileged",
@@ -192,7 +221,9 @@
     "bootstrap": false,
     "play": false,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "wait_until": {
    "purity": "privileged",
@@ -205,7 +236,9 @@
     "bootstrap": false,
     "play": false,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "get_ui_snapshot": {
    "purity": "privileged",
@@ -218,7 +251,9 @@
     "bootstrap": false,
     "play": false,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "press": {
    "purity": "privileged",
@@ -231,7 +266,9 @@
     "bootstrap": false,
     "play": false,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "list_goods": {
    "purity": "pure",
@@ -244,7 +281,9 @@
     "bootstrap": true,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "list_locations": {
    "purity": "pure",
@@ -257,7 +296,9 @@
     "bootstrap": true,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "go_out": {
    "purity": "write",
@@ -272,7 +313,9 @@
     "bootstrap": false,
     "play": false,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "scavenge": {
    "purity": "write",
@@ -285,7 +328,9 @@
     "bootstrap": false,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "return_home": {
    "purity": "write",
@@ -298,7 +343,9 @@
     "bootstrap": false,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "buy_wholesale": {
    "purity": "write",
@@ -313,7 +360,9 @@
     "bootstrap": false,
     "play": false,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "commissary_buy": {
    "purity": "write",
@@ -326,7 +375,9 @@
     "bootstrap": false,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "list_books": {
    "purity": "pure",
@@ -339,7 +390,9 @@
     "bootstrap": true,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "read_book": {
    "purity": "pure",
@@ -352,7 +405,9 @@
     "bootstrap": true,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "read_item": {
    "purity": "pure",
@@ -365,7 +420,9 @@
     "bootstrap": true,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "list_interactions": {
    "purity": "pure",
@@ -378,7 +435,9 @@
     "bootstrap": true,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "activate_item": {
    "purity": "write",
@@ -391,7 +450,9 @@
     "bootstrap": false,
     "play": false,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "toggle_item": {
    "purity": "write",
@@ -404,7 +465,9 @@
     "bootstrap": false,
     "play": false,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "use_tool": {
    "purity": "write",
@@ -417,7 +480,9 @@
     "bootstrap": false,
     "play": false,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "contraband_status": {
    "purity": "pure",
@@ -430,7 +495,9 @@
     "bootstrap": true,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "security_status": {
    "purity": "pure",
@@ -443,7 +510,9 @@
     "bootstrap": true,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "list_services": {
    "purity": "pure",
@@ -456,7 +525,9 @@
     "bootstrap": true,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "toggle_service": {
    "purity": "write",
@@ -469,7 +540,9 @@
     "bootstrap": false,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "husbandry_status": {
    "purity": "pure",
@@ -482,7 +555,9 @@
     "bootstrap": true,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "dispatch_expedition": {
    "purity": "privileged",
@@ -495,7 +570,9 @@
     "bootstrap": false,
     "play": false,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "advance_expedition": {
    "purity": "privileged",
@@ -508,7 +585,9 @@
     "bootstrap": false,
     "play": false,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "expedition_status": {
    "purity": "pure",
@@ -521,7 +600,9 @@
     "bootstrap": true,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "events_status": {
    "purity": "pure",
@@ -534,7 +615,9 @@
     "bootstrap": true,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "get_day_report": {
    "purity": "pure",
@@ -547,7 +630,9 @@
     "bootstrap": true,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "get_calendar": {
    "purity": "pure",
@@ -560,7 +645,9 @@
     "bootstrap": true,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "get_clientele": {
    "purity": "cached_impure",
@@ -573,7 +660,9 @@
     "bootstrap": false,
     "play": false,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "dismiss_tutorial_hints": {
    "purity": "write",
@@ -586,7 +675,9 @@
     "bootstrap": false,
     "play": false,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "list_signs": {
    "purity": "pure",
@@ -599,7 +690,9 @@
     "bootstrap": true,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "deliver_request": {
    "purity": "write",
@@ -612,7 +705,9 @@
     "bootstrap": false,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "report_client": {
    "purity": "write",
@@ -627,7 +722,9 @@
     "bootstrap": false,
     "play": false,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "barter_accept": {
    "purity": "write",
@@ -642,7 +739,9 @@
     "bootstrap": false,
     "play": false,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "arrest_wanted": {
    "purity": "write",
@@ -655,7 +754,9 @@
     "bootstrap": false,
     "play": false,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "list_factions": {
    "purity": "pure",
@@ -668,7 +769,9 @@
     "bootstrap": true,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "health_status": {
    "purity": "pure",
@@ -681,7 +784,9 @@
     "bootstrap": true,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "list_requests": {
    "purity": "pure",
@@ -694,7 +799,9 @@
     "bootstrap": true,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "wanted_status": {
    "purity": "pure",
@@ -707,7 +814,9 @@
     "bootstrap": true,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "barter_status": {
    "purity": "cached_impure",
@@ -720,7 +829,9 @@
     "bootstrap": false,
     "play": false,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "list_wine": {
    "purity": "pure",
@@ -733,7 +844,9 @@
     "bootstrap": true,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "wine_status": {
    "purity": "pure",
@@ -746,7 +859,9 @@
     "bootstrap": true,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "wine_add_water": {
    "purity": "privileged",
@@ -759,7 +874,9 @@
     "bootstrap": false,
     "play": false,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "wine_add_ingredient": {
    "purity": "write",
@@ -774,7 +891,9 @@
     "bootstrap": false,
     "play": false,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "start_fermentation": {
    "purity": "write",
@@ -789,7 +908,9 @@
     "bootstrap": false,
     "play": false,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "list_machines": {
    "purity": "pure",
@@ -802,7 +923,9 @@
     "bootstrap": true,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "machine_grow_status": {
    "purity": "pure",
@@ -815,7 +938,9 @@
     "bootstrap": true,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "machine_status": {
    "purity": "pure",
@@ -828,7 +953,9 @@
     "bootstrap": true,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "machine_insert": {
    "purity": "write",
@@ -843,7 +970,9 @@
     "bootstrap": false,
     "play": false,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "machine_collect": {
    "purity": "write",
@@ -858,7 +987,9 @@
     "bootstrap": false,
     "play": false,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "list_upgrades": {
    "purity": "pure",
@@ -871,7 +1002,9 @@
     "bootstrap": true,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "buy_upgrade": {
    "purity": "write",
@@ -886,7 +1019,9 @@
     "bootstrap": false,
     "play": false,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "lottery_status": {
    "purity": "pure",
@@ -899,7 +1034,9 @@
     "bootstrap": true,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "list_tickets": {
    "purity": "pure",
@@ -912,7 +1049,9 @@
     "bootstrap": true,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "inspect_ticket": {
    "purity": "pure",
@@ -925,7 +1064,9 @@
     "bootstrap": true,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "redeem_ticket": {
    "purity": "write",
@@ -938,7 +1079,9 @@
     "bootstrap": false,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "list_contacts": {
    "purity": "pure",
@@ -951,7 +1094,9 @@
     "bootstrap": true,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "call": {
    "purity": "write",
@@ -966,7 +1111,9 @@
     "bootstrap": false,
     "play": false,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "phone_state": {
    "purity": "pure",
@@ -979,7 +1126,9 @@
     "bootstrap": true,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "phone_advance": {
    "purity": "write",
@@ -994,7 +1143,9 @@
     "bootstrap": false,
     "play": false,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "phone_choose": {
    "purity": "write",
@@ -1009,7 +1160,9 @@
     "bootstrap": false,
     "play": false,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "end_call": {
    "purity": "write",
@@ -1024,7 +1177,9 @@
     "bootstrap": false,
     "play": false,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "list_labels": {
    "purity": "pure",
@@ -1037,7 +1192,9 @@
     "bootstrap": true,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "set_label": {
    "purity": "write",
@@ -1052,7 +1209,9 @@
     "bootstrap": false,
     "play": false,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "list_analyzers": {
    "purity": "pure",
@@ -1065,7 +1224,9 @@
     "bootstrap": true,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "analyze_item": {
    "purity": "write",
@@ -1080,7 +1241,9 @@
     "bootstrap": false,
     "play": false,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "set_pen_mode": {
    "purity": "write",
@@ -1093,7 +1256,9 @@
     "bootstrap": false,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "list_marks": {
    "purity": "pure",
@@ -1106,7 +1271,9 @@
     "bootstrap": true,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "list_containers": {
    "purity": "pure",
@@ -1119,7 +1286,9 @@
     "bootstrap": true,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "list_inventory": {
    "purity": "pure",
@@ -1132,7 +1301,9 @@
     "bootstrap": true,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "move_item": {
    "purity": "write",
@@ -1147,7 +1318,9 @@
     "bootstrap": false,
     "play": false,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "get_layout": {
    "purity": "pure",
@@ -1160,7 +1333,9 @@
     "bootstrap": true,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "get_item": {
    "purity": "pure",
@@ -1173,7 +1348,9 @@
     "bootstrap": true,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "ping": {
    "purity": "pure",
@@ -1186,7 +1363,9 @@
     "bootstrap": true,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "open_shop": {
    "purity": "write",
@@ -1201,7 +1380,9 @@
     "bootstrap": false,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "call_next_customer": {
    "purity": "write",
@@ -1214,7 +1395,9 @@
     "bootstrap": false,
     "play": false,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "advance_dialogue": {
    "purity": "write",
@@ -1229,7 +1412,9 @@
     "bootstrap": false,
     "play": false,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "choose_dialogue": {
    "purity": "write",
@@ -1242,7 +1427,9 @@
     "bootstrap": false,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "end_day": {
    "purity": "write",
@@ -1257,7 +1444,9 @@
     "bootstrap": false,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "bargain_preview": {
    "purity": "mutating",
@@ -1270,7 +1459,9 @@
     "bootstrap": false,
     "play": false,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "bargain": {
    "purity": "write",
@@ -1283,7 +1474,9 @@
     "bootstrap": false,
     "play": false,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "get_new_game_options": {
    "purity": "pure",
@@ -1296,7 +1489,9 @@
     "bootstrap": true,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "open_new_game_menu": {
    "purity": "write",
@@ -1309,7 +1504,9 @@
     "bootstrap": false,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "select_new_game_option": {
    "purity": "write",
@@ -1322,7 +1519,9 @@
     "bootstrap": false,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "new_game_next_page": {
    "purity": "write",
@@ -1335,7 +1534,9 @@
     "bootstrap": false,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "focus_new_game_selected_perk": {
    "purity": "write",
@@ -1348,7 +1549,9 @@
     "bootstrap": false,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "blur_new_game_option": {
    "purity": "write",
@@ -1361,7 +1564,9 @@
     "bootstrap": false,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "new_game_continue": {
    "purity": "write",
@@ -1374,7 +1579,9 @@
     "bootstrap": false,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "get_recording_save_status": {
    "purity": "pure",
@@ -1387,7 +1594,9 @@
     "bootstrap": true,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "save_recording_game": {
    "purity": "privileged",
@@ -1400,7 +1609,9 @@
     "bootstrap": false,
     "play": false,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "load_recording_game": {
    "purity": "write",
@@ -1413,7 +1624,9 @@
     "bootstrap": false,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "confirm_new_game": {
    "purity": "write",
@@ -1426,7 +1639,9 @@
     "bootstrap": false,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "new_game": {
    "purity": "privileged",
@@ -1439,7 +1654,9 @@
     "bootstrap": false,
     "play": false,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "load_game": {
    "purity": "write",
@@ -1452,7 +1669,9 @@
     "bootstrap": false,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "sleep": {
    "purity": "write",
@@ -1467,7 +1686,9 @@
     "bootstrap": false,
     "play": false,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "save_game": {
    "purity": "privileged",
@@ -1480,7 +1701,9 @@
     "bootstrap": false,
     "play": false,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "dismiss_current_client": {
    "purity": "write",
@@ -1495,7 +1718,9 @@
     "bootstrap": false,
     "play": false,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "confirm_trade": {
    "purity": "write",
@@ -1510,33 +1735,46 @@
     "bootstrap": false,
     "play": false,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "wait_for_events": {
    "purity": "pure",
    "player_reachable": null,
-   "status": "implemented",
+   "status": "d0a_fixed",
    "decision": "allow",
    "evidence": [],
-   "reason": "read-only per recorder classification; no known side effect",
+   "reason": "snapshot path no longer reads Refresh()-backed getters (D0a); live PPT-READ evidence still missing",
    "modes": {
-    "bootstrap": true,
+    "bootstrap": false,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   },
   "wait_for_change": {
    "purity": "pure",
    "player_reachable": null,
-   "status": "implemented",
+   "status": "d0a_fixed",
    "decision": "allow",
    "evidence": [],
-   "reason": "read-only per recorder classification; no known side effect",
+   "reason": "snapshot path no longer reads Refresh()-backed getters (D0a); live PPT-READ evidence still missing",
    "modes": {
-    "bootstrap": true,
+    "bootstrap": false,
     "play": true,
     "test": true
-   }
+   },
+   "live_evidence": [],
+   "offline_tests": []
   }
- }
+ },
+ "snapshot_readers": [
+  "get_legal_actions",
+  "get_run_summary",
+  "get_state",
+  "wait_for_change",
+  "wait_for_events"
+ ]
 }
