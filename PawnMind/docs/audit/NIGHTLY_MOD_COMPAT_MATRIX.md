@@ -31,7 +31,7 @@
 | C5 | 后台线程 / `Task` / `ThreadPool` / `Timer` / `async` = **0**；网络监听仅 1 个 **loopback** `TcpListener`；P/Invoke / `DllImport` / `unsafe` = **0**；Core 无 `UnityEngine` = **0**；主线程约束静态未发现绕过（含新 `/operation` 端点） | 低 / PASS（静态） | 见 §3–§8 |
 | C6 | 打包面干净：`dist/PawnMind/` 只有 `manifest.xml` + `PawnMind.dll`，**Python/脚本/外部进程不进 dist**；但"整仓拷进 Mods"会被扫描器按 payload/unlisted-DLL 拒绝 | 低（当前） / 高（误打包） | §5 + 安装草稿 |
 | C7 | 仓库内**没有**官方 `APIChanges.md` / `ModdingGuide.md`；官方可执行 Scanner 仍不可运行（无游戏进程），但 `_decomp/` 有本机反编译规则副本（仅分析用）。扫描结果一律 `NOT_RUN` | 中（证据缺口） | §1 + §10 |
-| C8 | **编译 gate 实测 PASS**（本机 Linux，.NET 9 SDK）：C# 749/0、脚本门禁 53/0、适配器契约 503 OK、`Build succeeded 0 Warning/0 Error`、退出码 0；`PAWNMIND_BUILD_ONLY=1` 在 dist 打包前退出。**dist 打包/安装仍 `NOT_RUN`** | PASS（编译） / NOT_RUN（打包·安装） | §10.1 `NR-06` |
+| C8 | **编译 gate 实测 PASS**（本机 Linux，.NET 9 SDK）：C# 749/0（审阅修复后 750/0）、脚本门禁 53/0、适配器契约 503 OK、`Build succeeded 0 Warning/0 Error`、退出码 0；`PAWNMIND_BUILD_ONLY=1` 在 dist 打包前退出。**dist 打包/安装仍 `NOT_RUN`** | PASS（编译） / NOT_RUN（打包·安装） | §10.1 `NR-06` |
 
 ### 0.3 不可突破的边界（本矩阵遵守）
 
@@ -286,7 +286,7 @@
 | 命令（精确） | `cd /root/work/game_mods/PawnMind && set -a; . ./.env.server; set +a; PAWNMIND_BUILD_ONLY=1 ./build.sh` |
 | 环境 | `/root/.dotnet/dotnet`（.NET SDK 9.0.321）；`GAME_MANAGED=/root/work/game_managed`；`PAWNMIND_NEWTONSOFT_DLL=/root/work/game_managed/Newtonsoft.Json.dll`（来自 host-local `.env.server`，已 gitignore） |
 | 退出码 | **0**（`EXIT=0`） |
-| 测试摘要 | C# 纯逻辑 `passed=749 failed=0`；脚本门禁 `passed=53 failed=0`；适配器契约 `contract checks: 503` / `adapter contract OK`；日志内 `PASS` 行 1305、`FAIL` 0、`SKIP` 0 |
+| 测试摘要 | C# 纯逻辑 `passed=749 failed=0`（审阅修复后 750/0）；脚本门禁 `passed=53 failed=0`；适配器契约 `contract checks: 503` / `adapter contract OK`；日志内 `PASS` 行 1305、`FAIL` 0、`SKIP` 0 |
 | 编译摘要 | `Build succeeded. 0 Warning(s) 0 Error(s)`；`PawnMind -> src/bin/Release/netstandard2.1/PawnMind.dll` |
 | 产物 | `src/bin/Release/netstandard2.1/PawnMind.dll`：SHA256 `d29209a44d2ede7e2e41010ff89abfa4409493155f12d357effe70b544c87eec`，338,432 B |
 | dist / 安装 | **未改写 dist**（`PAWNMIND_BUILD_ONLY=1` 在打包前退出；dist 哈希保持不变）；未安装、未覆盖游戏目录 |
@@ -373,7 +373,7 @@
 | **主线程约束绕过** | **0（静态）** | 含新 `/operation`（MT-07）；无后台线程 |
 | dist 文件数 | 2（DLL 296,960 B + manifest 1,138 B） | `ad335987…` / `fc14f3b7…`；本任务未改写 |
 | 比 dist 新的源码文件 | **26**（快照时，排除 `obj/bin`） | dist STALE |
-| 编译 gate 结果 | **PASS**：C# 749/0、门禁 53/0、契约 503 OK、0 warn/0 err、EXIT=0 | `PAWNMIND_BUILD_ONLY=1 ./build.sh` @ 20:41Z |
+| 编译 gate 结果 | **PASS**：C# 749/0（审阅修复后 750/0）、门禁 53/0、契约 503 OK、0 warn/0 err、EXIT=0 | `PAWNMIND_BUILD_ONLY=1 ./build.sh` @ 20:41Z |
 | 构建产物 vs dist | `d29209a4…`（338,432 B）≠ `ad335987…`（296,960 B） | 构建 gate 产出；dist 未更新 |
 | Manifest 版本 vs tag | `0.3.0` vs `v1.0.1` | 发布前需统一 |
 | MCP 工具数 | full **116** / recording **106** | `tools-inventory.json`、`AGENTS.md`、C/D 提交说明一致 |
@@ -458,7 +458,7 @@ git -C .. check-ignore -v PawnMind/dist/PawnMind/PawnMind.dll
 # 8) 编译 gate（本任务已实测 PASS；会先跑 test.sh，约 1–2 分钟；dist 打包前退出）
 cd /root/work/game_mods/PawnMind
 set -a; . ./.env.server; set +a
-PAWNMIND_BUILD_ONLY=1 ./build.sh        # 期望: C# 749/0, 门禁 53/0, 契约 503, Build succeeded 0/0, EXIT=0
+PAWNMIND_BUILD_ONLY=1 ./build.sh        # 期望: C# 749/0（审阅修复后 750/0）, 门禁 53/0, 契约 503, Build succeeded 0/0, EXIT=0
 # 日志示例（本机临时）: /tmp/pawnmind_build_gate_full.log
 
 # 9) 工具数 / 策略 sha

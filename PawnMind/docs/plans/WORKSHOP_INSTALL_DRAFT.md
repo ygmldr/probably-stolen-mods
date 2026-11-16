@@ -107,6 +107,11 @@ PawnMind 的交付物有**两个物理位置完全不同**的部分：
 
 ```ini
 # pawnmind bridge config v1
+
+> **版本必须成对安装（A-2 fail-closed）**：新 MCP server 要求 in-game 构建在 `/health` 报告
+> `policy_sha256`，缺失或不同都会拒绝写入（`policy_unverifiable` / `policy_mismatch`）。
+> 因此 **Python agent 与 `PawnMind.dll` 必须来自同一提交并一起升级**；只用新 MCP 配旧 DLL
+> 会表现为“所有写操作被拒”，这是有意的安全行为，不是 bug。
 port=15528
 token=<64 hex chars，自动生成，勿外泄>
 # 以下安全门字段默认留空 → 写操作全锁（fail-closed）

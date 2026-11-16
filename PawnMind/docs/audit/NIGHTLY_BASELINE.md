@@ -11,7 +11,8 @@
 | 项 | 值 |
 |---|---|
 | 起始 HEAD | `3369a31`（docs: server-side agent bootstrap and continuation guide） |
-| 本批次提交（按时间） | `4846189` chore(.env.server) → `6ab3333` B → `f09314e` D+C → `299ecd4` E → `f789a92` G → 收尾 `docs/reports|audit|plans` 提交（`git log -1`） |
+| 本批次提交（按时间） | `4846189` chore(.env.server) → `6ab3333` B → `f09314e` D+C → `299ecd4` E → `f789a92` G → `7548ddb` 审阅修复 → `f7ae62c` 报告/文档 → 审阅文档提交（`git log -1`） |
+| 最终代码/文档 HEAD | `f7ae62c`（含修复 `7548ddb`） |
 | A 模块提交 | `63ae0ef`（本批次之前已存在，本次补审阅） |
 | 分支 / 远程 | `main` / 未推送（本批次不加 remote） |
 | 收尾工作树 | 干净（审查文档提交后） |

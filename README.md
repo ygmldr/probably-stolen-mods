@@ -118,7 +118,7 @@ python -m venv .venv
 7. **陈酿 1 天品质未变**：只验证了入槽和槽内查找。
 8. **标签条件 ID 是本地化字符串**（如“纯水”），跨语言/版本脆弱。
 9. **彩票兑奖成功路径未验**：测试档未解锁/无中奖号。
-10. **版本号不一致**：`manifest.xml` 仍为 0.2.1，git tag 为 v1.0.1。
+10. **版本号不一致**：`manifest.xml` 已到 0.3.0，git tag 为 v1.0.1（发布前需统一，见 `PawnMind/docs/audit/NIGHTLY_MOD_COMPAT_MATRIX.md`）。
 11. **测试开关**：本地 `bridge.conf` 可能有 `allow_test_items=true`，发布包不要带。
 
 ## 文档

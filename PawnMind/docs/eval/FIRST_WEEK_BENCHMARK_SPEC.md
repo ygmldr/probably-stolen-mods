@@ -47,7 +47,7 @@
 
 | 字段 | 采集方式 | 本规范起草时（2026-11-17） |
 |---|---|---|
-| workspace HEAD | `git rev-parse HEAD`（在 `/root/work/game_mods` 跑） | `f09314e`（D+C）后的 `299ecd4`（E）/ `f789a92`（G）；评测时必须记录当时 HEAD 与工作树 |
+| workspace HEAD | `git rev-parse HEAD`（在 `/root/work/game_mods` 跑） | 本批次最终代码/文档 HEAD：`f7ae62c`（含修复 `7548ddb`；审阅提交见 `git log -1`）；评测时必须记录当时 HEAD 与工作树 |
 | PawnMind 工作树状态 | `git status --porcelain` | 原样记录（评测时不得有未声明改动）；评测必须使用**干净构建**并记录 diff 清单 |
 | 游戏版本 | 游戏 UI / `health.game_version` | *Probably Stolen* **0.46D**，`VERSION 100-Rev13`（`docs/plans/NEXT_LIVE_SESSION.md`） |
 | 游戏 MVID | `bridge.conf.expected_assembly_mvid` + `health.game_assembly_mvid` | 两者必须一致；未配置时记录实际值 |
@@ -381,7 +381,7 @@ sha256sum skills/pawnmind-first-week/SKILL.md
 ## 11. schema 已核对（最终，2026-11-17 D+C 合入后）
 
 以下字段已与 `mcp_server.py` / `src/Bridge/` / `src/Core/` 实际实现核对
-（HEAD `f09314e` 的 D+C，policy sha `e0da5a24…`，工具 full=116 / recording=106）：
+（最终 HEAD `f7ae62c`，policy sha `e0da5a24…`，工具 full=116 / recording=106）：
 
 | 主题 | 已核对 schema |
 |---|---|

@@ -13,7 +13,8 @@
 | 项 | 值 |
 |---|---|
 | 起始 HEAD | `3369a31` |
-| 本批次提交 | `4846189` chore → `6ab3333` B → `f09314e` D+C → `299ecd4` E → `f789a92` G → 收尾 docs 提交 |
+| 本批次提交 | `4846189` chore → `6ab3333` B → `f09314e` D+C → `299ecd4` E → `f789a92` G → `7548ddb` 审阅修复 → `f7ae62c` 报告/文档 → 审阅文档提交（`git log -1`） |
+| 最终代码/文档 HEAD | `f7ae62c`（含修复 `7548ddb`；审阅文档为最后一个提交） |
 | A 模块（批次前） | `63ae0ef`（本次补做独立审阅） |
 | 基线/矩阵 | `docs/audit/NIGHTLY_BASELINE.md`、`docs/audit/NIGHTLY_TEST_MATRIX.md` |
 | 调用链审计 | `docs/audit/NIGHTLY_SNAPSHOT_CALLGRAPH.md` |
@@ -114,11 +115,31 @@ Unity 目标 Mod 可在 Linux 上直接编译（`dotnet build src/PawnMind.cspro
 
 ## F — 独立审阅与集成
 
-- 每模块一份固定结构审阅 + 一份集成审阅，由独立 reviewer（fresh session、未参与实现）完成：
-  `docs/reviews/NIGHTLY_A_MODE_POLICY_REVIEW.md`、`_B_SNAPSHOT_REVIEW.md`、`_C_TRADE_REVIEW.md`、
-  `_D_OPERATION_REVIEW.md`、`_E_SKILL_EVAL_REVIEW.md`、`_G_MOD_COMPAT_REVIEW.md`、
-  `NIGHTLY_F_INTEGRATION_REVIEW.md`。
-- A 的旧 `NOT_REVIEWED` 已补做。
+独立 reviewer（fresh session、未参与实现；不同 agent）逐提交读 diff 并自己重跑测试后给出：
+
+| 文档 | Status |
+|---|---|
+| `docs/reviews/NIGHTLY_A_MODE_POLICY_REVIEW.md` | **APPROVE**（首轮发现 A-1/A-2，修复后复审通过） |
+| `docs/reviews/NIGHTLY_B_SNAPSHOT_REVIEW.md` | **APPROVE** |
+| `docs/reviews/NIGHTLY_C_TRADE_REVIEW.md` | **APPROVE** |
+| `docs/reviews/NIGHTLY_D_OPERATION_REVIEW.md` | **APPROVE** |
+| `docs/reviews/NIGHTLY_E_SKILL_EVAL_REVIEW.md` | **APPROVE** |
+| `docs/reviews/NIGHTLY_G_MOD_COMPAT_REVIEW.md` | **APPROVE** |
+| `docs/reviews/NIGHTLY_F_INTEGRATION_REVIEW.md` | **APPROVE_WITH_BLOCKERS**（blockers 均为 L3 真机 / strict play / 发布门槛，非代码缺陷） |
+
+A 的旧 `NOT_REVIEWED` 已补做。审阅发现的问题与处置：
+
+| # | 严重度 | 状态 | 说明 |
+|---|---|---|---|
+| A-1 | High | **已修复（`7548ddb`）** | Python 策略指纹 30s 缓存只存时间不存结论 → 窗口内第二次写被放行。改为缓存结论；新增连续 3 次拒绝回归测试（reviewer 独立复现 + 复测 3/3 拒绝、0 POST） |
+| A-2 | Medium | **已修复（有意的行为变更）** | 桥不报 `policy_sha256` 原被当兼容放行 → 现 fail-closed `policy_unverifiable`；旧 DLL 不能经新 MCP 写。测试夹具/fake_game 统一补报 canonical 指纹；安装草稿已注明“DLL 与 MCP 必须成对安装” |
+| D-1/C-1 | Medium | **已修复** | guard 拒绝的 operation 记录曾报 `dispatched=true`；改为按 execution 判定 + 回归测试 |
+| E Low | Low | **已修复** | legal_actions 行现在也输出 `availability=available`；fake_game 与 Python 测试钉死 schema |
+| C-2 | Medium | **OPEN / L3 NOT_RUN** | B12 方向依赖 `IsNegociatingItemOwned()` 原生语义，需真机确认；方向反了是安全侧拒绝，不会假成交 |
+| C-3 | Low | **OPEN / L3 NOT_RUN** | 原生 accept 后立即换/移除顾客实例会被判 `client_changed`（安全但可能漏报成功） |
+| B-2 | Low | 记录 | 快照纯度测试是源码正则，跨行/间接调用有盲区；callgraph 已把未知项标 UNKNOWN |
+| D-2 | Low | 记录 | `process_restarted` 只表示进程内缓存被清空/run 变化；真重启只能 unknown_operation（无需改代码） |
+| E-2 | Low | 记录 | trace validator 在 pending 期禁止任何其他写，比桥更严格（有意保守，建议文档注明） |
 
 ## 总测试摘要（CT101 实测，2026-11-17 05:0x）
 
@@ -148,7 +169,8 @@ Unity 目标 Mod 可在 Linux 上直接编译（`dotnet build src/PawnMind.cspro
 
 ## 能否进入下一阶段
 
-- **可以**进入实机验收（`docs/plans/NEXT_LIVE_SESSION.md`）与独立复核；离线部分已按停止规则收口。
+- **可以**进入实机验收（`docs/plans/NEXT_LIVE_SESSION.md`）；离线部分已按停止规则收口，
+  独立审阅结论为 A/B/C/D/E/G **APPROVE**、F 集成 **APPROVE_WITH_BLOCKERS**（blockers = L3/发布门槛）。
 - **不可以**进入 strict play / 录制 / 发布：
   `play_allowlist=0`、`dist` 未重建且与已安装 DLL 不一致、`PP-READ-01-real` 未插桩、
   官方 ModScanner 未跑、manifest capability 与 reflection-external 到期风险未解决。

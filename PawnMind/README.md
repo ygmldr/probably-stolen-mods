@@ -114,7 +114,7 @@ python -m venv .venv
 7. **陈酿 1 天品质未变**：只验入槽/槽内查找。
 8. **标签条件 ID 是本地化串**（如“纯水”）。
 9. **彩票兑奖成功路径未验**。
-10. **manifest 0.2.1 vs tag v1.0.1**。
+10. **manifest 0.3.0 vs tag v1.0.1**（发布前需统一；见 `docs/audit/NIGHTLY_MOD_COMPAT_MATRIX.md`）。
 11. **测试开关**：`allow_test_items=true` 只应存在于本地测试档。
 
 ---
