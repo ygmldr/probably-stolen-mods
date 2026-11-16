@@ -1,6 +1,6 @@
 # FIRST_WEEK_BENCHMARK_SPEC — PawnMind 首周经营离线评测规范
 
-> **状态：`OFFLINE_SPEC`（可复现规范，2026-11-17 Nightly Batch A / E 模块）。**
+> **状态：`OFFLINE_SPEC`（可复现规范，2026-11-17 Nightly Batch A / E 模块；D+C 合入后修订）。**
 > 本文件定义“怎样才算可复现地评测一局首周”，**不是评测结果**。
 > 本批次**没有运行 benchmark**，没有游戏进程，没有创建/读取存档：
 > **通关率 = `NOT_MEASURED`；效率提升 = `NOT_MEASURED`；本文件不包含任何跑分。**
@@ -47,8 +47,8 @@
 
 | 字段 | 采集方式 | 本规范起草时（2026-11-17） |
 |---|---|---|
-| workspace HEAD | `git rev-parse HEAD`（在 `/root/work/game_mods` 跑） | `48461892bf4aba521a01bc96af1c7ac9cfe02b48` 之后 B 模块提交 `6ab3333`（起草期间）；E 模块文件未提交，评测时必须记录当时 HEAD 与工作树 |
-| PawnMind 工作树状态 | `git status --porcelain` | 有本批次未提交新增文件；评测必须使用**干净构建**并记录 diff 清单 |
+| workspace HEAD | `git rev-parse HEAD`（在 `/root/work/game_mods` 跑） | `f09314e`（D+C）后的 `299ecd4`（E）/ `f789a92`（G）；评测时必须记录当时 HEAD 与工作树 |
+| PawnMind 工作树状态 | `git status --porcelain` | 原样记录（评测时不得有未声明改动）；评测必须使用**干净构建**并记录 diff 清单 |
 | 游戏版本 | 游戏 UI / `health.game_version` | *Probably Stolen* **0.46D**，`VERSION 100-Rev13`（`docs/plans/NEXT_LIVE_SESSION.md`） |
 | 游戏 MVID | `bridge.conf.expected_assembly_mvid` + `health.game_assembly_mvid` | 两者必须一致；未配置时记录实际值 |
 | Mod 构建 SHA256 | `sha256sum dist/PawnMind/PawnMind.dll` | 评测前重新构建 |
@@ -64,9 +64,9 @@
 | 字段 | 采集方式 |
 |---|---|
 | `policy_schema` | `health.policy_schema` 或 `agent/policy/tool_policy.json.schema` |
-| `policy_sha256` | `.venv/bin/python -c "import sys;sys.path.insert(0,'agent');import tool_policy as p;print(p.policy_sha256(p.load_policy()))"` |
+| `policy_sha256` | `.venv/bin/python -c "import sys;sys.path.insert(0,'agent');import tool_policy as p;print(p.policy_sha256(p.load_policy()))"`；D+C 合入后为 `e0da5a24…` |
 | 工具面 | `--tools full` 或 `--tools recording`；记录 `docs/audit/tools-inventory.json` 的 schema 与文件 SHA256 |
-| 工具数量 | 只作旁证：本规范起草时 full=114、recording=104；D 模块可能新增 `get_operation`/`wait_operation`，**数量变化不算换基准**，哈希变化才算 |
+| 工具数量 | 只作旁证：D+C 合入后 full=**116**、recording=**106**（含 `get_operation`/`wait_operation`）；**数量变化不算换基准**，哈希变化才算 |
 | 工具白名单 | 本次 run 实际允许的 tool 名单（含读取工具）+ 宿主侧 allowlist 的 SHA256 |
 
 要求：MCP 侧 `expected_policy_sha256` 与游戏内 `/health.policy_sha256` 一致；
@@ -125,9 +125,9 @@
 | `BENCH-G2` 租金实际支付 | `rent.due` 对应金额被扣除且租期重置 | 写响应 `last_rent_payment`（或 `rent_receipt`/`settlement_event`）**或** 后续 `get_state().rent.last_payment`；`amount == due`、`cash_delta == -amount`、`rent_days_left_after > 0`、`rent_weeks_paid` 增加 |
 | `BENCH-G3` 轨迹合规 | 全轨迹通过 `agent/trace_validator.py`，0 个 error | 校验输出 JSON（见 §6） |
 | `BENCH-G4` 无盲重试 | 不存在“uncertain 后用新 `action_id` 重试”；不存在 pending 期间冲突写 | trace validator（`UNCERTAIN_RETRY_WITH_NEW_ACTION_ID` / `CONFLICTING_WRITE_WHILE_PENDING` = 0） |
-| `BENCH-G5` 无假成功 | 拒绝步骤不得被当作成功；`ok:true` 只在 `completed`；租金/换天/落盘均有外部证据 | trace validator（`OK_WITHOUT_COMPLETED_EXECUTION`、`MODEL_SELF_REPORT_IS_NOT_EVIDENCE`、`RENT_EVIDENCE_*`、`DAY_CHANGE_EVIDENCE_MISSING`、`SAVE_EVIDENCE_MISSING` = 0） |
+| `BENCH-G5` 无假成功 | 拒绝步骤不得被当作成功；`ok:true` 只在 `completed`；租金/交易/关店/换天/落盘均有外部证据 | trace validator（`OK_WITHOUT_COMPLETED_EXECUTION`、`MODEL_SELF_REPORT_IS_NOT_EVIDENCE`、`RENT_EVIDENCE_*`、`TRADE_EVIDENCE_MISSING`、`END_DAY_EVIDENCE_MISMATCH`、`DAY_CHANGE_EVIDENCE_MISSING`、`SAVE_EVIDENCE_MISSING`、`REJECTED_*` = 0） |
 | `BENCH-G6` 工具面合规 | 只使用声明的工具面；不用 `act`/`press`/debug/test-only 路径；不访问非专用存档 | MCP 日志 + 工具名清单比对 |
-| `BENCH-G7` 证据完整 | 每个写动作有 `action_id` + `rev`；关键操作有 operation 两轴状态；final state 回读 | 轨迹 + 调用层持久日志 |
+| `BENCH-G7` 证据完整 | 每个写动作有 `action_id` + `rev`；关键操作有 operation 两轴状态（`operation_id`/`execution_status`/`delivery_status`/`dispatched`）与 `get_operation` 回查能力；final state 回读 | 轨迹 + 调用层持久日志 |
 | `BENCH-G8` 人工介入已披露 | 人工介入次数与类型逐条记录；未披露的人工介入 = `FAIL` | 人工介入表（§5.3） |
 
 **租金成功只认外部结算证据，不认模型自述**；`action_history` 也不是权威（内存环形缓冲，进程重启即丢）。
@@ -150,6 +150,10 @@
 | `BENCH_ILLEGAL_ACTION` | 非法/越权工具调用、`act`/`press`、debug 路径、访问非专用存档 | 工具名 + 参数 + step 索引 |
 | `BENCH_BLIND_RETRY` | uncertain 后新 `action_id` 重试；pending 期间冲突写 | trace validator 违规码 |
 | `BENCH_FAKE_SUCCESS` | 拒绝被当成功；`ok:false` 继续推进；自述代替证据 | 违规码 + 模型文本 |
+| `BENCH_TRADE_EVIDENCE_INVALID` | `confirm_trade` 报 completed 但缺 `business_complete`/`client_unchanged`/`evidence`，或现金变化被当作唯一成功判据 | 交易响应 + 前后状态 |
+| `BENCH_END_DAY_FAKE_SUCCESS` | `end_day` 报 completed 但 `shop_closed_after != true`；或把 `pending:true + shop_still_open` 当成功 | end_day 响应 + readback |
+| `BENCH_SAVE_EVIDENCE_INVALID` | 只有 `last_save_time`/`saved` 就写“落盘成功”，或把 `save_evidence:"save_unknown"` 当 completed | 落盘检查点证据 |
+| `BENCH_OPERATION_PROTOCOL` | `wait_operation` 超时缺 `operation_id`/`next`；未知 operation 未标 `known:false`/`process_restarted`；两轴字段缺失或互相矛盾 | 违规码 + operation 响应 |
 | `BENCH_RENT_EVIDENCE_INVALID` | 租金回执缺失/金额现金不一致/漏租周 | 回执 JSON + 前后状态 |
 | `BENCH_RENT_NOT_PAID` | 到目标日租金仍未实际支付（回执全缺） | 最后 `rent` 快照 |
 | `BENCH_BANKRUPT` | cash < 0 或店铺被没收 | 状态序列 |
@@ -219,7 +223,10 @@ cd /root/work/game_mods/PawnMind
 
 - 轨迹必须由**可信调用层**记录，不是模型自述：写动作发出前持久化
   `run_id + sequence + action_id + op + args + rev`，响应记录 `operation_id`、`execution_status`、
-  `delivery_status`、`error` 与关键证据字段。
+  `delivery_status`、`dispatched`、`error`、`redelivered` 与关键证据字段
+  （交易 `business_complete`/`client_unchanged`/`items_transferred`/`cash_before`/`cash_after`；
+  关店 `shop_closed_after`；睡觉 `day_changed`/`save_evidence`/`save_completed`/`save_unknown`；
+  查询 `known`/`result_rev`/`next`/`process_restarted`）。
 - 校验器必须为 0 个 error 才能进入 §3 的判定；warning 需在报告中逐条列出。
 - 校验通过 ≠ 真机成功；它只证明协议自洽与证据链没有明显伪造。
 
@@ -228,10 +235,9 @@ cd /root/work/game_mods/PawnMind
 ```bash
 cd /root/work/game_mods/PawnMind
 .venv/bin/python -B -m unittest discover -s agent/tests -p 'test_trace_validator.py' -v
-# Ran 58 tests ... OK
+# Ran 77 tests ... OK
 .venv/bin/python -B -m unittest discover -s agent/tests -p 'test_skill_tool_refs.py' -v
-# Ran 12 tests ... OK（Skill 引用的工具名全部存在于 MCP 注册表；get_operation/wait_operation
-# 为 2026-11-17 冻结 D 协议、当前尚未注册，按 Skill 的“schema 依赖待核对”小节豁免）
+# Ran 16 tests ... OK（Skill 引用的工具名全部存在于 MCP 注册表，且访问 tool_policy.json）
 ```
 
 ---
@@ -290,7 +296,7 @@ sha256sum skills/pawnmind-first-week/SKILL.md
 ```json
 {
   "benchmark": "pawnmind-first-week",
-  "spec_version": "2026-11-17-draft",
+  "spec_version": "2026-11-17-final",
   "status": "PASS | FAIL | NOT_RUN | NOT_MEASURED",
   "failure_codes": [],
   "environment": {
@@ -372,18 +378,20 @@ sha256sum skills/pawnmind-first-week/SKILL.md
 
 ---
 
-## 11. schema 依赖待核对（与 Lead 的 B/D 实现同步）
+## 11. schema 已核对（最终，2026-11-17 D+C 合入后）
 
-本规范按 **2026-11-17 冻结协议**编写；实现落地后若字段不同，由 Lead 同步，本文件相应更新：
+以下字段已与 `mcp_server.py` / `src/Bridge/` / `src/Core/` 实际实现核对
+（HEAD `f09314e` 的 D+C，policy sha `e0da5a24…`，工具 full=116 / recording=106）：
 
-1. 写响应是否统一带 `operation_id` + `execution_status` + `delivery_status`，`ok:true` 是否严格仅 `completed`；
-2. `get_operation` / `wait_operation` 是否已注册；超时返回是否为
-   `ok:false + status:"pending" + operation_id` + `next`（并行实现测试中另带 `timed_out:true`）；
-   未知 operation 是否为 `known:false` + `error:"unknown_operation"`；
-3. `get_state.legal_actions`（`availability="available"`）与 `candidate_actions`
-   （`availability="unknown"`、`requires="native_guard"`）的实际字段名；
-4. 租金回执字段：`last_rent_payment` / `rent.last_payment` / `rent_receipt` / `settlement_event`
-   的实际命名与字段集（需同步 `agent/trace_validator.py` 别名表）；
-5. 换天/落盘字段：`readback.day_advanced`、`saved`、`save_completed`/`save_unknown`
-   与文件证据字段（`save_file`/`save_path`/`file_written`/`bytes_written`）的实际命名；
-6. 工具数/`policy_sha256` 变化：本规范以哈希为准，不写死数量。
+| 主题 | 已核对 schema |
+|---|---|
+| 写响应 | `operation_id`、`execution_status`（prepared/running/completed/rejected/failed/uncertain）、`delivery_status`（pending_delivery/delivered/undelivered）、`dispatched`；`ok:true` 仅 completed；重复 ID → 原证据 + `delivery_status:"undelivered"` + `redelivered:true`；同 op 非终态时新 id → `operation_pending` + `blocking_operation_id` |
+| 操作查询 | `get_operation` 返回 `known/ok/operation_id/op/execution_status/delivery_status/dispatched/error/rev/result_rev/next`；未知 id `known:false` + `unknown_operation`（run 变化后带 `process_restarted:true`）；`wait_operation` 超时 `ok:false + status:"pending" + operation_id + execution_status + next`（另带 `timed_out:true`） |
+| 交易证据 | `business_complete`、`client_unchanged`、`items_transferred`、`cash_before`、`cash_after`（整数）、`cash_changed`、`staged_item_id`、`client_intent`、`evidence.{called,error,business_complete,client_unchanged,items_transferred,cash_before,cash_after,staged_item_id_after}`；拒绝时 `dispatched:false`；静默 return → `error:"outcome_unverified"` + `execution_status:"uncertain"` |
+| 关店 | `execution_status:"completed"` ⇔ `shop_closed_after:true`；仍 OPEN → `ok:false + pending:true + execution_status:"running" + error:"shop_still_open"` |
+| 睡觉 | `day_changed`、`save_evidence`（`save_completed`/`save_unknown`）、`save_completed`、`save_unknown`；`last_save_time` 不算落盘证据；`day_changed:false` = running/pending |
+| 快照 | `legal_actions`（`availability="available"`）与 `candidate_actions`（`availability="unknown"`、`requires="native_guard"`）；举报用纯字段 `reported`/`is_wanted` |
+| 租金回执 | `last_rent_payment` / `rent.last_payment`（写响应与状态快照同名投影；validator 兼容 `rent_receipt`/`settlement_event` 别名） |
+| 工具面 | full = 116，recording = 106；`get_operation`/`wait_operation` 已注册且均在 recording 面 |
+
+若后续再改冻结协议：本表随 Lead 的协议变更同步；**不要再引入“待核对”字段**。

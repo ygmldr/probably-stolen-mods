@@ -12,9 +12,10 @@ operation with a new action_id", and externally verifiable rent evidence.
 Registry source: ``agent/mcp_server.py`` parsed with :mod:`ast`; only
 ``@tool()``-decorated top-level/nested functions count.
 
-Two D-contract tools (``get_operation`` / ``wait_operation``) are allowed to be
-referenced while the Lead is still landing them; once they are registered the
-exception set is simply unused. See the Skill's "schema 依赖待核对" section.
+D+C landed (116 tools / 106 recording): ``get_operation`` / ``wait_operation``
+are registered and covered by ``tool_policy.json``, so there is no pending
+exception set anymore. The final frozen response fields are documented in the
+Skill's "schema 已核对" section and pinned by the assertions below.
 """
 
 import ast
@@ -32,12 +33,9 @@ MCP_SERVER = os.path.join(AGENT_DIR, "mcp_server.py")
 POLICY_PATH = os.path.join(AGENT_DIR, "policy", "tool_policy.json")
 SKILL_PATH = os.path.join(MOD_DIR, "skills", "pawnmind-first-week", "SKILL.md")
 
-#: Frozen 2026-11-17 D contract tools that may be referenced before the Lead's
-#: parallel change registers them. Keep this set tiny and delete the entries
-#: once the tools exist in ``mcp_server.py``.
-PENDING_CONTRACT_TOOLS = frozenset({"get_operation", "wait_operation"})
-
 #: Tool calls the Skill must teach for the first-week loop.
+#: (D landed: get_operation/wait_operation are registered, 116 tools / 106
+#: recording, so there is no pending exception set anymore.)
 REQUIRED_SKILL_TOOLS = frozenset({
     "ping",
     "get_state",
@@ -64,6 +62,8 @@ REQUIRED_SKILL_TOOLS = frozenset({
     "new_game_continue",
     "confirm_new_game",
     "get_recording_save_status",
+    "get_operation",
+    "wait_operation",
 })
 
 #: Markdown section titles the handoff requires in the Skill.
@@ -119,7 +119,7 @@ class SkillToolReferenceTests(unittest.TestCase):
         cls.policy = policy_tools()
         cls.text = read_skill()
         cls.references = skill_tool_references(cls.text)
-        cls.known = cls.registered | PENDING_CONTRACT_TOOLS
+        cls.known = cls.registered
 
     def test_server_registry_is_not_empty(self):
         self.assertIn("get_state", self.registered)
@@ -136,22 +136,49 @@ class SkillToolReferenceTests(unittest.TestCase):
                          " MCP registry: %r" % (missing,))
 
     def test_every_referenced_tool_is_covered_by_the_policy(self):
-        # The pending D tools are exempt until the Lead lands them.
-        missing = sorted(self.references - self.policy - PENDING_CONTRACT_TOOLS)
+        missing = sorted(self.references - self.policy)
         self.assertEqual([], missing,
                          "SKILL.md references tools absent from"
                          " tool_policy.json: %r" % (missing,))
 
-    def test_pending_contract_tools_are_documented(self):
-        # This must hold both before and after the Lead registers the D tools:
-        # the Skill keeps referencing them, and the schema-dependency section
-        # stays the place that records their registration state.
-        referenced_pending = self.references & PENDING_CONTRACT_TOOLS
-        if not referenced_pending:
-            return
-        self.assertIn("schema 依赖待核对", self.text,
-                      "the D-contract tools must be listed in the"
-                      " 'schema 依赖待核对' section")
+    def test_operation_tools_are_registered(self):
+        for name in ("get_operation", "wait_operation"):
+            self.assertIn(name, self.registered,
+                          "%s must be registered (D landed)" % name)
+            self.assertIn(name, self.policy,
+                          "%s must have a tool_policy entry" % name)
+
+    def test_write_response_fields_are_documented(self):
+        for token in ("operation_id", "execution_status", "delivery_status",
+                      "dispatched", "redelivered", "undelivered",
+                      "process_restarted"):
+            self.assertIn(token, self.text,
+                          "SKILL.md must document the final write/operation"
+                          " response field %r" % token)
+
+    def test_trade_evidence_fields_are_documented(self):
+        for token in ("business_complete", "client_unchanged",
+                      "items_transferred", "cash_before", "cash_after",
+                      "cash_changed", "staged_item_id", "client_intent",
+                      "outcome_unverified"):
+            self.assertIn(token, self.text,
+                          "SKILL.md must document the frozen confirm_trade"
+                          " evidence field %r" % token)
+
+    def test_end_day_and_sleep_semantics_are_documented(self):
+        for token in ("shop_closed_after", "shop_still_open", "day_changed",
+                      "save_evidence", "save_completed", "save_unknown",
+                      "last_save_time"):
+            self.assertIn(token, self.text,
+                          "SKILL.md must document the frozen end_day/sleep"
+                          " field %r" % token)
+
+    def test_schema_is_marked_as_verified_not_pending(self):
+        self.assertIn("schema 已核对", self.text,
+                      "the D/C schema is frozen; the old '待核对' section must"
+                      " become a verified summary")
+        self.assertNotIn("schema 依赖待核对", self.text,
+                         "stale schema-dependency section must be removed")
 
     def test_required_first_week_tools_are_taught(self):
         missing = sorted(REQUIRED_SKILL_TOOLS - self.references)

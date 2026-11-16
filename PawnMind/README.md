@@ -3,16 +3,17 @@
 给《深空当铺：可能是偷的》(Probably Stolen 0.46D) 做的本地桥：
 游戏内 Mod 暴露 HTTP，Python 再包一层 stdio MCP，供 DSH/脚本/AI 调用。
 
-> **当前状态：v1.0.1（2026-11-11）**
-> MCP 工具 89 个；C# 144 项 + 适配器契约 + Python 8 项全绿。
+> **当前状态：v1.0.1 / manifest 0.3.0（2026-11-17，Nightly Batch A 之后）**
+> MCP 工具 **116** 个（recording **106**）；C# **750** + 门禁 **53** + 适配器契约 **503** + Python **365** 全绿。
+> HTTP 端点：`/health`、`/state`、`/action`、`/events`、`/operation`；`play_allowlist` 仍为 0。
 > 还没有视觉鉴定，也没有 LLM agent loop；`agent/orchestrator.py` 只有规则基线。
 > 下方保留的是按时间追加的历史验证记录；**最新能力/限制以本段、根 README 和 docs 为准。**
 
 ## 这是什么
 
 - **Mod 侧**：`PawnMind.dll` 在 Unity 主线程上读写游戏状态，监听 `127.0.0.1:15528`
-- **HTTP 侧**：`/health`、`/state`、`/action`、`/events`；Bearer token + `rev` + `action_id`
-- **MCP 侧**：`agent/mcp_server.py` 把动作包成 89 个 MCP 工具
+- **HTTP 侧**：`/health`、`/state`、`/action`、`/events`、`/operation`；Bearer token + `rev` + `action_id`
+- **MCP 侧**：`agent/mcp_server.py` 把动作包成 116 个 MCP 工具
 - **Agent 侧**：`agent/orchestrator.py` 提供 observe→decide→act 骨架；`RulePolicy` 只用于验证管线
 
 ## 架构

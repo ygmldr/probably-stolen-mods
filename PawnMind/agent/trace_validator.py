@@ -68,9 +68,11 @@ Rules enforced (error unless stated otherwise)
 10. ``DAY_CHANGE_EVIDENCE_MISSING`` -- a day-change claim needs a readable
     ``readback.day_advanced`` (or an equivalent later state read showing a
     higher ``day``). A day that did not move is not a successful transition.
-11. ``SAVE_EVIDENCE_MISSING`` -- ``saved``/``save_completed`` claims need file
-    evidence (``save_file`` / ``save_path`` / ``file_written`` etc.). A new
-    ``last_save_time`` alone is not proof; no evidence means ``save_unknown``.
+11. ``SAVE_EVIDENCE_MISSING`` -- ``saved``/``save_completed`` claims need the
+    sleep save axis (``save_evidence: "save_completed"`` / ``save_completed:
+    true``) or file evidence (``save_file`` / ``save_path`` / ``file_written``
+    etc.). ``save_evidence: "save_unknown"`` can never be claimed as saved, and
+    a new ``last_save_time`` alone is not proof.
 12. ``REJECTED_WITH_SUCCESS_FIELDS`` / ``REJECTED_CLAIMED_AS_SUCCESS`` -- a
     rejected/failed step may not carry success fields or be presented as a
     success.
@@ -82,6 +84,22 @@ Rules enforced (error unless stated otherwise)
     (warnings) -- the trace ends while an operation is still unresolved.
 16. ``INVALID_TRACE_STEP`` -- malformed step (not a dict, missing tool, wrong
     args/result type).
+17. ``TRADE_EVIDENCE_MISSING`` -- a completed ``confirm_trade`` needs
+    ``business_complete:true`` + ``client_unchanged:true`` plus the ``evidence``
+    object; a cash delta is supporting evidence only (barter can be zero-cash).
+18. ``END_DAY_EVIDENCE_MISMATCH`` -- ``end_day`` may report ``completed`` only
+    when ``shop_closed_after:true``; still-OPEN is ``running``/``pending``.
+19. ``REJECTED_WITH_DISPATCHED_TRUE`` / ``COMPLETED_WITHOUT_DISPATCH`` /
+    ``REDELIVERED_WITHOUT_UNDELIVERED`` (warning) / ``INVALID_DISPATCHED``
+    (warning) -- the ``dispatched`` and ``delivery_status`` fields must agree
+    with the execution axis; a re-delivery keeps ``delivery_status:
+    "undelivered"``.
+20. ``WAIT_OPERATION_TIMEOUT_MISSING_NEXT`` -- a ``wait_operation`` timeout must
+    carry ``operation_id`` and ``next`` instead of looking like a dead end or a
+    fake success.
+
+Frozen D/C schema (HEAD ``f09314e``, policy sha ``e0da5a24``) is described in
+``skills/pawnmind-first-week/SKILL.md`` §13 and the benchmark spec.
 
 CLI
 ---
@@ -96,7 +114,7 @@ import json
 import re
 from dataclasses import dataclass, field
 
-VALIDATOR_VERSION = "1.0.0"
+VALIDATOR_VERSION = "1.1.0"
 
 __all__ = [
     "DELIVERY_STATUSES",
@@ -146,6 +164,8 @@ UNCERTAIN_ERROR_CODES = frozenset({
     "dispatch_unknown",
     "dispatch_failed_unknown",
     "previous_response_lost",
+    "outcome_unverified",
+    "client_changed",
 })
 
 RENT_CLAIM_CODES = frozenset({"rent_paid", "paid_rent", "rent_settled"})
@@ -168,8 +188,9 @@ SAVE_FILE_EVIDENCE_FIELDS = (
     "save_path",
     "file_written",
     "bytes_written",
-    "save_evidence",
 )
+SAVE_EVIDENCE_COMPLETED = "save_completed"
+SAVE_EVIDENCE_UNKNOWN = "save_unknown"
 SUCCESS_TEXT_RE = re.compile(
     r"(?:succeed(?:ed|s)?|success(?:ful(?:ly)?)?|completed?|paid|settled|"
     r"sold|bought|done)",
@@ -422,7 +443,7 @@ class _ScanState:
             return False
         if "rev" in args or "action_id" in args:
             return True
-        if result.get("dispatched") is True:
+        if "dispatched" in result:
             return True
         if "execution_status" in result:
             return True
@@ -488,6 +509,30 @@ class _ScanState:
                      " delivery_status axis" % (tool, status),
                      index, severity="warning")
 
+        # Frozen D contract: `dispatched` must agree with the execution axis,
+        # and a re-delivered cached response keeps the undelivered axis.
+        dispatched = result.get("dispatched")
+        if dispatched is not None and not isinstance(dispatched, bool):
+            self.add("INVALID_DISPATCHED",
+                     "write %r returned non-boolean dispatched=%r"
+                     % (tool, dispatched), index, severity="warning")
+        if status == "rejected" and dispatched is True:
+            self.add("REJECTED_WITH_DISPATCHED_TRUE",
+                     "write %r is rejected but reports dispatched:true; a"
+                     " pre-dispatch refusal must not claim dispatch" % tool,
+                     index)
+        if status == "completed" and dispatched is False:
+            self.add("COMPLETED_WITHOUT_DISPATCH",
+                     "write %r is completed but reports dispatched:false"
+                     % tool, index)
+        if (result.get("redelivered") is True
+                and delivery != "undelivered"):
+            self.add("REDELIVERED_WITHOUT_UNDELIVERED",
+                     "write %r reports redelivered:true but"
+                     " delivery_status=%r; a cached re-delivery must keep the"
+                     " undelivered axis" % (tool, delivery),
+                     index, severity="warning")
+
         # Rule 3: no conflicting write while an operation is pending.
         for key, pending in list(self.pending.items()):
             same_attempt = (
@@ -543,6 +588,7 @@ class _ScanState:
             break
 
         ok = result.get("ok")
+        claims = self._claim_set(step)
         self._check_status_claims(index, step, result, status, operation_id)
         if ok is True and status is not None and status != "completed":
             self.add(
@@ -557,9 +603,62 @@ class _ScanState:
                 " execution_status; the completion claim cannot be proven"
                 % tool, index, severity="warning")
 
-        rejected = (ok is False
-                    or status in DEFINITIVE_REJECTION_STATUSES
-                    or (ok is None and result.get("error") is not None))
+        # Infer the execution axis when a response omits it (legacy shape or a
+        # generic refusal). A `pending:true` refusal is a running operation and
+        # must never be misread as a rejection.
+        execution = status
+        error = result.get("error")
+        if execution is None:
+            if result.get("pending") is True:
+                execution = "running"
+            elif ok is False:
+                if error in UNCERTAIN_ERROR_CODES:
+                    execution = "uncertain"
+                elif result.get("dispatched") is True:
+                    execution = "failed"
+                else:
+                    execution = "rejected"
+            elif error in UNCERTAIN_ERROR_CODES:
+                execution = "uncertain"
+
+        # D3: end_day is completed only when the readback shows the shop CLOSED.
+        if (tool == "end_day" and execution == "completed"
+                and result.get("shop_closed_after") is not True):
+            self.add(
+                "END_DAY_EVIDENCE_MISMATCH",
+                "end_day reports completed but shop_closed_after=%r;"
+                " completion requires the shop to be CLOSED"
+                % (result.get("shop_closed_after"),), index)
+
+        # C: a trusted trade completion needs business_complete for the same
+        # client instance; a cash delta is supporting evidence only.
+        if tool == "confirm_trade" and (
+                ok is True or execution == "completed"
+                or "trade_completed" in claims):
+            business = result.get("business_complete")
+            unchanged = result.get("client_unchanged")
+            evidence = result.get("evidence")
+            if business is not True or unchanged is not True:
+                self.add(
+                    "TRADE_EVIDENCE_MISSING",
+                    "confirm_trade is presented as completed but"
+                    " business_complete=%r / client_unchanged=%r; both are"
+                    " required for a trusted trade"
+                    % (business, unchanged),
+                    index, business_complete=business,
+                    client_unchanged=unchanged)
+            elif (not isinstance(evidence, dict)
+                  or evidence.get("business_complete") is not True):
+                self.add(
+                    "TRADE_EVIDENCE_MISSING",
+                    "confirm_trade reports business_complete but the"
+                    " 'evidence' object is missing or does not confirm it",
+                    index, reason="evidence_object_missing")
+
+        rejected = (execution in DEFINITIVE_REJECTION_STATUSES
+                    or (ok is False and execution == "completed")
+                    or (ok is False and status is None
+                        and execution == "rejected"))
         if rejected:
             success_fields = (
                 status == "completed"
@@ -571,7 +670,6 @@ class _ScanState:
                     "REJECTED_WITH_SUCCESS_FIELDS",
                     "step %r is rejected/failed but carries success fields"
                     % tool, index)
-            claims = self._claim_set(step)
             if claims & GENERIC_SUCCESS_CLAIM_CODES:
                 self.add(
                     "REJECTED_CLAIMED_AS_SUCCESS",
@@ -596,14 +694,6 @@ class _ScanState:
                     index, depends_on=dependency)
 
         # Store / update the operation record.
-        execution = status
-        if execution is None:
-            error = result.get("error")
-            if ok is False:
-                execution = ("uncertain" if error in UNCERTAIN_ERROR_CODES
-                             else "rejected")
-            elif error in UNCERTAIN_ERROR_CODES:
-                execution = "uncertain"
         key = action_id
         if key is None:
             key = "opid:%s" % operation_id
@@ -703,11 +793,27 @@ class _ScanState:
                      "%s reports status %r without delivery_status"
                      % (tool, status), index, severity="warning")
 
+        if (result.get("ok") is True and status is not None
+                and status != "completed"):
+            self.add(
+                "OK_WITHOUT_COMPLETED_EXECUTION",
+                "%s returned ok:true with execution_status=%r; ok:true only"
+                " means completed" % (tool, status), index)
+        if (tool == "wait_operation" and result.get("ok") is False
+                and result.get("status") == "pending"
+                and (operation_id is None or not result.get("next"))):
+            self.add(
+                "WAIT_OPERATION_TIMEOUT_MISSING_NEXT",
+                "wait_operation timed out without operation_id/next; a"
+                " timeout must never look like a success or a dead end",
+                index, operation_id=operation_id)
+
         keys = self._record_for(action_id, operation_id)
-        # The D2 contract may report a lost/restarted operation either with
-        # error=="unknown_operation" or with known:false (no error string).
+        # Unknown ids (lost/restarted bridge or run change) are reported via
+        # error=="unknown_operation", known:false and/or process_restarted.
         unknown_operation = (result.get("error") == "unknown_operation"
-                             or result.get("known") is False)
+                             or result.get("known") is False
+                             or result.get("process_restarted") is True)
         resolved = (unknown_operation
                     or status in TERMINAL_STATUSES)
         if unknown_operation:
@@ -900,11 +1006,16 @@ class _ScanState:
             index, reason=reason, tool=tool)
 
     def _check_save_claim(self, index, tool, result):
-        if result.get("save_unknown") is True:
+        save_evidence = result.get("save_evidence")
+        if (result.get("save_unknown") is True
+                or save_evidence == SAVE_EVIDENCE_UNKNOWN):
             self.add(
                 "SAVE_EVIDENCE_MISSING",
                 "the save result is explicitly save_unknown; it may not be"
                 " claimed as saved", index, reason="save_unknown", tool=tool)
+            return
+        if (result.get("save_completed") is True
+                or save_evidence == SAVE_EVIDENCE_COMPLETED):
             return
         for field_name in SAVE_FILE_EVIDENCE_FIELDS:
             value = result.get(field_name)

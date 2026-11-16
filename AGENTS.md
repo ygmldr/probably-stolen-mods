@@ -40,7 +40,7 @@ This workspace contains two mods for **Probably Stolen 0.46D**:
 - `PawnMind/src/Game/`：唯一允许反射/直连游戏类型的层
 - `PawnMind/test/PawnMind.Tests/`：纯逻辑测试
 - `PawnMind/test/PawnMind.AdapterTests/`：对 `Assembly-CSharp.dll` 的契约测试（DLL 缺失时 SKIP）
-- `PawnMind/agent/mcp_server.py`：stdio MCP，114 个工具（`--tools recording` 只注册录制用 104 个）
+- `PawnMind/agent/mcp_server.py`：stdio MCP，116 个工具（`--tools recording` 只注册录制用 106 个）
 - `PawnMind/agent/pawnmind_client.py`：HTTP 客户端 + 长轮询
 - `PawnMind/agent/orchestrator.py`：observe→decide→act 基线，只有 `RulePolicy`
 - 详细规则见 [`PawnMind/AGENTS.md`](PawnMind/AGENTS.md)
@@ -114,7 +114,7 @@ cd PawnMind && ./build.sh
 
 ## 7. 当前已知坑
 
-- PawnMind `manifest.xml` 是 0.2.1，git tag 是 v1.0.1。
+- PawnMind `manifest.xml` 是 0.3.0，git tag 是 v1.0.1（发布前需统一；见 `PawnMind/docs/audit/NIGHTLY_MOD_COMPAT_MATRIX.md`）。
 - 远征（Expedition）是 debug-only/未上线内容；正常 Perk 不启用。
 - 突袭（RaidScene）正常流程不可达，属于独立飞船/站点战斗脚手架。
 - 需求/通缉/Barter 只验了错误路径，成功路径缺样本。

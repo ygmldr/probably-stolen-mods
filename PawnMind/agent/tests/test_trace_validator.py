@@ -101,12 +101,41 @@ def write_result(tool, action_id=None, operation_id="op-1",
     return payload
 
 
+def _trade_success_extra(item_id=101):
+    return {
+        "dispatched": True,
+        "business_complete": True,
+        "client_unchanged": True,
+        "items_transferred": True,
+        "cash_before": 500,
+        "cash_after": 480,
+        "cash_changed": True,
+        "staged_item_id": item_id,
+        "client_intent": "BUY",
+        "evidence": {
+            "called": True,
+            "error": None,
+            "business_complete": True,
+            "client_unchanged": True,
+            "items_transferred": True,
+            "cash_before": 500,
+            "cash_after": 480,
+            "staged_item_id_after": item_id,
+        },
+    }
+
+
 def write(tool, rev=5, action_id="act-1", args=None, result=None, **extra):
     merged = dict(args or {})
     merged.setdefault("rev", rev)
     merged.setdefault("action_id", action_id)
     if result is None:
         result = write_result(tool, action_id=action_id)
+        # D/C frozen contract: a completed trade/end_day carries evidence.
+        if tool == "confirm_trade" and result.get("execution_status") == "completed":
+            result.update(_trade_success_extra(merged.get("item_id", 101)))
+        elif tool == "end_day" and result.get("execution_status") == "completed":
+            result.update({"dispatched": True, "shop_closed_after": True})
     return step(tool, args=merged, result=result, rev=rev, **extra)
 
 
@@ -213,10 +242,7 @@ class ValidTraceTests(unittest.TestCase):
         self.assertEqual([], errors(trace_validator.validate_trace(trace)))
 
     def test_delivered_axis_and_completed_status_are_required_on_success(self):
-        trace = [
-            write("confirm_trade", action_id="act-1",
-                  result=write_result("confirm_trade", action_id="act-1")),
-        ]
+        trace = [write("confirm_trade", action_id="act-1")]
         violations = trace_validator.validate_trace(trace)
         self.assertEqual([], errors(violations), codes(violations))
 
@@ -291,7 +317,8 @@ class UncertainRetryTests(unittest.TestCase):
             self._uncertain_first(),
             write("confirm_trade", action_id="act-1",
                   args={"item_id": 101, "side": "buy"},
-                  result=write_result("confirm_trade", action_id="act-1")),
+                  result=dict(write_result("confirm_trade", action_id="act-1"),
+                              **_trade_success_extra(101))),
         ]
         violations = trace_validator.validate_trace(trace)
         self.assertEqual([], errors(violations), codes(violations))
@@ -713,6 +740,228 @@ class RejectedPathTests(unittest.TestCase):
         ]
         violations = trace_validator.validate_trace(trace)
         self.assertEqual([], errors(violations), codes(violations))
+
+
+# ---------------------------------------------------------------------------
+# frozen D/C protocol fields (trade / end_day / sleep / get_operation)
+# ---------------------------------------------------------------------------
+
+class FrozenProtocolTests(unittest.TestCase):
+    def test_trade_completion_requires_business_evidence(self):
+        trace = [
+            write("confirm_trade", action_id="act-1",
+                  result={"ok": True, "op": "confirm_trade",
+                          "operation_id": "op-1",
+                          "execution_status": "completed",
+                          "delivery_status": "delivered",
+                          "dispatched": True}),
+        ]
+        self.assertIn("TRADE_EVIDENCE_MISSING",
+                      codes(trace_validator.validate_trace(trace)))
+
+    def test_trade_completion_with_frozen_evidence_is_clean(self):
+        result = dict(write_result("confirm_trade", action_id="act-1"),
+                      **_trade_success_extra())
+        trace = [
+            write("confirm_trade", action_id="act-1",
+                  args={"item_id": 101, "side": "buy"},
+                  result=result, claims=["trade_completed"]),
+        ]
+        self.assertEqual([], errors(trace_validator.validate_trace(trace)))
+
+    def test_silent_trade_return_is_inferred_uncertain(self):
+        first = write(
+            "confirm_trade", action_id="act-1",
+            args={"item_id": 101, "side": "buy"},
+            result={"ok": False, "op": "confirm_trade",
+                    "error": "outcome_unverified", "dispatched": True})
+        retry = write("confirm_trade", action_id="act-2",
+                      args={"item_id": 101, "side": "buy"})
+        violations = trace_validator.validate_trace([first, retry])
+        self.assertIn("UNCERTAIN_RETRY_WITH_NEW_ACTION_ID",
+                      codes(violations))
+
+    def test_trade_rejection_with_dispatched_false_is_clean(self):
+        trace = [
+            write("confirm_trade", action_id="act-1",
+                  args={"item_id": 101, "side": "buy"},
+                  result={"ok": False, "op": "confirm_trade",
+                          "error": "trade_locked", "dispatched": False,
+                          "execution_status": "rejected",
+                          "delivery_status": "delivered"}),
+        ]
+        self.assertEqual([], errors(trace_validator.validate_trace(trace)))
+
+    def test_end_day_completion_requires_shop_closed_after(self):
+        trace = [
+            write("end_day", action_id="act-1",
+                  result=write_result("end_day", action_id="act-1",
+                                      shop_closed_after=False)),
+        ]
+        self.assertIn("END_DAY_EVIDENCE_MISMATCH",
+                      codes(trace_validator.validate_trace(trace)))
+
+    def test_end_day_with_shop_closed_after_true_is_clean(self):
+        trace = [
+            write("end_day", action_id="act-1",
+                  result=write_result("end_day", action_id="act-1",
+                                      dispatched=True,
+                                      shop_closed_after=True)),
+        ]
+        self.assertEqual([], errors(trace_validator.validate_trace(trace)))
+
+    def test_end_day_pending_is_not_treated_as_rejection(self):
+        pending = write(
+            "end_day", action_id="act-1",
+            result={"ok": False, "op": "end_day",
+                    "execution_status": "running",
+                    "delivery_status": "delivered",
+                    "dispatched": True, "pending": True,
+                    "error": "shop_still_open"})
+        trace = [pending,
+                 write("confirm_trade", action_id="act-2", depends_on=[0])]
+        violations = trace_validator.validate_trace(trace)
+        self.assertIn("CONFLICTING_WRITE_WHILE_PENDING", codes(violations))
+        self.assertNotIn("REJECTED_DEPENDENCY_TREATED_AS_SUCCESS",
+                         codes(violations))
+
+    def test_sleep_save_completed_evidence_is_accepted(self):
+        result = dict(
+            write_result("sleep", action_id="act-sleep",
+                         readback=_valid_day_readback(1, 2)),
+            dispatched=True, day_changed=True,
+            save_evidence="save_completed", save_completed=True,
+            save_unknown=False, last_save_time="2026-01-01T00:10:00")
+        trace = [
+            get_state(day=1),
+            write("sleep", action_id="act-sleep", result=result,
+                  claims=["day_changed", "saved"]),
+        ]
+        self.assertEqual([], errors(trace_validator.validate_trace(trace)))
+
+    def test_sleep_save_unknown_claim_is_rejected(self):
+        result = dict(
+            write_result("sleep", action_id="act-sleep",
+                         readback=_valid_day_readback(1, 2)),
+            dispatched=True, day_changed=True,
+            save_evidence="save_unknown", save_completed=False,
+            save_unknown=True, last_save_time="2026-01-01T00:10:00")
+        trace = [
+            get_state(day=1),
+            write("sleep", action_id="act-sleep", result=result,
+                  claims=["day_changed", "saved"]),
+        ]
+        self.assertIn("SAVE_EVIDENCE_MISSING",
+                      codes(trace_validator.validate_trace(trace)))
+
+    def test_sleep_day_unchanged_running_is_not_a_success(self):
+        result = dict(
+            write_result("sleep", action_id="act-sleep",
+                         ok=False, execution_status="running",
+                         readback=_valid_day_readback(1, 1)),
+            dispatched=True, pending=True, day_changed=False,
+            save_evidence="save_unknown", save_completed=False,
+            save_unknown=True)
+        trace = [
+            get_state(day=1),
+            write("sleep", action_id="act-sleep", result=result,
+                  claims=["day_changed"]),
+        ]
+        self.assertIn("DAY_CHANGE_EVIDENCE_MISSING",
+                      codes(trace_validator.validate_trace(trace)))
+
+    def test_wait_operation_timeout_requires_operation_id_and_next(self):
+        trace = [
+            step("wait_operation",
+                 args={"operation_id": "op-1", "timeout_ms": 100},
+                 result={"ok": False, "status": "pending",
+                         "operation_id": "op-1",
+                         "execution_status": "running",
+                         "delivery_status": "delivered"}),
+        ]
+        self.assertIn("WAIT_OPERATION_TIMEOUT_MISSING_NEXT",
+                      codes(trace_validator.validate_trace(trace)))
+
+    def test_wait_operation_timeout_with_next_is_not_a_failure(self):
+        trace = [
+            step("wait_operation",
+                 args={"operation_id": "op-1", "timeout_ms": 100},
+                 result={"ok": False, "status": "pending",
+                         "operation_id": "op-1",
+                         "execution_status": "running",
+                         "delivery_status": "delivered",
+                         "next": "call get_operation again"}),
+        ]
+        self.assertEqual([], errors(trace_validator.validate_trace(trace)))
+
+    def test_operation_query_ok_true_requires_completed(self):
+        trace = [
+            step("get_operation", args={"operation_id": "op-1"},
+                 result={"ok": True, "known": True,
+                         "operation_id": "op-1", "op": "end_day",
+                         "execution_status": "running",
+                         "delivery_status": "delivered"}),
+        ]
+        self.assertIn("OK_WITHOUT_COMPLETED_EXECUTION",
+                      codes(trace_validator.validate_trace(trace)))
+
+    def test_unknown_operation_with_process_restarted_allows_retry(self):
+        first = write(
+            "confirm_trade", action_id="act-1",
+            args={"item_id": 101, "side": "buy"},
+            result=write_result("confirm_trade", action_id="act-1",
+                                operation_id="op-1", ok=False,
+                                execution_status="uncertain",
+                                error="outcome_unknown"))
+        query = step("get_operation", args={"operation_id": "op-1"},
+                     result={"ok": False, "known": False,
+                             "operation_id": "op-1",
+                             "error": "unknown_operation",
+                             "process_restarted": True})
+        retry = write("confirm_trade", action_id="act-2",
+                      args={"item_id": 101, "side": "buy"})
+        violations = trace_validator.validate_trace([first, query, retry])
+        self.assertEqual([], errors(violations), codes(violations))
+
+    def test_redelivered_requires_undelivered_delivery(self):
+        result = dict(write_result("confirm_trade", action_id="act-1"),
+                      **_trade_success_extra())
+        result["redelivered"] = True
+        trace = [write("confirm_trade", action_id="act-1",
+                       args={"item_id": 101, "side": "buy"},
+                       result=result)]
+        violations = trace_validator.validate_trace(trace)
+        self.assertIn("REDELIVERED_WITHOUT_UNDELIVERED", codes(violations))
+
+    def test_redelivered_undelivered_is_clean(self):
+        result = dict(
+            write_result("confirm_trade", action_id="act-1",
+                         delivery_status="undelivered"),
+            **_trade_success_extra())
+        result["redelivered"] = True
+        trace = [write("confirm_trade", action_id="act-1",
+                       args={"item_id": 101, "side": "buy"},
+                       result=result)]
+        self.assertEqual([], errors(trace_validator.validate_trace(trace)))
+
+    def test_rejected_step_with_dispatched_true_is_a_contradiction(self):
+        trace = [
+            write("confirm_trade", action_id="act-1",
+                  result={"ok": False, "op": "confirm_trade",
+                          "error": "trade_locked", "dispatched": True,
+                          "execution_status": "rejected",
+                          "delivery_status": "delivered"}),
+        ]
+        self.assertIn("REJECTED_WITH_DISPATCHED_TRUE",
+                      codes(trace_validator.validate_trace(trace)))
+
+    def test_completed_step_with_dispatched_false_is_a_contradiction(self):
+        result = dict(write_result("end_day", action_id="act-1",
+                                   dispatched=False,
+                                   shop_closed_after=True))
+        trace = [write("end_day", action_id="act-1", result=result)]
+        self.assertIn("COMPLETED_WITHOUT_DISPATCH",
+                      codes(trace_validator.validate_trace(trace)))
 
 
 # ---------------------------------------------------------------------------

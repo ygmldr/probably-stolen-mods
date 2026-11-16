@@ -3,7 +3,8 @@
 > **状态：草稿 v0.1（2026-11-16，Nightly Batch A · 模块 G）**
 > **未上架、未发布、未推送 Steam Workshop；未在真实游戏环境执行过本文任何安装步骤。**
 > 本文是面向**未来 Workshop Beta** 的安装说明草稿，不是对玩家的发布承诺；所有需要实机的步骤标注 `NOT_RUN`，待用户在场、`mod-scan` 与验收完成后才能升级为正式文档。
-> 配套阅读：`docs/audit/NIGHTLY_MOD_COMPAT_MATRIX.md`（兼容/发布预审矩阵）。
+> **2026-11-16 复核（task-4）**：本机 Linux/.NET 9 的**编译 gate 已实测 PASS**（C# 749/0、脚本门禁 53/0、适配器契约 503 OK、0 Warning/0 Error；`PAWNMIND_BUILD_ONLY=1 ./build.sh` 在 dist 打包前退出）。**dist 打包、安装、`/health` 实机校验仍为 `NOT_RUN`**（§8.4/§8.10）。
+> 配套阅读：`docs/audit/NIGHTLY_MOD_COMPAT_MATRIX.md`（兼容/发布预审矩阵，§10.1 为编译 gate 证据）。
 
 ---
 
@@ -57,6 +58,7 @@ PawnMind 的交付物有**两个物理位置完全不同**的部分：
 | 2.6 | 安装包来源 | 只用 `dist/PawnMind/`（应只有 2 个文件）；**不要**把仓库根、`agent/`、`tools/`、`.venv/`、`_decomp/`、`test/` 拷进 `Mods/` | 多余文件会被扫描器按 payload-file / unlisted-DLL 拒绝（见矩阵 §5 P-04） |
 | 2.7 | 能力预期 | 启用时会出现能力确认。当前 manifest 声明 `network` + `reflection-external`；**静态预审预测还缺 `files`**（矩阵 §11.1，未实机确认） | 出现拒绝时记录原文，**不要**改游戏/绕过；交回开发者改 manifest 或特性 |
 | 2.8 | 只读冒烟配置 | 首次跑通只用 `run_mode=bootstrap`（只读）；**不要**用 `test`，`play` 当前允许集为 0 | 非 `bootstrap` 的写操作一律不要做 |
+| 2.9 | 编译 gate / dist 可信度 | 安装前确认 dist 是**当前源码**构建：编译 gate 本机可跑（`PAWNMIND_BUILD_ONLY=1 ./build.sh`，矩阵 §10.1）；但当前 `dist` 已 STALE（早于 26 个源码文件，矩阵 §9.3 D-04）→ **不要**直接用当前 dist 安装，先按矩阵 `NR-11` 重建并记录 SHA256 | 不重建不安装 |
 
 ---
 
@@ -136,7 +138,7 @@ allow_test_mode=false
 curl -s http://127.0.0.1:15528/health
 ```
 
-预期字段（`src/Bridge/BridgeServer.cs:696-760`；preflight 同源字段 `agent/preflight.py:34-42`）：
+预期字段（`src/Bridge/BridgeServer.cs:748-760` 的 `HealthJson`；preflight 同源字段 `agent/preflight.py:34-42`）：
 
 | 字段 | 预期 | 不符时 |
 |---|---|---|
@@ -149,6 +151,7 @@ curl -s http://127.0.0.1:15528/health
 | `latest` / `latest_verified` | `UNVERIFIED` / `false` | 属预期：本地代码不访问 Steam，不能宣称是最新稳定版 |
 
 > 进一步只读探测（可选）：`python -m agent.preflight --config "<bridge.conf>" --json`（`agent/preflight.py:1-17`；只做 3 次只读请求、从不打印 token，退出码 0=ready / 1=connected-unready / 2=fatal）。
+> 另有只读端点 `GET /operation?id=<op_id>`（D2 新增）：需要 Bearer token；`bootstrap` 模式可查询，`Locked` 模式拒绝；它只查进程内操作缓存、**不建快照、不派发写操作**（源码：`src/Bridge/BridgeServer.cs:566-613`；路由 `src/Core/RouteTable.cs:37`；模式映射 `src/Core/EndpointPolicy.cs:15,36-41`）。不要把它当作写入口。
 > 不要让任何一条命令把 token 打印到终端/日志/截图。
 
 ### A-5 验收通过标准（本步 `NOT_RUN`）
@@ -228,7 +231,7 @@ python -m venv .venv
 ```
 
 - 路径/环境变量语义、`failOnStartupError` 的原因（游戏未开时不要让整个宿主 profile 启动失败）见 `docs/pawnmind-ai-host-setup.zh-CN.md:92-154`。
-- 工具集：默认 full（114 个 MCP 工具，AGENTS.md）；`--tools recording` 只注册录制用 104 个（用于受控录制，不要给普通用户开）。**具体数量以 `--probe`/宿主工具列表实测为准（`NOT_RUN`）。**
+- 工具集：默认 full（**116** 个 MCP 工具）；`--tools recording` 只注册录制用 **106** 个（用于受控录制，不要给普通用户开）。数量与 `docs/audit/tools-inventory.json`（full 116 / recording 106）、`AGENTS.md`、C/D 提交说明一致；**具体以 `--probe`/宿主工具列表实测为准**（宿主侧实测仍 `NOT_RUN`）。
 - `PAWNMIND_BRIDGE_CONF` 必须指向真实 `bridge.conf`；不要写死占位符后"假装能连"——MCP 会启动即失败（刻意 fail-loud）。
 
 ### B-5 安全约束
@@ -311,15 +314,17 @@ python -m venv .venv
 
 | # | 项 | 状态/说明 |
 |---|---|---|
-| 8.1 | 官方扫描器 `mod-scan` | **`NOT_RUN`**：需要在真实游戏内执行（见矩阵 §10 `NR-01`）；本文"能力确认/拒绝"的预测未实机确认 |
+| 8.1 | 官方扫描器 `mod-scan` | **`NOT_RUN`**：需要在真实游戏内执行（见矩阵 §10.2 `NR-01`）；本文"能力确认/拒绝"的预测未实机确认 |
 | 8.2 | 预测 `files` 能力未声明 | 矩阵 §11.1（`F-01~F-07`）；**可能是启用阻塞**；本文只记录处理原则，不在本批次改 manifest |
 | 8.3 | `reflection-external` retiring | **2026-12-10 起拒绝**（矩阵 C2）；上架前必须整改并移除该能力 |
-| 8.4 | dist 与源码/已安装 DLL 不一致 | 矩阵 §9.3（D-04/D-07）：**当前安装不能用来证明仓库代码**；安装前必须重建 dist 并记录 SHA256 |
-| 8.5 | 版本号不一致 | `manifest 0.3.0` vs tag `v1.0.1` vs 文档 `0.2.1`（矩阵 §9.2）：上架前统一 |
+| 8.4 | dist 与源码/已安装 DLL 不一致 | 矩阵 §9.3（D-04/D-07）：dist DLL 早于 26 个源码 `.cs`；编译 gate 产物 `d29209a4…`/338,432 B 也与 dist `ad335987…`/296,960 B 不同。**当前安装不能用来证明仓库代码**；安装前必须重建 dist 并记录 SHA256 |
+| 8.5 | 版本号不一致 | `manifest 0.3.0` vs tag `v1.0.1`（矩阵 §9.2；README/AGENTS 已被其他模块更新，但发布号仍需统一）：上架前统一 |
 | 8.6 | `/health` 实机值、MVID、端口 | `NOT_RUN`（无游戏）；A-4 字段是源码契约，不是实测值 |
 | 8.7 | Workshop 上传/验证/预览素材 | `NOT_RUN`；**未上架**，本文不构成发布流程 |
 | 8.8 | Windows/WSL/宿主组合 | 宿主接入的离线验证见 `docs/pawnmind-ai-host-setup.zh-CN.md` §8；Windows 宿主未验证（该文档 §15） |
 | 8.9 | 存档/ModData 精确路径 | 本文只给既定文档路径；实际路径以本机为准，`NOT_RUN` 未逐项核实 |
+| 8.10 | 编译 gate / dist 打包 | **编译 gate 本机 PASS**（C# 749/0、门禁 53/0、契约 503 OK、0 warn/0 err；证据矩阵 §10.1 `NR-06`）；**dist 打包与安装仍 `NOT_RUN`**（需 Windows/游戏环境、用户在场，矩阵 `NR-11`） |
+| 8.11 | 工具数 / 策略 sha | full **116** / recording **106**；policy sha256 `e0da5a24…`（`gen_policy_catalog.py --check` PASS）；以实测 `--probe`/宿主工具列表为准 |
 
 ---
 
@@ -329,7 +334,8 @@ python -m venv .venv
 - [ ] manifest 能力与代码一致（`network` / `reflection-external` / 预测的 `files` 决策完成）。
 - [ ] `reflection-external` 移除或确认官方宽限期（2026-12-10 前必须完成整改）。
 - [ ] 版本号统一：manifest / git tag / README / 工坊条目一致。
-- [ ] clean build → dist 仅 2 文件 → 记录 DLL/manifest SHA256 与 MVID。
+- [ ] 本机编译 gate 通过：`set -a; . .env.server; set +a; PAWNMIND_BUILD_ONLY=1 ./build.sh`（C#/门禁/契约全绿；仅编译，不打包）。
+- [ ] clean build → dist 仅 2 文件 → 记录 DLL/manifest SHA256 与 MVID（矩阵 `NR-11`）。
 - [ ] 安装/回滚演练（干净 Windows 环境；含"旧版备份→升级→回滚"）。
 - [ ] 能力提示文案与 README/工坊描述一致（声明 loopback-only、ModData-only 文件用途）。
 - [ ] Workshop 验证路径确认（若声明 `files`/`network`）。
@@ -349,7 +355,9 @@ python -m venv .venv
 | 健康检查 | `curl -s http://127.0.0.1:<port>/health` |
 | 只读预检 | `python -m agent.preflight --config "<bridge.conf>" --json` |
 | MCP 冒烟 | `<venv>\python agent\mcp_server.py --config "<bridge.conf>" --probe` |
-| 构建（构建机；本批次未执行） | `cd PawnMind && PAWNMIND_BUILD_ONLY=1 ./build.sh`（只编译不打包）；打包用 `./build.sh` |
+| 构建 gate（本机可跑，已实测 PASS） | `cd PawnMind && set -a; . .env.server; set +a; PAWNMIND_BUILD_ONLY=1 ./build.sh`（先跑 `test.sh`；dist 打包前退出；C# 749/0、门禁 53/0、契约 503 OK、0 warn/0 err） |
+| 打包 dist（需 Windows/游戏环境，`NOT_RUN`） | 完整 `./build.sh`（会重写 `dist/PawnMind/`，须用户在场并先记录旧 dist 哈希） |
+| 工具数 / 策略 sha | full **116** / recording **106**；policy sha256 `e0da5a24a0c21014db57ee842413ef4d6d10ac0e1dca3545dea417490f22d1cc`（`python tools/gen_policy_catalog.py --check`） |
 | 参考文档 | `README.md` §安装/连接；`docs/plans/NEXT_LIVE_SESSION.md`；`docs/pawnmind-s8-runbook.zh-CN.md` §2-3；`docs/pawnmind-ai-host-setup.zh-CN.md` |
 
 ---

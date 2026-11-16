@@ -1,13 +1,13 @@
 # PawnMind 首周经营 Skill（pawnmind-first-week）
 
-> **状态：`OFFLINE_DRAFT`（离线草案，2026-11-17 Nightly Batch A / E 模块）。**
-> 本 Skill 依据仓库内已实现或本期冻结的 MCP 协议编写，**不包含任何真机验证结论**。
+> **状态：`OFFLINE_DRAFT`（离线草案，2026-11-17 Nightly Batch A / E 模块，D+C 合入后修订）。**
+> 本 Skill 依据仓库已实现并冻结的 MCP 协议编写，**不包含任何真机验证结论**。
 > 真机（L3）证据：`NOT_RUN`（无游戏进程、未读写存档、未安装 DLL）。
 > 通关率 / 效率收益：`NOT_MEASURED`，本文件不给出任何跑分。
 
 - 适用游戏：*Probably Stolen* **0.46D**（`VERSION 100-Rev13`；以 `get_state` 的版本字段与 bridge 的 MVID 门禁为准）。
-- 适用工具面：`mcp_server.py --tools full`（起草时 114 个工具）或 `--tools recording`（104 个玩家等价工具）；
-  版本以 `tool_policy.json` 的 `policy_sha256` 与 `docs/audit/tools-inventory.json` 为准，不写死数量。
+- 适用工具面：`mcp_server.py --tools full`（**116** 个工具）或 `--tools recording`（**106** 个玩家等价工具）；
+  版本以 `tool_policy.json` 的 `policy_sha256`（当前 **`e0da5a24…`**）与 `docs/audit/tools-inventory.json` 为准。
   本 Skill **只用首周最小闭环里已注册的工具**，未注册的工具名一律不要调用。
 - 适用模式：`run_mode=play`（进入游戏后）或显式 `test`。`bootstrap` 只用于主菜单只读探测。
 - 前置：`play_allowlist` 目前为空（无 live evidence），所以**真机 `play` 下写操作仍会被拒**——这是预期，不要改配置绕过。
@@ -20,9 +20,9 @@
 2. 有原生弹窗 → `get_pending_prompt()` → 读懂文字后再 `answer_prompt()`。
 3. `shop_state == "MORNING"` → `open_shop()`。
 4. 顾客/议价 → `list_goods()` / `confirm_trade()`；对话 → `advance_dialogue()` / `choose_dialogue()`。
-5. 顾客处理完、没有待接待 → `end_day()`；`readback.day_advanced` 必须为 `false`（关店≠换天）。
-6. `sleep()`（必须在 `end_day` 之后）→ 用 `wait_for_events()` 或 `get_state()` 等真实 `day` 变化，
-   再 `get_day_report()` 读晨报。换天与落盘要分开判断。
+5. 顾客处理完、没有待接待 → `end_day()`；**只有 `shop_closed_after == true` 才算关店完成**（关店≠换天）。
+6. `sleep()`（必须在 `end_day` 之后）→ 用 `wait_for_events()` 或 `get_state()` 等真实 `day` 变化；
+   `day_changed` 与 `save_evidence` 分开判断，再 `get_day_report()` 读晨报。
 7. 第一周结束（`rent.days_left == 0`、房东 `client.intent == "RENT"`）→ 走对话付租，
    **只认外部结算回执**（见 §8）。
 8. 出现任何 `pending`/`uncertain` → `get_operation()` / `wait_operation()` 查询，**禁止用新的 action_id 盲重试**。
@@ -65,7 +65,8 @@
 ### 2.1 读取顺序
 
 1. `get_state()` —— 唯一权威快照（`rev` 是序列化指纹计数，不是隐藏状态/RNG 版本号）。
-2. `get_legal_actions()` —— 只含 `availability="available"` 的项；返回 `{rev, legal_actions}`。
+2. `get_legal_actions()` —— 返回 `{rev, legal_actions, candidate_actions}`；`legal_actions` 只含
+   `availability="available"` 的项。
 3. 需要局部细节时再读：`list_goods()`、`list_inventory()`、`get_item()`、`get_calendar()`、`get_day_report()`。
 4. 一次只做**一个**写动作，动作后必须重新 `get_state()` 回读；不要连发多个写。
 
@@ -80,7 +81,7 @@
 | `rent` | 见 §8：`days_left`、`due`、`can_pay`、`rent_paid_total`、`rent_weeks_paid/missed`、`last_payment` |
 | `legal_actions` | **已证实可做**的动作（`availability="available"`） |
 | `candidate_actions` | **候选**动作：`availability="unknown"`、`requires="native_guard"`，需要实际调用时由原生守卫确认；**不是**合法证明 |
-| `client` | 当前顾客：`name`、`intent`（如 `RENT`）、`is_wanted`、`reported`、`budget` |
+| `client` | 当前顾客：`name`、`intent`（如 `RENT`、`BARTER`）、`is_wanted`、`reported`、`budget` |
 | `prompt` | 非 `null` = 原生确认框占用输入；先 `get_pending_prompt()` |
 | `dialogue` | `available/choice/ended/typing/choices[]`；`choices[i].enabled` 决定可选项 |
 | `dialogue.readable == false` | 读不到对话：**不要**假设内容，停机或等下一拍 |
@@ -111,41 +112,54 @@
 
 ---
 
-## 3. 操作协议：两轴状态（写动作必读）
+## 3. 操作协议：两轴状态（写动作必读，D 模块已冻结）
 
-每个写动作的响应新增两个轴：
+每个写动作的响应都带以下字段：
 
-- `operation_id`：本次操作 id，用于回查。
-- `execution_status ∈ prepared | running | completed | rejected | failed | uncertain`
-- `delivery_status ∈ pending_delivery | delivered | undelivered`
+| 字段 | 取值 / 含义 |
+|---|---|
+| `operation_id` | 本次操作 id（即 `action_id`），用于 `get_operation()` / `wait_operation()` 回查 |
+| `execution_status` | `prepared \| running \| completed \| rejected \| failed \| uncertain` |
+| `delivery_status` | `pending_delivery \| delivered \| undelivered`（只描述“调用方有没有拿到响应”） |
+| `dispatched` | 是否真的派发了原生调用；`false` = 派发前被拒（含 `execution_status:"rejected"`） |
 
 规则：
 
-1. **`ok:true` 只代表 `completed`**。`ok:false` 不一定是失败：
-   - `ok:false + status/execution_status:"pending"`：操作仍在进行 → `get_operation()` 或 `wait_operation()`。
-   - `ok:false + execution_status:"uncertain"`：可能已执行，证据不足 → 只能查 operation，或复用**原** `action_id`。
-2. `pending/uncertain/completed` **只能**来自 bridge 的 operation 两轴状态（写响应或 `get_operation()`/`wait_operation()`）。
-   模型自己的话、自然语言总结、`claim_text`、`action_history` 都不是证据。
-3. `uncertain` 操作**不得用新的 `action_id` 重试**：同 op+args 必须复用原 `action_id`，
+1. **`ok:true` 只代表 `execution_status:"completed"`**。
+   `ok:false` 不一定是失败：`running`/`uncertain` 必须查 operation。
+2. 重发**同一 `action_id`** 时，若之前已完成，返回原完成证据 + `delivery_status:"undelivered"` +
+   `redelivered:true`（不会重新执行，也**不会**把 completed 改写成 unknown）。
+3. 同一个 op 存在非终态操作时，再用**新 `action_id`** 发起同一 op 会返回
+   `error:"operation_pending"` + `blocking_operation_id` + `next`（不重复派发）；
+   必须先查 `blocking_operation_id`。
+4. `get_operation(operation_id)` 返回：
+   `known` / `ok` / `operation_id` / `op` / `execution_status` / `delivery_status` / `dispatched` /
+   `error` / `rev` / `result_rev` / `next`。
+   - `ok:true` 仅当 `execution_status:"completed"`；非终态时 `next` 给出下一步建议。
+   - 未知 id：`ok:false` + `known:false` + `error:"unknown_operation"`；
+     若期间发生 new game / 读档 / 进程重启，还会带 `process_restarted:true`，**禁止自动重放**。
+5. `wait_operation(operation_id, timeout_ms)`：Python 侧有界轮询（≤10s），不阻塞 Unity 主线程。
+   - 终态返回终态 payload；
+   - 超时返回 `ok:false` + `status:"pending"` + `execution_status` + `operation_id` + `next`
+     （另带 `timed_out:true`），**绝不是假成功**。
+6. `pending/uncertain/completed` **只能**来自 bridge 的 operation 两轴状态（写响应或
+   `get_operation()`/`wait_operation()`）。模型自己的话、自然语言总结、`claim_text`、
+   `action_history` 都不是证据。
+7. `uncertain` 操作**不得用新的 `action_id` 重试**：同 op+args 必须复用原 `action_id`，
    或先用 `get_operation()` / `wait_operation()` 查清状态。**盲重试 = 允许双扣款/双成交，是硬违规。**
-4. `pending` 操作存在时，不允许发出冲突写动作（不同 op 或不同 `rev`）；
+8. `pending` 操作存在时，不允许发出冲突写动作（不同 op 或不同 `rev`）；
    读（`get_state()` 等）与同一 `action_id` 的幂等重放允许。
-5. `get_operation(operation_id)`：只读查询，返回两轴与证据；**不修改游戏**。
-   `wait_operation(operation_id, timeout_ms)`：有界等待。
-   - 超时返回 `ok:false + status:"pending" + operation_id` + 下一步建议（实现另带 `timed_out:true`），
-     **不是成功**。
-   - `known:false` + `error:"unknown_operation"`：进程重启/记录丢失，禁止自动重放。
-   - 不要自己写循环轮询主线程；用这两个工具，遵守其 `next` 建议。
-6. `error:"unknown_operation"`：bridge 进程重启后内存记录已丢失，**禁止自动重放**；
-   先重新 `get_state()` 核对世界，再由上层决定是否重新发起（新意图、新 `action_id`，并记录人工判断）。
-7. 进程重启不承诺跨进程 exactly-once；durable intent 只证明“曾发出过”，不证明“执行到哪一步”。
+9. `delivery_status:"undelivered"`：响应丢失但执行事实可能已成立——用原 `action_id` 重查/重放拿回原证据
+   （会带 `redelivered:true`），不要新建 id。
+10. 进程重启不承诺跨进程 exactly-once；durable intent 只证明“曾发出过”，不证明“执行到哪一步”。
 
 ---
 
 ## 4. 开店与顾客
 
 1. `get_state()` 确认 `shop_state == "MORNING"` 且无 `prompt`。
-2. `open_shop()`（带 `rev`）。被拒（`shutter_busy` / 非 MORNING / 动画锁）时**不要连点**：
+2. `open_shop()`（带 `rev`）。被拒（`shutter_busy` / `busy_arrest` / `busy_shootout` /
+   `shop_not_morning` / `cannot_open_shop` / `open_shop_failed`）时**不要连点**：
    等一拍（`wait_for_events()` 或重新 `get_state()`）再决定。
 3. 顾客到柜台：`get_state()` 的 `client` / `client_items`。
 4. 顾客在等但需要下一位 → `call_next_customer()`（`can_call_next` 为真时才试）。
@@ -153,23 +167,54 @@
 
 ---
 
-## 5. 普通交易（首周核心收入）
+## 5. 普通交易（首周核心收入，C 模块已冻结证据协议）
+
+### 5.1 流程
 
 1. **看货**：`list_goods(scope="all")` → 每项 `id/identifier/name/value/owned/sellable`。
 2. **对账基线**：`get_state()` 记 `cash`、`inventory_count`、`back_counter_count`。
 3. **买**：`confirm_trade(item_id=<id>, side="buy", rev=<state.rev>)`。
-4. **卖**：需要先确认物品在自己背包且可卖：`list_inventory(container="main")` 拿 `item_id`，
-   再 `confirm_trade(item_id=<id>, side="sell", rev=<新 rev>)`。
-5. **回读验证**：再 `get_state()`，核对
-   - `cash` 变化 == 可见价格（买减、卖加）；
-   - `inventory_count` / `back_counter_count` 变化符合方向；
-   - 必要时 `list_inventory()` 找到同一 `identifier`。
-6. 以物易物可能**零现金变化**：不要只凭 cash 判断成交，必须同时看物品归属/计数变化。
-7. 交易被拒的分类见 §9；`cannot_afford` / `item_not_found` / `already_owned` / `not_owned`
-   都是**派发前拒绝**，世界无副作用：重新读状态、重新规划，不要重复发送同一请求。
-8. 只有 `confirm_trade` 的 operation 到达 `completed` 才算成交；**成交完成 ≠ 顾客工作流完成**，
-   后续对话用 `advance_dialogue()` / `choose_dialogue()` 继续，不要因为交易 pending 而卡住对话。
-9. 大额/高风险动作（批发、升级购买等）不在首周最小闭环内；除非有明确 live evidence，否则不要用。
+4. **卖**：先 `list_inventory(container="main")` 拿 `item_id`，再
+   `confirm_trade(item_id=<id>, side="sell", rev=<新 rev>)`。
+5. **回读验证**：再 `get_state()`，核对现金/库存/柜面变化；以物易物可能**零现金变化**。
+6. 只有 `execution_status:"completed"` 才算成交；**成交完成 ≠ 顾客工作流完成**，
+   后续对话用 `advance_dialogue()` / `choose_dialogue()` 继续，交易 completed/uncertain 都不阻塞对话。
+
+### 5.2 `confirm_trade` 成功证据（唯一可信来源）
+
+`completed` 必须同时具备：
+
+- `business_complete: true`（**同一顾客**的业务完成）
+- `client_unchanged: true`（顾客身份未变，不能用别的顾客状态背书）
+
+响应同时带以下证据字段（用于审计与对账）：
+
+| 字段 | 含义 |
+|---|---|
+| `dispatched` | 成功时为 `true`；派发前拒绝为 `false`（派发 0 次） |
+| `item_id` / `side` | 请求的物品与方向 |
+| `staged_item_id` | 谈判桌上被接受的物品 |
+| `client_intent` | 当前顾客意图（BUY/SELL/BARTER/INFORMATION_DEALER/GUNSMITH…） |
+| `items_transferred` | 物品归属/桌面是否真的转移（辅助证据） |
+| `cash_before` / `cash_after` | 整数现金前后值；`cash_changed` 表示是否变化（**不能**用现金变化当唯一成功判据） |
+| `evidence` | 明细：`called`、`error`、`business_complete`、`client_unchanged`、`items_transferred`、`cash_before`、`cash_after`、`staged_item_id_after` |
+
+### 5.3 拒绝与“静默失败”分类
+
+派发前拒绝（`dispatched:false`、`execution_status:"rejected"`，世界无副作用）：
+`trade_locked`（B10 被逮捕/枪战锁定）、`intent_undefined`、`business_complete`（B11 业务已完成）、
+`item_not_staged`（B12 物品不在桌上）、`barter_not_acceptable`、`not_introduced`（B13）、
+`cannot_afford`（B14）、`gun_order_not_accepted`（B15）、`cannot_buy_from_table`、
+`client_refuses_item`（B16）、`bad_side`、`item_not_found`、`no_negotiation`、`not_owned`、
+`already_owned`、`trade_read_failed`。
+处理：接受拒绝，重新读状态、重新规划；不要重复发送同一请求“确认一下”。
+
+原生 accept 调用返回但**没有可信完成证据**（静默 return / 异常 / 业务未完成）：
+`error:"outcome_unverified"` + `execution_status:"uncertain"` + `dispatched:true`。
+- 这是 `uncertain`，**不是**失败也不是成功；
+- 只能查 `get_operation()` / `wait_operation()`，或复用原 `action_id`；
+- **禁止新 `action_id` 重试**（可能已成交，双成交 = 硬违规）；
+- 若 `client_changed`：成交可能发生在另一个顾客实例上，同样只能 uncertain 处理。
 
 ---
 
@@ -190,7 +235,7 @@
 
 ---
 
-## 7. 关店与睡觉（两个动作、两种语义）
+## 7. 关店与睡觉（两个动作、两种语义，D3 已冻结）
 
 ### 7.1 关店 `end_day()`
 
@@ -199,20 +244,26 @@
   `client_still_present`、`shop_not_open`、`shutter_busy`。
   - **不要**为了绕过房东而 `sleep()` 或强制关店；房东必须接待。
   - `dismiss_waiting=true` 只在明确要放弃排队顾客时使用，并记录原因。
-- 成功：`readback.day_advanced` 应为 `false`、`readback.changed` 可为真。
-  **关店 ≠ 换天**，不要拿 `end_day` 当换天证据。
+- **完成条件**：`execution_status:"completed"` **当且仅当**响应中 `shop_closed_after == true`。
+  若动画仍在跑、回读仍 `OPEN`：返回 `ok:false` + `execution_status:"running"` + `pending:true` +
+  `error:"shop_still_open"` + 下一步建议 → 查 `get_operation()` / `wait_operation()`，**不要重新派发**。
+- 关店 ≠ 换天：`readback.day_advanced` 在 `end_day` 时应为 `false`。
 
 ### 7.2 睡觉 `sleep()`
 
-- 前置：店铺已 `CLOSED`（`end_day` 之后）；否则返回 `not_closed`。
+- 前置：店铺已 `CLOSED`（`end_day()` 之后）；否则返回 `not_closed`。
 - `sleep()` 触发原生异步黑屏序列，**返回时 day 可能尚未变**：
   - 用 `wait_for_events(since_rev=<当前 rev>)` 等到 revision 变化；
-  - 或短暂后 `get_state()` 回读，直到 `day` 增加 / `shop_state` 回到 `MORNING`/`OPEN`。
+  - 或短暂后 `get_state()` 回读，直到 `day` 增加 / `shop_state` 回到 `MORNING`/`OPEN`；
   - 轮询要有上限，用本次回合的预算；不要死循环。
-- 完成判定分两件事：
-  - **换天**：`readback.day_advanced == true`，或后续 `get_state().day > 之前 day`；
-  - **落盘**：`saved` / `save_completed` 或 `save_unknown`（判定见 §9）。
-    `last_save_time` 变化**单独不足以**证明落盘成功。
+- 完成判定分**两个独立事实**：
+  - **换天**：`day_changed == true`（或 `readback.day_advanced == true`，或后续 `get_state().day` 增加）；
+    `day_changed == false` 且 `execution_status:"running"` = 异步仍在进行 → `get_operation()` / `wait_operation()`，
+    不是失败也不是成功。
+  - **落盘**：`save_evidence` ∈ `save_completed | save_unknown`；布尔快捷字段 `save_completed` / `save_unknown`。
+    - `save_completed` 必须来自 bridge 的落盘证据；
+    - **`last_save_time` 变化不算落盘证据**（它只能提示“可能有保存”，不构成证明）；
+    - 只有时间/无证据时如实标 `save_unknown`，报告中写“未证实落盘”，不要写成功。
 - 睡醒后：`get_day_report()` 读晨报（`readable:false` + `morning_pending` 时等换天完成再读，不要重复 `sleep()`），
   再看 `rent`、`calendar_next`、当日事件。
 
@@ -280,7 +331,10 @@
 `cannot_afford`、`item_not_found`、`already_owned`、`not_owned`、`choice_disabled`、
 `cannot_end_day`、`customers_waiting`、`not_closed`、`shop_not_open`、`shutter_busy`、
 `client_still_present`、`window_readback_mismatch`、`tutorial_hints_readback_mismatch`、
-`recording_locked`、`recording_slot_mismatch`、`recording_run_mismatch`。
+`recording_locked`、`recording_slot_mismatch`、`recording_run_mismatch`；
+交易专用：`trade_locked`、`intent_undefined`、`business_complete`、`item_not_staged`、
+`barter_not_acceptable`、`not_introduced`、`gun_order_not_accepted`、`cannot_buy_from_table`、
+`client_refuses_item`、`bad_side`、`no_negotiation`、`trade_read_failed`。
 
 处理：**接受拒绝**，按错误语义重新读状态、重新规划；不要重复发送同一请求来“确认一下”。
 其中 `*_readback_mismatch` 明确要求停机，不重试。
@@ -289,17 +343,21 @@
 
 | 情况 | 处理 |
 |---|---|
-| `ok:false + execution_status:"pending"` | `get_operation()` / `wait_operation()` 等待；pending 期间只读 |
-| `execution_status:"uncertain"` | 只查询 operation；**禁止新 action_id**；同 op+args 复用原 `action_id` |
-| `outcome_unknown` | 视为 uncertain；查 operation + 回读世界，人工/上层判定，不自动重放 |
-| `unknown_operation`（`known:false`） | 记录“进程重启/记录丢失”；重新 `get_state()` 核对世界；不自动重放 |
-| `delivery_status:"undelivered"` | 响应丢失但执行事实可能已成立：用原 `action_id` 重查/重放拿回原结果，不要新建 id |
-| `wait_operation` 超时（`ok:false + status:"pending"`） | 不是失败也不是成功；继续有界等待或停机记录 |
+| `ok:false + execution_status:"pending"/"running"` | `get_operation()` / `wait_operation()` 等待；pending 期间只读 |
+| `error:"operation_pending"` + `blocking_operation_id` | 同一 op 已有非终态操作；查 blocking id，**不要**新 action_id 发起 |
+| `execution_status:"uncertain"` / `error:"outcome_unverified"` | 只查询 operation；**禁止新 action_id**；同 op+args 复用原 `action_id` |
+| `outcome_unknown` / `client_changed` | 视为 uncertain；查 operation + 回读世界，人工/上层判定，不自动重放 |
+| `unknown_operation`（`known:false`） | 记录“进程重启/run 变化/记录丢失”（可能带 `process_restarted:true`）；重新 `get_state()` 核对世界；不自动重放 |
+| `delivery_status:"undelivered"` | 响应丢失但执行事实可能已成立：用原 `action_id` 重查/重放拿回原结果（`redelivered:true`），不要新建 id |
+| `wait_operation` 超时（`ok:false + status:"pending"` + `next`） | 不是失败也不是成功；继续有界等待或停机记录 |
 
-### 9.4 存档相关
+### 9.4 存档 / 关店 / 换天
 
-`saved` 为真且带文件证据（如 `save_file`/`save_path`/`file_written`/`bytes_written`）才算落盘成功；
-只有 `last_save_time` 变化 → `save_unknown`，报告写“未证实落盘”，不要写成功。
+- `save_evidence:"save_completed"` = 可报告的落盘完成；`save_evidence:"save_unknown"` = 如实“未证实落盘”。
+- `last_save_time` 单独变化 → 仍按 `save_unknown`，不得写成功。
+- `end_day` 的 `execution_status:"completed"` 只认 `shop_closed_after:true`；
+  `pending:true + error:"shop_still_open"` 是 running，不是失败也不是成功。
+- `sleep` 的 `day_changed` 与落盘是两件事：换天不代表落盘成功，落盘也不代表换天。
 
 ---
 
@@ -308,7 +366,8 @@
 **硬停（必须人工/上层介入）**
 
 1. `bridge_unavailable`、`unauthorized`、`policy_mismatch`、`version_locked`。
-2. `outcome_unknown` / `execution_status:"uncertain"` 且 `get_operation()` 查不到结果（`unknown_operation`）。
+2. `outcome_unknown` / `outcome_unverified` / `execution_status:"uncertain"` 且 `get_operation()` 查不到结果
+   （`unknown_operation` / `known:false`）。
 3. `uncertain` 操作被要求用新的 `action_id` 重试时（协议禁止，直接停）。
 4. 租金回执缺失、金额/现金对账不一致、`rent_weeks_missed` 增加却被描述为已付。
 5. 现金/库存出现无法用可见交易解释的变化（疑似重复扣款/双成交）。
@@ -331,11 +390,16 @@
 可信调用层（不是模型）必须记录：
 
 - `run_id + sequence + action_id + op + args + rev`（写动作发出前持久化）；
-- 响应：`operation_id`、`execution_status`、`delivery_status`、`error`、关键 `readback`/`receipt`；
+- 响应两轴 + 派发事实：`operation_id`、`execution_status`、`delivery_status`、`dispatched`、
+  `error`、`redelivered`、`next`；
+- 交易证据：`business_complete`、`client_unchanged`、`items_transferred`、`cash_before`、`cash_after`、
+  `cash_changed`、`staged_item_id`、`client_intent`、
+  `evidence.{called,error,business_complete,client_unchanged,items_transferred,cash_before,cash_after,staged_item_id_after}`；
+- 关店/换天/落盘：`shop_closed_after`、`readback.day_advanced`、`day_changed`、`save_evidence`、
+  `save_completed`、`save_unknown`；
 - 动作前后关键状态摘要：`day`、`shop_state`、`cash`、`inventory_count`、`back_counter_count`、
   `rent.days_left`、`rent.rent_paid_total`、`rent.last_payment.id`；
-- 关键证据：租金回执、`readback.day_advanced`、`saved`/`save_unknown`；
-- 停止原因与最后一条成功证据。
+- 租金回执、停止原因与最后一条成功证据。
 
 这些记录可交给 `agent/trace_validator.py` 离线校验（见该模块 docstring 与
 `docs/eval/FIRST_WEEK_BENCHMARK_SPEC.md`）。**trace 校验 PASS 只说明协议自洽，不等于真机成功。**
@@ -350,7 +414,7 @@
   `advance_dialogue()`、`choose_dialogue()`、`dismiss_current_client()`、
   `get_pending_prompt()`、`answer_prompt()`、`close_windows()`。
 - 日终：`end_day()`、`sleep()`、`wait_for_events()`。
-- 操作协议：`get_operation()`、`wait_operation()`（D 协议新增）。
+- 操作协议（D 已注册）：`get_operation()`、`wait_operation()`。
 - 开局（仅专用槽）：`get_new_game_options()`、`open_new_game_menu()`、
   `select_new_game_option()`、`new_game_continue()`、`confirm_new_game()`、
   `get_recording_save_status()`。
@@ -359,20 +423,19 @@
 
 ---
 
-## 13. schema 依赖待核对（与 Lead 的 D/B 实现同步）
+## 13. schema 已核对（最终，2026-11-17 D+C 合入后）
 
-本 Skill 按 **2026-11-17 冻结协议**编写；实现落地时若字段不同，以 Lead 同步为准，本文件相应更新：
+以下字段已与 `mcp_server.py` / `src/Bridge/` / `src/Core/` 实际实现核对
+（HEAD `f09314e` 的 D+C，policy sha `e0da5a24…`，工具 full=116 / recording=106）：
 
-1. `get_operation()` / `wait_operation()` 是否已注册（起草时 HEAD 尚未注册；D 模块落地后确认实际注册名与
-   响应字段；工具清单 lint 的 `PENDING_CONTRACT_TOOLS` 例外届时即可删除）。
-2. 写响应是否统一带 `operation_id` + `execution_status` + `delivery_status`；`ok:true` 是否严格只在 `completed`。
-3. `wait_operation` 超时返回是否确为 `ok:false + status:"pending" + operation_id` + 下一步建议
-   （并行实现测试中另带 `timed_out:true`）；未知 operation 是否为 `known:false` + `error:"unknown_operation"`。
-4. `get_state.legal_actions` 是否已只保留 `availability="available"`；
-   `candidate_actions` 是否带 `availability="unknown"` + `requires="native_guard"`。
-5. 举报相关字段是否已切到纯字段 `reported`/`is_wanted`（旧的可举报性字段应已删除）。
-6. 租金回执字段名（`last_rent_payment` / `rent.last_payment`）与字段集是否与本文一致；
-   若改为 `settlement_event`/`rent_receipt`，更新 §8.3 与 trace validator 的别名表。
-7. 换天/落盘字段：`readback.day_advanced`、`saved`、`save_completed`/`save_unknown`
-   以及文件证据字段的实际名称。
-8. 工具数（full/recording）与 `policy_sha256` 变化；本文不写死数量作为判据。
+| 主题 | 已核对 schema |
+|---|---|
+| 写响应 | `operation_id`、`execution_status`、`delivery_status`、`dispatched`；`ok:true` 仅 completed；重复 ID → 原证据 + `delivery_status:"undelivered"` + `redelivered:true` |
+| 操作查询 | `get_operation` 返回 `known/ok/operation_id/op/execution_status/delivery_status/dispatched/error/rev/result_rev/next`；未知 id `known:false` + `unknown_operation`（run 变化后带 `process_restarted:true`）；`wait_operation` 超时 `ok:false + status:"pending" + operation_id + execution_status + next` |
+| 交易证据 | `business_complete`、`client_unchanged`、`items_transferred`、`cash_before`、`cash_after`（整数）、`cash_changed`、`staged_item_id`、`client_intent`、`evidence.{called,error,business_complete,client_unchanged,items_transferred,cash_before,cash_after,staged_item_id_after}`；拒绝时 `dispatched:false`；静默 return → `error:"outcome_unverified"` + `execution_status:"uncertain"` |
+| 关店 | `execution_status:"completed"` ⇔ `shop_closed_after:true`；仍 OPEN → `ok:false + pending:true + execution_status:"running" + error:"shop_still_open"` |
+| 睡觉 | `day_changed`、`save_evidence`（`save_completed`/`save_unknown`）、`save_completed`、`save_unknown`；`last_save_time` 不算落盘证据；`day_changed:false` = running/pending |
+| 快照 | `legal_actions`（`availability="available"`）与 `candidate_actions`（`availability="unknown"`、`requires="native_guard"`）；举报用纯字段 `reported`/`is_wanted` |
+| 工具面 | full = 116，recording = 106；`get_operation` / `wait_operation` 已注册且均在 recording 面 |
+
+若后续再改冻结协议：本表随 Lead 的协议变更同步；**不要再引入“待核对”字段**。

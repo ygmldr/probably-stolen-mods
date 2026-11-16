@@ -10,14 +10,16 @@
 > 游戏版本：正式版 0.46D（主菜单 VERSION 100，原生 ModLoader）。
 > 反编译/逆向产物统一放在根目录 `_decomp/`，不提交、不分发。
 
-## 当前状态（2026-11-14）
+## 当前状态（2026-11-17，Nightly Batch A 之后）
 
-- PawnMind tag：`v1.0.1`（最新提交 `3eb3154`；本工作树有大量未提交的离线改造）
-- MCP 工具：**100 个**（`--tools recording` 只注册首周录制用 28 个）
-- 测试：C# **462**（含脚本门禁 53）+ 适配器契约 **392** + Python **81**，均 0 skip
-- 构建产物：`PawnMind/dist/PawnMind/{manifest.xml, PawnMind.dll}`
-- 已离线完成：新局菜单语义、专用录制槽授权、首周付租回执、传输加固与隐藏字段清理
-- **尚未真机验证**：以上全部只经过假 UI/假桥与已安装程序集契约；真机步骤见 [`PawnMind/docs/pawnmind-s8-runbook.zh-CN.md`](PawnMind/docs/pawnmind-s8-runbook.zh-CN.md)
+- PawnMind tag：`v1.0.1`；`manifest.xml` 已到 `0.3.0`（三处版本号仍不一致，见 `PawnMind/docs/audit/NIGHTLY_MOD_COMPAT_MATRIX.md`）
+- MCP 工具：**116 个**（`--tools recording` 只注册首周录制用 **106** 个）；新增 `get_operation` / `wait_operation`
+- 测试（服务器 CT101 实测）：C# **750** + 脚本门禁 **53** + 适配器契约 **503** + Python **365**，全绿
+- 策略指纹：`policy_schema=2`，`sha256=e0da5a24…`；`play_allowlist` 仍为 **0**
+- 构建产物：`PawnMind/dist/PawnMind/{manifest.xml, PawnMind.dll}`（**旧**，与源码/已安装不一致）
+- 已离线完成：模式 fail-closed 门禁、快照纯度（删除 `can_report`）、legal/candidate 分离、
+  交易守卫 B10–B16、执行/投递两轴 + `GET /operation`、end_day/sleep 异步语义、首周 Skill 与 trace validator
+- **尚未真机验证**：全部离线 PASS 都是 L0/L1/L2 证据；真机清单见 [`PawnMind/docs/plans/NEXT_LIVE_SESSION.md`](PawnMind/docs/plans/NEXT_LIVE_SESSION.md)
 - **还没有**接入真实 LLM 宿主；`agent/orchestrator.py` 只有 `RulePolicy`，`agent/demo_agent.py` 是脚本化演示
 
 ## PawnMind 架构
