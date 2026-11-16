@@ -5,3 +5,6 @@ src/bin/
 src/obj/
 test/**/bin/
 test/**/obj/
+
+# host-local env (generated on the build host)
+.env.server
