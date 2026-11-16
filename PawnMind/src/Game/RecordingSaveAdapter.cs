@@ -75,6 +75,7 @@ namespace PawnMind.Game
                         state.WaitingCustomers = GameState.GetWaitingCustomerCount();
                         state.ShopState = store.storeState.ToString();
                         state.CanEndDay = store.CanEndDay();
+                        state.Outside = GameState.IsOutside;
                         state.DayCycleReadable = true;
                     }
                     catch (Exception)

@@ -12,29 +12,61 @@ namespace PawnMind.Bridge
     /// </summary>
     internal static class GameActions
     {
+        /// <summary>
+        /// Opens the shutter by pressing the game's own button, so the player-facing
+        /// guards run: the shutter animation lock, arrest/shootout states and the
+        /// MORNING state. Calling OnShutterOpened() by hand re-rolled the whole
+        /// customer queue and re-issued the daily items (welfare coupons,
+        /// dividends, newspapers, mentor notes), which is a save-level exploit.
+        /// </summary>
         public static ActionResult OpenShop()
         {
-            // The UI button runs the full morning sequence (OnShutterOpened generates
-            // the day's client stack). Calling PlayerStore.OpenShutter alone only flips
-            // the state enum and leaves the shop with no customers.
-            try
-            {
-                StoreShutterButton button = StoreShutterButton.Instance;
-                if (button != null)
-                {
-                    button.OpenShutter();
-                    return ActionResult.Success("open_shop");
-                }
-            }
-            catch
-            {
-            }
-
             PlayerStore store;
             if (!TryStore(out store)) return ActionResult.Failure("open_shop", "not_in_game");
 
-            store.OnShutterOpened();
-            store.OpenShutter();
+            StoreShutterButton button;
+            try
+            {
+                button = StoreShutterButton.Instance;
+            }
+            catch (Exception)
+            {
+                return ActionResult.Failure("open_shop", "open_shop_unavailable");
+            }
+            if (button == null) return ActionResult.Failure("open_shop", "open_shop_unavailable");
+
+            // Mirror the native predicates so the caller gets a stable code instead
+            // of a silently ignored click.
+            if (store.lockShutterButtonFlag > 0)
+            {
+                return ActionResult.Failure("open_shop", "shutter_busy");
+            }
+            if (store.isClientBeingArrested)
+            {
+                return ActionResult.Failure("open_shop", "busy_arrest");
+            }
+            if (store.isHandlingShootout)
+            {
+                return ActionResult.Failure("open_shop", "busy_shootout");
+            }
+            if (store.storeState != PlayerStore.StoreState.MORNING)
+            {
+                return ActionResult.Failure("open_shop", "shop_not_morning");
+            }
+            if (!store.CanStartDay())
+            {
+                return ActionResult.Failure("open_shop", "cannot_open_shop");
+            }
+
+            try
+            {
+                button.OnClick();
+            }
+            catch (Exception)
+            {
+                return ActionResult.Failure("open_shop", "open_shop_failed");
+            }
+
             return ActionResult.Success("open_shop");
         }
 
@@ -61,6 +93,12 @@ namespace PawnMind.Bridge
             {
                 return ActionResult.Failure("dismiss_current_client", "no_client");
             }
+            if (!store.IsClientDimissable())
+            {
+                // Landlord and story clients are deliberately not dismissable; the
+                // player cannot send them away either.
+                return ActionResult.Failure("dismiss_current_client", "client_not_dismissable");
+            }
 
             DialogUIManager ui = GetDialogUi();
             if (ui != null && ui.GetCurrentDialog() != null)
@@ -72,7 +110,9 @@ namespace PawnMind.Bridge
 
             try
             {
-                GameState.DismissCurrentClient();
+                // Goes through the player path so intercepted dismissals (e.g. a
+                // client that triggers something on leaving) still run.
+                store.TryPlayerDismissCurrentClient(callNextWhenPossible: false);
             }
             catch (Exception)
             {

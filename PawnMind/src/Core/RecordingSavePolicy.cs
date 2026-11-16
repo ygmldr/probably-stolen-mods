@@ -251,6 +251,9 @@ namespace PawnMind.Core
         /// <summary>PlayerStore.CanEndDay(): false while a non-dismissable client waits.</summary>
         public bool CanEndDay;
 
+        /// <summary>True while the player is out on the night round.</summary>
+        public bool Outside;
+
         public int RentDaysLeft;
         public int Cash;
         public string NewGameStartType = string.Empty;

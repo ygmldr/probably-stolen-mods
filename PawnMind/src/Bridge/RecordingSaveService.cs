@@ -252,7 +252,8 @@ namespace PawnMind.Bridge
             // non-dismissable client (the landlord) is queued. Checking here as
             // well is what stops a sleep from skipping the rent collection.
             string blocked = DayEndPolicy.EvaluateSleep(
-                true, game.CanEndDay, game.WaitingCustomers, dismissWaiting, game.ShopState);
+                true, game.CanEndDay, game.WaitingCustomers, dismissWaiting,
+                game.ShopState, game.Outside);
             if (blocked != null)
             {
                 return Failure(op, blocked);

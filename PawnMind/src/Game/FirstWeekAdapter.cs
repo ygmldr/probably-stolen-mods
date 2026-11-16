@@ -31,9 +31,9 @@ namespace PawnMind.Game
             return GameState.ReadShopDaySnapshot();
         }
 
-        public void EndDay()
+        public void EndDay(bool dismissWaiting)
         {
-            GameState.EndDay();
+            GameState.EndDay(dismissWaiting);
         }
     }
 }

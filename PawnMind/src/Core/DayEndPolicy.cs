@@ -12,6 +12,9 @@ namespace PawnMind.Core
         /// <summary>Sleep is only legal after the shop was actually closed for the day.</summary>
         public const string NotClosed = "not_closed";
 
+        /// <summary>Sleeping while out on the night round loses the afterhour bag.</summary>
+        public const string NotInStore = "not_in_store";
+
         public const string ReadbackUnavailable = "day_readback_unavailable";
     }
 
@@ -42,13 +45,24 @@ namespace PawnMind.Core
             bool canEndDay,
             int waitingCustomers,
             bool dismissWaiting,
-            string shopState)
+            string shopState,
+            bool outside)
         {
             string endDay = EvaluateEndDay(readable, canEndDay, waitingCustomers, dismissWaiting);
             if (endDay != null) return endDay;
 
+            // MapUIManager.Sleep() walks the player back from the night map first;
+            // skipping it loses the afterhour inventory transfer.
+            if (outside) return DayEndErrors.NotInStore;
             if (!IsClosed(shopState)) return DayEndErrors.NotClosed;
             return null;
+        }
+
+        /// <summary>end_day is only legal while the shop is actually open.</summary>
+        public static bool IsOpenState(string shopState)
+        {
+            return shopState != null
+                && string.Equals(shopState.Trim(), "OPEN", System.StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>

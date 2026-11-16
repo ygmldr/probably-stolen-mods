@@ -121,7 +121,12 @@ namespace PawnMind.Tests
                 Day = day,
                 Cash = cash,
                 RentDaysLeft = rentDaysLeft,
-                RentDue = due
+                RentDue = due,
+                // The shop is open and idle unless a test overrides it.
+                ShopState = "OPEN",
+                ShutterBusy = false,
+                ClientPresent = false,
+                WaitingCustomers = 0
             };
         }
 

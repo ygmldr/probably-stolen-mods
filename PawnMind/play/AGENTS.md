@@ -226,10 +226,10 @@
 | `stale_rev` | `rev` 过期（别人/游戏改了状态） | **停这一步**。只读回读 `get_state` 拿新 `rev`；判断上一个动作是否已生效。**禁止**换新 `action_id` 重放同一个写动作；判断不了就停机问人。 |
 | `outcome_unknown` / `recording_outcome_unknown` | 结果未知（可能已扣款/已写盘） | **立即停止所有写动作**。只用只读工具核对，把看到的东西原样报告；**禁止**重试。 |
 | `confirmation_required` | 原生确认框挂起了动作（如离开时地上有物品） | 按 8.3 读弹窗再答；**不要**当成功继续下一步。 |
-| `cannot_end_day` / `customers_waiting` / `not_closed` | 关店/睡觉被游戏规则挡住 | `cannot_end_day`＝重要客户（房东）在等，必须招待；`customers_waiting`＝还有顾客，先招待或明确 `dismiss_waiting=true`；`not_closed`＝先 `end_day`。**不换路、不重试**。 |
+| `cannot_end_day` / `customers_waiting` / `not_closed` / `not_in_store` / `shop_not_open` / `shutter_busy` / `client_still_present` | 关店/开门/睡觉被游戏规则挡住 | `cannot_end_day`＝重要客户（房东）在等，必须招待；`customers_waiting`＝还有顾客，先招待或明确 `dismiss_waiting=true`；`not_closed`＝先 `end_day`；`not_in_store`＝夜里出门未回店，先 `return_home`；`shop_not_open`＝当前不是营业状态（MORNING/CLOSED）；`shutter_busy`＝卷帘门动画 2.75s 内，等一下；`client_still_present`＝顾客还在柜台，先送走或 `dismiss_waiting=true`。**不换路、不重试**。 |
 | `recording_locked` / `recording_unconfigured` / `recording_not_bound` / `recording_slot_mismatch` / `recording_run_mismatch` | 录制门禁拒绝 | 停机。交用户核对专用槽；不得换槽、不得重试。 |
 | `bridge unavailable` / `unauthorized` / MCP 工具整体报错 | 游戏没开、Mod 没加载、端口/token 不对 | 停机。不要反复重试。 |
-| `choice_disabled` / `cannot_afford` / `option_locked` / `insufficient_points` / `perk_limit_reached` / `menu_closed` / `wrong_phase` / `page_out_of_range` / `no_dialogue` / `continue_unavailable` / `no_client` / `not_fillable` / `cannot_report` / `not_enough_cash` | 正常拒绝（状态不满足） | 回读，换合法动作或等条件；**同一个拒绝连续两次 → 停机**。 |
+| `client_not_dismissable` / `choice_disabled` / `cannot_afford` / `option_locked` / `insufficient_points` / `perk_limit_reached` / `menu_closed` / `wrong_phase` / `page_out_of_range` / `no_dialogue` / `continue_unavailable` / `no_client` / `not_fillable` / `cannot_report` / `not_enough_cash` | 正常拒绝（状态不满足） | 回读，换合法动作或等条件；**同一个拒绝连续两次 → 停机**。 |
 | HTTP 429 / 超时 / 模型报错 | 额度或链路问题 | 停机，不做重试循环，不自动续费。 |
 
 **任何写动作失败后，都不要“换个 `action_id` 再试一次”。** 幂等由服务端负责；重放只会制造第二笔交易的风险。

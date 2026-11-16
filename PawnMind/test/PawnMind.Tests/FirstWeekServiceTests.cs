@@ -63,7 +63,7 @@ namespace PawnMind.Tests
             return Snapshot;
         }
 
-        public void EndDay()
+        public void EndDay(bool dismissWaiting)
         {
             EndCalls++;
             if (ThrowOnEndDay != null) throw ThrowOnEndDay;

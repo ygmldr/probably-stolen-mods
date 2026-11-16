@@ -319,6 +319,16 @@ namespace PawnMind.AdapterTests
             CheckMethod(assembly, "PlayerStore", "GetStoreInventory");
             CheckMethod(assembly, "StoreClient", "GetBudget");
             CheckMethod(assembly, "DialogUIManager", "GetCurrentDialog");
+
+            // Guard audit P0: the shutter button is the only player entry point.
+            CheckProperty(assembly, "StoreShutterButton", "Instance");
+            CheckMethod(assembly, "StoreShutterButton", "OnClick");
+            CheckMethod(assembly, "StoreShutterButton", "CloseShutter");
+            CheckMethod(assembly, "StoreShutterButton", "EndAndClose");
+            CheckField(assembly, "PlayerStore", "lockShutterButtonFlag");
+            CheckMethod(assembly, "PlayerStore", "CanStartDay");
+            CheckMethod(assembly, "PlayerStore", "IsClientDimissable");
+            CheckMethod(assembly, "PlayerStore", "TryPlayerDismissCurrentClient");
             CheckProperty(assembly, "BargainUIManager", "IsOpen");
             CheckMethod(assembly, "BargainUIManager", "CanOfferDiscount");
 

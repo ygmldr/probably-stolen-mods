@@ -99,13 +99,26 @@ namespace PawnMind.Core
 
         /// <summary>Customers already queued (the game asks before dismissing them).</summary>
         public int WaitingCustomers;
+
+        /// <summary>PlayerStore.storeState name (OPEN / CLOSED / MORNING).</summary>
+        public string ShopState;
+
+        /// <summary>True while the shutter animation lock is held (2.75s).</summary>
+        public bool ShutterBusy;
+
+        /// <summary>True while a client occupies the counter.</summary>
+        public bool ClientPresent;
     }
 
     public interface IShopDayPort
     {
         ShopDaySnapshot ReadShopDay();
 
-        /// <summary>Exactly one native EndDay call; never retried.</summary>
-        void EndDay();
+        /// <summary>
+        /// Exactly one native close for the day. <paramref name="dismissWaiting"/>
+        /// mirrors the player confirming "close the shop with customers waiting";
+        /// the bridge only passes true after the caller asked for it explicitly.
+        /// </summary>
+        void EndDay(bool dismissWaiting);
     }
 }

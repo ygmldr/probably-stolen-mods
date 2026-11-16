@@ -652,7 +652,10 @@ namespace PawnMind.Game
                     Cash = store.playerCash,
                     RentDaysLeft = store.dayUntilRent,
                     RentDue = store.GetRentValue(),
-                    WaitingCustomers = GetWaitingCustomerCount()
+                    WaitingCustomers = GetWaitingCustomerCount(),
+                    ShopState = store.storeState.ToString(),
+                    ShutterBusy = store.lockShutterButtonFlag > 0,
+                    ClientPresent = store.currentClientInstance != null
                 };
             }
             catch
@@ -665,12 +668,25 @@ namespace PawnMind.Game
             }
         }
 
-        public static void EndDay()
+        /// <summary>
+        /// Closes the shop through the shutter button: PlayerStore.EndDay() is the
+        /// inner half and skips the teardown the player path performs (clearing the
+        /// table, closing dialogue, the shutter animation, the delayed dismissal).
+        /// </summary>
+        public static void EndDay(bool dismissWaiting)
         {
             if (!PlayerStore.HasInstance) throw new InvalidOperationException("not_in_game");
-            PlayerStore store = PlayerStore.Instance;
-            if (store == null) throw new InvalidOperationException("not_in_game");
-            store.EndDay();
+            StoreShutterButton button = StoreShutterButton.Instance;
+            if (button == null) throw new InvalidOperationException("no_shutter_button");
+
+            if (dismissWaiting)
+            {
+                // The player's "yes" on the confirmation dialog.
+                button.EndAndClose();
+                return;
+            }
+
+            button.CloseShutter();
         }
 
         public static Dictionary<string, object> GetBargainSnapshot()

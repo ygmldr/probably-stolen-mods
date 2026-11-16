@@ -159,6 +159,21 @@ namespace PawnMind.Bridge
             {
                 return Failure(op, DayCycleErrors.NotInGame, false, null, null, null, null);
             }
+            // The shutter button only works while the shop is open and idle; the
+            // inner PlayerStore.EndDay() would silently clear the whole queue.
+            if (before.ShutterBusy)
+            {
+                return Failure(op, "shutter_busy", false, null, null, null, null);
+            }
+            if (!DayEndPolicy.IsOpenState(before.ShopState))
+            {
+                return Failure(op, "shop_not_open", false, null, null, null, null);
+            }
+            if (before.ClientPresent && !dismissWaiting)
+            {
+                return Failure(op, "client_still_present", false, null, null, null, null);
+            }
+
             string blocked = DayEndPolicy.EvaluateEndDay(
                 before.Readable, before.CanEndDay, before.WaitingCustomers, dismissWaiting);
             if (blocked != null)
@@ -169,7 +184,7 @@ namespace PawnMind.Bridge
             ShopDaySnapshot after;
             try
             {
-                shopPort.EndDay();
+                shopPort.EndDay(dismissWaiting);
             }
             catch (Exception)
             {
