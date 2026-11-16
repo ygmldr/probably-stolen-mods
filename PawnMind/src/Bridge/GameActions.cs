@@ -70,11 +70,25 @@ namespace PawnMind.Bridge
             return ActionResult.Success("open_shop");
         }
 
+        /// <summary>
+        /// Rings for the next customer. The player path is StoreBell.RingBell, which
+        /// refuses while the bell animation lock is held and while the shop is not
+        /// OPEN; calling TryCallNextClient directly could ring during either.
+        /// </summary>
         public static ActionResult CallNextCustomer()
         {
             PlayerStore store;
             if (!TryStore(out store)) return ActionResult.Failure("call_next_customer", "not_in_game");
-            if (!store.CanNextClient()) return ActionResult.Failure("call_next_customer", "cannot_call_next");
+
+            string blocked = Core.ShopBellPolicy.Evaluate(
+                true,
+                store.lockNextBellFlag > 0,
+                store.storeState.ToString(),
+                store.CanNextClient());
+            if (blocked != null)
+            {
+                return ActionResult.Failure("call_next_customer", blocked);
+            }
 
             store.TryCallNextClient();
             return ActionResult.Success("call_next_customer");

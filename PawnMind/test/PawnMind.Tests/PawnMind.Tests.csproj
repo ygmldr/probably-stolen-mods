@@ -55,6 +55,7 @@
     <Compile Include="WindowRulesTests.cs" />
     <Compile Include="WindowServiceTests.cs" />
     <Compile Include="DayEndPolicyTests.cs" />
+    <Compile Include="ShopBellPolicyTests.cs" />
     <Compile Include="FactionPerkRulesTests.cs" />
     <Compile Include="TutorialRulesTests.cs" />
     <Compile Include="IntelTestFakes.cs" />

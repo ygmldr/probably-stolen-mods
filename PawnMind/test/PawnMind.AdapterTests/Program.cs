@@ -326,6 +326,7 @@ namespace PawnMind.AdapterTests
             CheckMethod(assembly, "StoreShutterButton", "CloseShutter");
             CheckMethod(assembly, "StoreShutterButton", "EndAndClose");
             CheckField(assembly, "PlayerStore", "lockShutterButtonFlag");
+            CheckField(assembly, "PlayerStore", "lockNextBellFlag");
             CheckMethod(assembly, "PlayerStore", "CanStartDay");
             CheckMethod(assembly, "PlayerStore", "IsClientDimissable");
             CheckMethod(assembly, "PlayerStore", "TryPlayerDismissCurrentClient");
