@@ -8,13 +8,13 @@ namespace PawnMind.Core
     public static class PolicyCatalog
     {
         public const string Schema = "2";
-        public const string Sha256 = "fe5c6b647ef6645aa504b43f3cdb106c67aa2807f431ae5911936818cb130984";
+        public const string Sha256 = "e0da5a24a0c21014db57ee842413ef4d6d10ac0e1dca3545dea417490f22d1cc";
 
         /// <summary>Tools that read the state snapshot; never allowed in Bootstrap.</summary>
         public static readonly string[] SnapshotReaders = { "get_legal_actions", "get_run_summary", "get_state", "wait_for_change", "wait_for_events", "wait_until" };
 
         /// <summary>Bootstrap (main menu) operations.</summary>
-        public static readonly string[] BootstrapOps = { "capture_screenshot", "contraband_status", "events_status", "expedition_status", "get_action_history", "get_calendar", "get_day_report", "get_item", "get_layout", "get_new_game_options", "get_pending_prompt", "get_recording_save_status", "health_status", "husbandry_status", "inspect_ticket", "list_analyzers", "list_books", "list_contacts", "list_containers", "list_factions", "list_goods", "list_interactions", "list_inventory", "list_labels", "list_locations", "list_machines", "list_marks", "list_requests", "list_screenshots", "list_services", "list_signs", "list_tickets", "list_upgrades", "list_wine", "lottery_status", "machine_grow_status", "machine_status", "memory_bootstrap", "memory_get", "memory_retrieve", "memory_status", "phone_state", "ping", "read_book", "read_item", "security_status", "wanted_status", "wine_status" };
+        public static readonly string[] BootstrapOps = { "capture_screenshot", "contraband_status", "events_status", "expedition_status", "get_action_history", "get_calendar", "get_day_report", "get_item", "get_layout", "get_new_game_options", "get_operation", "get_pending_prompt", "get_recording_save_status", "health_status", "husbandry_status", "inspect_ticket", "list_analyzers", "list_books", "list_contacts", "list_containers", "list_factions", "list_goods", "list_interactions", "list_inventory", "list_labels", "list_locations", "list_machines", "list_marks", "list_requests", "list_screenshots", "list_services", "list_signs", "list_tickets", "list_upgrades", "list_wine", "lottery_status", "machine_grow_status", "machine_status", "memory_bootstrap", "memory_get", "memory_retrieve", "memory_status", "phone_state", "ping", "read_book", "read_item", "security_status", "wait_operation", "wanted_status", "wine_status" };
 
         /// <summary>
         /// Play operations: only tools with reviewed live evidence. Empty until a

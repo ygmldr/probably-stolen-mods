@@ -100,6 +100,7 @@ RECORDING_TOOL_NAMES = frozenset({
     "get_layout",
     "get_legal_actions",
     "get_new_game_options",
+    "get_operation",
     "get_pending_prompt",
     "get_recording_save_status",
     "get_run_summary",
@@ -164,6 +165,7 @@ RECORDING_TOOL_NAMES = frozenset({
     "use_tool",
     "wait_for_change",
     "wait_for_events",
+    "wait_operation",
     "wanted_status",
     "wine_add_ingredient",
     "wine_status",
@@ -175,6 +177,11 @@ CALENDAR_MAX_DAYS = 14
 MEMORY_MAX_LIMIT = 50
 MEMORY_MAX_TOKEN_BUDGET = 100000
 MEMORY_MAX_QUERY_CHARS = 500
+
+#: D2 wait_operation bounds (milliseconds). The poll happens on the Python side;
+#: it never blocks the Unity main thread.
+WAIT_OPERATION_MAX_MS = 10000
+WAIT_OPERATION_DEFAULT_MS = 2000
 
 NEW_GAME_OPTION_KINDS = ("scenario", "perk", "difficulty")
 NEW_GAME_PAGE_ROWS = ("available", "selected")
@@ -216,6 +223,20 @@ def _check_choice(field, value, allowed, expected_type):
 def _check_rev(rev):
     if type(rev) is not int or rev < 0:
         return _invalid_argument("rev")
+    return None
+
+
+def _check_operation_id(operation_id):
+    if type(operation_id) is not str or not operation_id.strip():
+        return _invalid_argument("operation_id")
+    if len(operation_id) > 128:
+        return _invalid_argument("operation_id")
+    return None
+
+
+def _check_wait_timeout(timeout_ms):
+    if type(timeout_ms) is not int or timeout_ms < 0 or timeout_ms > WAIT_OPERATION_MAX_MS:
+        return _invalid_argument("timeout_ms")
     return None
 
 
@@ -530,6 +551,23 @@ def build_server(client, tool_set=TOOL_SET_FULL, memory_provider=None):
     def get_legal_actions() -> dict:
         """Return the actions that are legal right now (state-derived, includes args) plus candidate_actions. legal_actions rows were accepted by the native guards; candidate actions (availability=unknown, requires=native_guard) are plausible but unproven - execute one only through its write tool and treat an unavailable/refused result as normal, not as a bug. Old snapshots without candidate_actions degrade to an empty list."""
         return _legal_action_payload(client.get_state())
+
+    @tool()
+    def get_operation(operation_id: str) -> dict:
+        """Read-only (no rev): two-axis status of one write action, {ok, known, operation_id, op, execution_status, delivery_status, dispatched, error, rev, result_rev}. ok:true only when execution_status=completed. Use it after a lost response or an uncertain/pending write; unknown_operation means the in-process record is gone (mod restart or run change) - re-read get_state instead of replaying with a new action_id."""
+        error = _check_operation_id(operation_id)
+        if error is not None:
+            return error
+        return client.get_operation(operation_id)
+
+    @tool()
+    def wait_operation(operation_id: str, timeout_ms: int = WAIT_OPERATION_DEFAULT_MS) -> dict:
+        """Read-only (no rev): bounded poll of get_operation for up to timeout_ms (0..10000, default 2000). Returns the terminal operation payload (completed/rejected/failed) or, on timeout, ok:false + status=pending + execution_status + operation_id + next - never a fake success. The poll runs in this Python process; the Unity main thread is not blocked. Do not start a new action id for the same op while it is pending."""
+        error = _first_error(_check_operation_id(operation_id),
+                             _check_wait_timeout(timeout_ms))
+        if error is not None:
+            return error
+        return client.wait_operation(operation_id, timeout_ms)
 
     @tool()
     def get_run_summary() -> dict:
@@ -1132,7 +1170,7 @@ def build_server(client, tool_set=TOOL_SET_FULL, memory_provider=None):
 
     @tool()
     def confirm_trade(item_id: int, side: str, rev: int) -> dict:
-        """Buy (side=buy) or sell (side=sell) one item currently on the back counter."""
+        """Buy (side=buy) or sell (side=sell) the item staged on the negotiation table by pressing the game's own accept button. Every known silent native refusal branch is pre-checked (trade_locked, intent_undefined, business_complete, item_not_staged, barter_not_acceptable, cannot_afford, gun_order_not_accepted, cannot_buy_from_table, client_refuses_item) and returns dispatched=false without clicking. ok:true only when execution_status=completed (business_complete observed for the same client); a silent native return is uncertain - query get_operation, do not retry with a new action_id. The closing dialogue is a separate workflow: call advance_dialogue next."""
         return client.action("confirm_trade", item_id=item_id, side=side, rev=rev)
 
     @tool()

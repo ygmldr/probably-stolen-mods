@@ -60,7 +60,10 @@ namespace PawnMind.Core
                 builder.Append("{\"op\":\"").Append(Escape(entry.Op)).Append('"');
                 builder.Append(",\"args\":").Append(entry.ArgsJson);
                 builder.Append(",\"ok\":").Append(entry.Ok ? "true" : "false");
-                if (!entry.Ok && !string.IsNullOrEmpty(entry.Error))
+                // An ok row may still carry a delivery-axis error (the business
+                // action succeeded but the response was lost), so the error field
+                // is independent of the ok flag.
+                if (!string.IsNullOrEmpty(entry.Error))
                 {
                     builder.Append(",\"error\":\"").Append(Escape(entry.Error)).Append('"');
                 }

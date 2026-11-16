@@ -71,6 +71,7 @@ EXPECTED_RECORDING_TOOLS = frozenset({
     "get_layout",
     "get_legal_actions",
     "get_new_game_options",
+    "get_operation",
     "get_pending_prompt",
     "get_recording_save_status",
     "get_run_summary",
@@ -135,6 +136,7 @@ EXPECTED_RECORDING_TOOLS = frozenset({
     "use_tool",
     "wait_for_change",
     "wait_for_events",
+    "wait_operation",
     "wanted_status",
     "wine_add_ingredient",
     "wine_status",
@@ -187,7 +189,7 @@ class ToolsModeTests(unittest.TestCase):
         default_names = self._list_tool_names()
         explicit_names = self._list_tool_names("--tools", "full")
 
-        self.assertEqual(114, len(default_names))
+        self.assertEqual(116, len(default_names))
         self.assertEqual(default_names, explicit_names,
                          "omitting --tools must behave exactly like --tools full")
         for expected in ("act", "press", "get_ui_snapshot", "new_game", "save_game"):
@@ -196,7 +198,7 @@ class ToolsModeTests(unittest.TestCase):
     def test_recording_mode_registers_only_the_recording_surface(self):
         names = self._list_tool_names("--tools", "recording")
 
-        self.assertEqual(104, len(EXPECTED_RECORDING_TOOLS))
+        self.assertEqual(106, len(EXPECTED_RECORDING_TOOLS))
         self.assertEqual(set(EXPECTED_RECORDING_TOOLS), names)
         self.assertEqual(EXPECTED_RECORDING_TOOLS, mcp_server.RECORDING_TOOL_NAMES)
         for required in EXPECTED_RECORDING_TOOLS:

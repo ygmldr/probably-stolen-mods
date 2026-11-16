@@ -30,7 +30,8 @@ public sealed class PawnMindMod : IMod
     private static ClienteleService _clienteleService;
     private static TutorialService _tutorialService;
     private BridgeServer _server;
-    private ActionRouter _router;
+    // Static for the same reason as _recordingGuard: the dispatch table is static.
+    private static ActionRouter _router;
     private GameObject _pumpObject;
 
     public void Init(ModManifest manifest)
@@ -155,7 +156,10 @@ public sealed class PawnMindMod : IMod
                 config.Token,
                 delegate { return writeGate; },
                 CaptureOutcome,
-                delegate(string op) { return ModePolicy.Refusal(op); });
+                delegate(string op) { return ModePolicy.Refusal(op); },
+                // D2: GET /operation re-checks a running shop operation against a
+                // read-only game readback. Never dispatches and never writes.
+                VerifyOperation);
 
             // S3B menu writes are evaluated by the same S4 slot policy. The
             // default (recording unconfigured) still refuses every write before
@@ -182,7 +186,14 @@ public sealed class PawnMindMod : IMod
                 new BridgeLimits(),
                 // A dispatched write whose response never reached the client must
                 // not stay cached as a success for the retrying agent.
-                _router.MarkResponseUndelivered);
+                _router.MarkResponseUndelivered,
+                // D2: read-only two-axis operation query (never builds the
+                // snapshot, never dispatches).
+                delegate(string operationId)
+                {
+                    return _router.GetOperationJson(operationId)
+                        .ToString(Newtonsoft.Json.Formatting.None);
+                });
 
             MainThreadPump pump = _pumpObject.AddComponent<MainThreadPump>();
             pump.Initialize(_server);
@@ -250,6 +261,11 @@ public sealed class PawnMindMod : IMod
             {
                 FirstWeekService service = FirstWeekService.Current;
                 if (service != null) service.ResetRentReceipts();
+                // D2/PP-RECOVERY-01: a new game or a loaded save starts a new run;
+                // operation evidence from the previous run must not be attributed
+                // to this one, and unknown ids must not be replayed blindly.
+                ActionRouter router = _router;
+                if (router != null) router.ResetOperations();
             }
             return recordingResult;
         }
@@ -843,6 +859,30 @@ public sealed class PawnMindMod : IMod
             case "selected": row = NewGamePageRow.Selected; return true;
             default: return false;
         }
+    }
+
+    /// <summary>
+    /// D2 read-only verifier for a running operation. It only ever reads game
+    /// state; a non-terminal operation stays running until the readback proves a
+    /// transition. Only end_day is verified this way (the shutter animation);
+    /// sleep/save evidence needs a real file check and stays NOT_RUN.
+    /// </summary>
+    private static OperationRecord VerifyOperation(OperationRecord record)
+    {
+        if (record == null) return null;
+        if (!string.Equals(record.Op, "end_day", StringComparison.Ordinal)) return record;
+
+        ShopDaySnapshot after = GameState.ReadShopDaySnapshot();
+        if (after == null || !after.Readable) return record;
+
+        // CLOSED (or a new day) proves the shutter request finished; OPEN means
+        // the native animation is still running.
+        if (DayEndPolicy.IsOpenState(after.ShopState)) return record;
+
+        record.Execution = ExecutionStatus.Completed;
+        record.Error = null;
+        record.ResultRevision = StateSnapshot.CurrentRevision;
+        return record;
     }
 
     private static bool IsRunChangeOp(string op)

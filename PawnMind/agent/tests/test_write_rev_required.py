@@ -21,6 +21,7 @@ CONF = os.path.join(ROOT, "test-artifacts", "audit-bridge.conf")
 READ_ONLY = {
     "ping", "get_state", "get_run_summary", "get_legal_actions",
     "get_action_history", "wait_for_events", "wait_for_change", "wait_until",
+    "get_operation", "wait_operation",
     "bargain_preview", "contraband_status", "events_status", "expedition_status",
     "get_item", "get_layout", "get_new_game_options", "get_recording_save_status",
     "get_pending_prompt", "get_day_report", "get_calendar", "get_clientele",

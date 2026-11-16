@@ -370,7 +370,13 @@ namespace PawnMind.Tests
             Assert.Equal(0, h.NativePort.SleepCalls, "no native sleep before bind");
 
             h.Bind();
-            Assert.True(h.Service.Sleep().Ok, "bound sleep is allowed");
+            ActionResult sleep = h.Service.Sleep();
+            JObject json = Json(sleep);
+            // D3: dispatch is allowed, but the day transition is asynchronous, so
+            // an immediate unchanged readback is pending ("running"), not success.
+            Assert.False(sleep.Ok, "the day has not advanced yet");
+            Assert.Equal("running", (string)json["execution_status"], "running");
+            Assert.True((bool)json["pending"], "pending is explicit");
             Assert.Equal(1, h.NativePort.SleepCalls, "native sleep called once");
         }
 
@@ -461,7 +467,10 @@ namespace PawnMind.Tests
             ActionResult result = h.Service.Sleep();
             JObject json = Json(result);
 
-            Assert.True(result.Ok, "sleep succeeds");
+            Assert.False(result.Ok, "the async day change is still pending");
+            Assert.Equal("running", (string)json["execution_status"], "running");
+            Assert.False((bool)json["day_changed"], "no day change yet");
+            Assert.Equal(true, (bool)json["save_unknown"], "no file evidence yet either");
             Assert.Equal(false, (bool)json["report"]["readable"], "no new report yet");
             Assert.Equal("morning_pending", (string)json["report"]["reason"], "stable pending reason");
             Assert.Equal(3, (int)json["report"]["day"], "old day");

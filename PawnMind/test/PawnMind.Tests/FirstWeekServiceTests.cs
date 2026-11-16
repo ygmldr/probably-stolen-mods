@@ -404,6 +404,10 @@ namespace PawnMind.Tests
         {
             var harness = new FirstWeekHarness();
             harness.Shop.Snapshot = FirstWeekTestData.Shop(5, 600, 5);
+            // D3: end_day completes when the shop really reaches CLOSED. The
+            // shutter animation may still be running right after the click.
+            harness.Shop.After = FirstWeekTestData.Shop(5, 600, 5);
+            harness.Shop.After.ShopState = "CLOSED";
 
             ActionResult result = harness.EndDay();
 
@@ -419,6 +423,24 @@ namespace PawnMind.Tests
             Assert.Equal(600L, (long)readback["cash_before"], "cash before");
             Assert.Equal(600L, (long)readback["cash_after"], "cash after");
             Assert.False((bool)readback["day_advanced"], "end_day does not advance day");
+        }
+
+        [Test]
+        public static void EndDay_Still_Open_After_Dispatch_Is_Pending()
+        {
+            var harness = new FirstWeekHarness();
+            harness.Shop.Snapshot = FirstWeekTestData.Shop(5, 600, 5);
+
+            ActionResult result = harness.EndDay();
+
+            JObject json = harness.Json(result);
+            Assert.False(result.Ok, "a click that did not close the shop is not success");
+            Assert.Equal("running", (string)json["execution_status"],
+                "the shutter animation is still running");
+            Assert.True((bool)json["pending"], "pending is explicit");
+            Assert.Equal("shop_still_open", (string)json["error"], "stable code");
+            Assert.Equal(1, harness.Shop.EndCalls, "native called once");
+            Assert.False((bool)json["shop_closed_after"], "the shop is still open");
         }
 
         [Test]

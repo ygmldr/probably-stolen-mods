@@ -308,8 +308,21 @@ namespace PawnMind.Bridge
                 return Failure(op, RecordingSaveErrors.OutcomeUnknown, true, true, readback);
             }
 
+            // D3: day_changed and save evidence are two separate facts. A changed
+            // day does not prove the save file was written, and last_save_time
+            // alone is not file evidence, so the save axis stays save_unknown
+            // until a real readback exists. A sleep that has not visibly advanced
+            // the day yet is pending (asynchronous blackscreen), not a no-effect.
+            SleepSemantics semantics = ShopOperationSemantics.Sleep(
+                true,
+                readback.Readable,
+                readback.Error,
+                game.Day,
+                afterSleep != null ? afterSleep.Day : game.Day,
+                ShopOperationSemantics.SaveUnknown);
             return SaveSuccess(op, status, false, readback,
-                SleepReport(game.Day, afterSleep.Day));
+                SleepReport(game.Day, afterSleep != null ? afterSleep.Day : game.Day),
+                semantics);
         }
 
         public ActionResult NewGame()
@@ -526,14 +539,31 @@ namespace PawnMind.Bridge
             RecordingStatus status,
             bool saved,
             DayCycleReadback readback = null,
-            JObject report = null)
+            JObject report = null,
+            SleepSemantics sleep = null)
         {
             JObject row = new JObject();
-            row["ok"] = true;
+            bool completed = sleep == null || sleep.Execution == ExecutionStatus.Completed;
+            row["ok"] = completed;
             row["op"] = op;
             row["dispatched"] = true;
             row["saved"] = saved;
             if (!saved) row["slept"] = true;
+            if (sleep != null)
+            {
+                row["execution_status"] = sleep.Execution;
+                row["day_changed"] = sleep.DayChanged;
+                row["save_evidence"] = sleep.SaveEvidence;
+                row["save_completed"] = sleep.SaveCompleted;
+                row["save_unknown"] = sleep.SaveUnknown;
+                if (!completed)
+                {
+                    row["pending"] = true;
+                    row["next"] = "the day transition is still running; call"
+                        + " get_operation or wait_operation, do not re-dispatch";
+                }
+            }
+
             if (readback != null) row["readback"] = JObject.FromObject(FirstWeekJson.Readback(readback));
             if (report != null) row["report"] = report;
             row["state"] = StateText(status.State);

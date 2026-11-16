@@ -1300,7 +1300,7 @@ namespace PawnMind.Tests
         }
 
         [Test]
-        public static void Router_Marks_Undelivered_Write_As_Outcome_Unknown()
+        public static void Router_Marks_Undelivered_Write_On_The_Delivery_Axis()
         {
             int dispatches = 0;
             ActionRouter router = Router(3, delegate(string op, JObject request)
@@ -1313,15 +1313,18 @@ namespace PawnMind.Tests
             string first = router.Handle(body);
             Assert.Contains(first, "\"ok\":true", "first attempt was dispatched and answered");
 
-            // The transport could not deliver the first response. The cached
-            // result must not keep claiming success to the retrying agent.
+            // D1: the transport could not deliver the first response. Only the
+            // delivery axis changes; the completed business fact stays completed
+            // (the old behaviour rewrote it to outcome_unknown, which lost that
+            // evidence). See OperationTests.PP_ASYNC_02 for the full contract.
             router.MarkResponseUndelivered(body, first);
 
             string retry = router.Handle(body);
-            Assert.Contains(retry, "\"ok\":false", "retry is not a success");
-            Assert.Contains(retry, "outcome_unknown", "retry reports the unknown outcome");
-            Assert.Contains(retry, "\"unknown\":true", "unknown is explicit");
-            Assert.Contains(retry, "\"dispatched\":true", "the write did run");
+            Assert.Contains(retry, "\"ok\":true", "a completed action is not rewritten");
+            Assert.Contains(retry, "\"delivery_status\":\"undelivered\"",
+                "the lost response is reported on the delivery axis");
+            Assert.False(retry.Contains("outcome_unknown"),
+                "the execution outcome is not overwritten");
             Assert.Equal(1, dispatches, "the retry must not dispatch the write again");
         }
 
@@ -1638,7 +1641,9 @@ namespace PawnMind.Tests
                 response);
 
             Assert.Equal(1, outcomes.Count, "undelivered write is captured");
-            Assert.Equal("outcome_unknown", outcomes[0].Error, "transport failure is unknown outcome");
+            Assert.Equal("delivery_undelivered", outcomes[0].Error,
+                "D1: a lost response is a delivery failure, not an unknown execution");
+            Assert.True(outcomes[0].Ok, "the business action itself still succeeded");
         }
     }
 

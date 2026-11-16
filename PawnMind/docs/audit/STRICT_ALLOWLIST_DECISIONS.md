@@ -1,9 +1,9 @@
 # STRICT_ALLOWLIST_DECISIONS — 逐工具放行决策（Round 3 复审后）
 
 - **来源**：`agent/policy/tool_policy.json`（schema 2），由 `agent/tool_policy.py` 读取
-- **依据**：真实 `tools/list`（114）+ `PLAYER_ENTRY_MATRIX.csv`（58 写 op）
-- **决策分布**：`allow` 73 / `needs_evidence` 30 / `deny` 11
-- **模式可导出**：bootstrap **48** / play 候选 **73** / test 114
+- **依据**：真实 `tools/list`（116）+ `PLAYER_ENTRY_MATRIX.csv`（58 写 op）
+- **决策分布**：`allow` 75 / `needs_evidence` 30 / `deny` 11
+- **模式可导出**：bootstrap **50** / play 候选 **75** / test **116**
 - **`play_allowlist`（严格玩家模式）**：**0** —— 需要 live 证据，本轮全部 `NOT_RUN`
 
 ## 0. 判定规则（`tool_policy.validate()` 强制）
@@ -35,7 +35,7 @@
 
 ## 2. 逐工具表
 
-## A. `allow`（候选；无 live 证据前不进 play）（73 个）
+## A. `allow`（候选；无 live 证据前不进 play）（75 个）
 
 | tool | purity | status | decision | boot/play/test | live | reason |
 |---|---|---|---|---|---|---|
@@ -58,6 +58,7 @@
 | `get_layout` | pure | implemented | allow | Y/Y/Y | - | read-only per recorder classification; no known side effect |
 | `get_legal_actions` | pure | d0a_fixed | allow | -/Y/Y | - | B1: client.can_report removed; snapshot path static-pure (PP-READ-03); live PP-READ-01 still NOT_RUN |
 | `get_new_game_options` | pure | implemented | allow | Y/Y/Y | - | read-only per recorder classification; no known side effect |
+| `get_operation` | pure | implemented | allow | Y/Y/Y | - | read-only two-axis operation query (GET /operation); never builds the snapshot, never dispatches; ok:true only for completed |
 | `get_pending_prompt` | pure | implemented | allow | Y/Y/Y | - | read-only per recorder classification; no known side effect |
 | `get_recording_save_status` | pure | implemented | allow | Y/Y/Y | - | read-only per recorder classification; no known side effect |
 | `get_run_summary` | pure | d0a_fixed | allow | -/Y/Y | - | B1: client.can_report removed; snapshot path static-pure (PP-READ-03); live PP-READ-01 still NOT_RUN |
@@ -110,6 +111,7 @@
 | `toggle_service` | write | fixed | allow | -/Y/Y | - | guard fixed in 3d85963/3fed61c with regression tests |
 | `wait_for_change` | pure | d0a_fixed | allow | -/Y/Y | - | B1: client.can_report removed; snapshot path static-pure (PP-READ-03); live PP-READ-01 still NOT_RUN |
 | `wait_for_events` | pure | d0a_fixed | allow | -/Y/Y | - | B1: client.can_report removed; snapshot path static-pure (PP-READ-03); live PP-READ-01 still NOT_RUN |
+| `wait_operation` | pure | implemented | allow | Y/Y/Y | - | bounded client-side poll of get_operation; timeout returns ok:false + status=pending, never a fake success |
 | `wanted_status` | pure | implemented | allow | Y/Y/Y | - | read-only per recorder classification; no known side effect |
 | `wine_status` | pure | implemented | allow | Y/Y/Y | - | read-only per recorder classification; no known side effect |
 

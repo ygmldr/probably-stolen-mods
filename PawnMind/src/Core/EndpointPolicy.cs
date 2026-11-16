@@ -11,6 +11,9 @@ namespace PawnMind.Core
         /// <summary>The operation name the snapshot endpoints map to.</summary>
         public const string StateReadOp = "get_state";
 
+        /// <summary>The operation name GET /operation maps to.</summary>
+        public const string OperationReadOp = "get_operation";
+
         /// <summary>Null when the endpoint may run, otherwise the refusal code.</summary>
         public static string Refusal(RouteKind kind)
         {
@@ -29,6 +32,13 @@ namespace PawnMind.Core
                 case RouteKind.State:
                 case RouteKind.Events:
                     return ModePolicy.Refusal(StateReadOp);
+
+                case RouteKind.Operation:
+                    // Querying an already-issued operation is a protocol necessity
+                    // (it answers "what happened to my write?"), not a snapshot
+                    // read: it is allowed in Bootstrap but never in Locked, and the
+                    // per-mode allowlist still decides.
+                    return ModePolicy.Refusal(OperationReadOp);
 
                 case RouteKind.Action:
                     // Per-operation authorization happens inside ActionRouter

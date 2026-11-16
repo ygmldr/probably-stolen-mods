@@ -140,6 +140,7 @@ namespace PawnMind.Bridge
         private readonly Func<BridgeHealth> _healthProvider;
         private readonly BridgeLimits _limits;
         private readonly Action<string, string> _undeliveredHandler;
+        private readonly Func<string, string> _operationProvider;
         private readonly List<Client> _clients = new List<Client>();
 
         private TcpListener _listener;
@@ -154,7 +155,8 @@ namespace PawnMind.Bridge
             Func<long> revisionProvider = null,
             Func<BridgeHealth> healthProvider = null,
             BridgeLimits limits = null,
-            Action<string, string> undeliveredHandler = null)
+            Action<string, string> undeliveredHandler = null,
+            Func<string, string> operationProvider = null)
         {
             if (config == null) throw new ArgumentNullException("config");
             if (stateProvider == null) throw new ArgumentNullException("stateProvider");
@@ -169,6 +171,7 @@ namespace PawnMind.Bridge
             _healthProvider = healthProvider;
             _limits = (limits ?? new BridgeLimits()).Copy();
             _undeliveredHandler = undeliveredHandler;
+            _operationProvider = operationProvider;
         }
 
         /// <summary>Number of accepted (not yet closed) connections.</summary>
@@ -559,6 +562,55 @@ namespace PawnMind.Bridge
                     client.Dispatched = true;
                     QueueResponse(client, 200, "OK", _actionHandler(request.Body));
                     return;
+
+                case RouteKind.Operation:
+                {
+                    if (!Authorized(request))
+                    {
+                        QueueResponse(client, 401, "Unauthorized", ErrorJson("unauthorized"));
+                        return;
+                    }
+
+                    string operationRefusal = EndpointPolicy.Refusal(RouteKind.Operation);
+                    if (operationRefusal != null)
+                    {
+                        QueueResponse(client, 403, "Forbidden", ErrorJson(operationRefusal));
+                        return;
+                    }
+
+                    // Read-only query: it never builds the snapshot and never
+                    // dispatches. A GET cannot be replayed as a write.
+                    string operationId = QueryValues.Get(request.Query, "id");
+                    if (string.IsNullOrEmpty(operationId))
+                    {
+                        QueueResponse(client, 400, "Bad Request",
+                            ErrorJson(OperationErrors.MissingOperationId));
+                        return;
+                    }
+
+                    Func<string, string> provider = _operationProvider;
+                    if (provider == null)
+                    {
+                        QueueResponse(client, 200, "OK",
+                            "{\"ok\":false,\"known\":false,\"error\":\""
+                            + OperationErrors.OperationUnavailable + "\"}");
+                        return;
+                    }
+
+                    string operationBody;
+                    try
+                    {
+                        operationBody = provider(operationId);
+                    }
+                    catch (Exception)
+                    {
+                        operationBody = "{\"ok\":false,\"known\":false,\"error\":\""
+                            + OperationErrors.OperationUnavailable + "\"}";
+                    }
+
+                    QueueResponse(client, 200, "OK", operationBody);
+                    return;
+                }
 
                 case RouteKind.Events:
                     if (!Authorized(request))

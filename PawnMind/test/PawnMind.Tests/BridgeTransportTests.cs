@@ -708,7 +708,7 @@ namespace PawnMind.Tests
         // ----------------------------------------------------------- Undelivered
 
         [Test]
-        public static void Oversized_Action_Response_Is_Recorded_As_Unknown()
+        public static void Oversized_Action_Response_Is_Recorded_As_Undelivered()
         {
             int dispatches = 0;
             long revision = 3;
@@ -747,14 +747,20 @@ namespace PawnMind.Tests
                     "the refused response is reported as undelivered");
                 Assert.True(LogContains(harness, "output limit"), "the refusal is logged");
 
-                using (var retry = new RawClient(harness.Port))
-                {
-                    retry.Send(PostRequest(harness.Port, body));
-                    string response = ReadWholeResponse(harness, retry, 5000);
-                    Assert.Contains(Body(response), "\"error\":\"outcome_unknown\"",
-                        "the retry must not be told the oversized write succeeded");
-                    Assert.Equal(1, dispatches, "the retry must not dispatch the write again");
-                }
+                // The response body itself is larger than the pending limit, so it
+                // can never be redelivered. D1/D2: the execution evidence stays
+                // queryable through GET /operation instead of being rewritten to
+                // outcome_unknown, and a retry does not dispatch again.
+                Newtonsoft.Json.Linq.JObject operation =
+                    router.GetOperationJson("act-huge");
+                Assert.True((bool)operation["ok"], "the completed business fact is preserved");
+                Assert.Equal("completed", (string)operation["execution_status"],
+                    "execution stays completed");
+                Assert.Equal("undelivered", (string)operation["delivery_status"],
+                    "the lost response is recorded on the delivery axis");
+                Assert.False(operation.ToString().Contains("outcome_unknown"),
+                    "the execution outcome is no longer rewritten");
+                Assert.Equal(1, dispatches, "no second dispatch");
             }
             finally
             {
@@ -763,7 +769,7 @@ namespace PawnMind.Tests
         }
 
         [Test]
-        public static void Undelivered_Write_Becomes_Outcome_Unknown_On_Retry()
+        public static void Undelivered_Write_Keeps_Completed_Evidence_On_Retry()
         {
             int dispatches = 0;
             long revision = 3;
@@ -774,7 +780,7 @@ namespace PawnMind.Tests
                 {
                     dispatches++;
                     return ActionResult.SuccessRaw(op,
-                        "{\"ok\":true,\"blob\":\"" + new string('y', 400 * 1024) + "\"}");
+                        "{\"ok\":true,\"blob\":\"" + new string('y', 4 * 1024) + "\"}");
                 },
                 new ActionHistory(10),
                 delegate { return revision; },
@@ -813,10 +819,12 @@ namespace PawnMind.Tests
                     retry.Send(PostRequest(harness.Port, body));
                     string response = ReadWholeResponse(harness, retry, 5000);
                     string responseBody = Body(response);
-                    Assert.Contains(responseBody, "\"error\":\"outcome_unknown\"",
-                        "the retry must not be told the first attempt failed");
-                    Assert.Contains(responseBody, "\"unknown\":true", "unknown is explicit");
-                    Assert.Contains(responseBody, "\"dispatched\":true", "the write did run");
+                    Assert.Contains(responseBody, "\"ok\":true",
+                        "D1: the completed business fact survives the lost response");
+                    Assert.Contains(responseBody, "\"delivery_status\":\"undelivered\"",
+                        "the delivery axis records the lost response");
+                    Assert.Contains(responseBody, "\"redelivered\":true",
+                        "the retry is flagged as a re-delivery");
                     Assert.Equal(1, dispatches, "the retry must not dispatch the write again");
                 }
             }

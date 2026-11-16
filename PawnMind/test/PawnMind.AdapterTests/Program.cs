@@ -678,6 +678,19 @@ namespace PawnMind.AdapterTests
             // confirm_trade presses the native accept button, so the client
             // completes its business and can leave.
             CheckMethod(assembly, "NegociationUIManager", "OnOfferAcceptClick");
+            // C module (B10-B16 trade guard): every guard member the pre-check reads.
+            CheckMethod(assembly, "NegociationUIManager", "IsTradeLocked");
+            CheckMethod(assembly, "NegociationUIManager", "IsNegociatingItemOwned");
+            CheckMethod(assembly, "PlayerStore", "CanPay");
+            CheckMethod(assembly, "PlayerStore", "CanBuyItemFromTable");
+            CheckMethod(assembly, "PlayerStore", "CanSellThisItem");
+            CheckField(assembly, "StoreClient", "isIntroduced");
+            CheckField(assembly, "StoreClient", "serviceCost");
+            CheckField(assembly, "StoreClient", "barterOffer");
+            CheckField(assembly, "StoreClient", "gunOrderData");
+            CheckField(assembly, "StoreClient", "isBusinessComplete");
+            CheckMethod(assembly, "BarterOffer", "IsBarterAcceptable");
+            CheckMethod(assembly, "GunOrderData", "IsAccepted");
             CheckProperty(assembly, "NegociationUIManager", "IsOpen");
             CheckField(assembly, "StoreClient", "isBusinessComplete");
             CheckField(assembly, "PlayerStore", "currentClientInstance");

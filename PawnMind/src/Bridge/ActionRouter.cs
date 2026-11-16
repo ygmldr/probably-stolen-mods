@@ -93,6 +93,12 @@ namespace PawnMind.Bridge
         // triggered a native getter with side effects).
         private readonly Func<string, string> _authorize;
 
+        // D2: optional readback verifier. It runs on GET /operation for a
+        // non-terminal operation and may promote running/uncertain to completed or
+        // failed. It must be a read-only game probe; null keeps the status frozen.
+        private readonly Func<OperationRecord, OperationRecord> _operationVerifier;
+        private bool _operationsCleared;
+
         public ActionRouter(
             ActionGate gate,
             Func<long> revision,
@@ -102,7 +108,8 @@ namespace PawnMind.Bridge
             string secretToken = null,
             Func<WriteGateDecision> writeGate = null,
             Action<ActionOutcome> onOutcome = null,
-            Func<string, string> authorize = null)
+            Func<string, string> authorize = null,
+            Func<OperationRecord, OperationRecord> operationVerifier = null)
         {
             if (gate == null) throw new ArgumentNullException("gate");
             if (revision == null) throw new ArgumentNullException("revision");
@@ -117,6 +124,7 @@ namespace PawnMind.Bridge
             _secretToken = secretToken;
             _onOutcome = onOutcome;
             _authorize = authorize;
+            _operationVerifier = operationVerifier;
         }
 
         public string Handle(string body)
@@ -186,16 +194,19 @@ namespace PawnMind.Bridge
             string cached;
 
             // Probe the cache before refreshing state: a safe retry must return
-            // the recorded first result (including an unknown outcome) even when
-            // the game snapshot is currently unavailable. The request revision is
-            // passed as the comparison revision only to suppress the stale check;
-            // format validation and duplicate/conflict detection still run.
+            // the recorded first result (including a running/uncertain one) even
+            // when the game snapshot is currently unavailable. The request revision
+            // is passed as the comparison revision only to suppress the stale
+            // check; format validation and duplicate/conflict detection still run.
             ActionGateResult cachedGate = _gate.Check(
                 actionId,
                 revision,
                 revision ?? 0,
                 fingerprint,
                 out cached);
+
+            if (cachedGate == ActionGateResult.Duplicate)
+                return Scrub(DecorateCached(actionId, cached));
 
             string cachedFailure = GateResponse(cachedGate, cached);
             if (cachedFailure != null) return Scrub(cachedFailure);
@@ -219,45 +230,59 @@ namespace PawnMind.Bridge
             string gateFailure = GateResponse(gate, cached);
             if (gateFailure != null) return Scrub(gateFailure);
 
+            // D4: while the same operation is still running (native animation or
+            // async save), a second action id for that op would issue a duplicate
+            // native call. Refuse it; unrelated writes (for example a dialogue
+            // continuation) stay available so the workflow cannot deadlock.
+            OperationRecord pending = _gate.FindPendingFor(op);
+            if (pending != null) return Scrub(OperationPending(op, pending));
+
+            OperationRecord operation = _gate.Begin(actionId, op, currentRevision, fingerprint);
             ActionResult result = Dispatch(op, request);
 
             long responseRevision;
             if (!TryRefreshRevision(out responseRevision))
             {
                 // The action ran but the resulting state cannot be observed. Do
-                // not report success/failure: cache an explicit unknown outcome so
-                // a retry with the same id returns the same answer without a
+                // not report success/failure: cache an explicit uncertain outcome
+                // so a retry with the same id returns the same answer without a
                 // second dispatch.
                 string unknown = OutcomeUnknown(op, currentRevision);
-                _gate.Remember(actionId, fingerprint, unknown);
+                string envelope = DecorateResponse(actionId, unknown,
+                    ExecutionStatus.Uncertain, DeliveryStatus.Delivered, false);
+                _gate.Complete(actionId, envelope, ExecutionStatus.Uncertain,
+                    DeliveryStatus.Delivered, currentRevision, "outcome_unknown");
                 _history.Add(
                     HistoryText(Scrub(op)),
                     Scrub(JsonForAudit(request)),
                     false,
                     "outcome_unknown",
                     currentRevision);
-                return Scrub(unknown);
+                return Scrub(envelope);
             }
 
             string response = result.ToJson(responseRevision);
-
-            _gate.Remember(actionId, fingerprint, response);
+            string execution = Classify(result, response, out string error);
+            string decorated = DecorateResponse(actionId, response, execution,
+                DeliveryStatus.Delivered, false);
+            _gate.Complete(actionId, decorated, execution, DeliveryStatus.Delivered,
+                responseRevision, error);
             _history.Add(
                 HistoryText(Scrub(op)),
                 Scrub(JsonForAudit(request)),
-                result.Ok,
-                HistoryText(Scrub(result.Error)),
+                ExecutionStatus.IsSuccess(execution),
+                HistoryText(Scrub(error)),
                 responseRevision);
-            return Scrub(response);
+            return Scrub(decorated);
         }
 
         /// <summary>
         /// Called by the transport after a write action was dispatched but its
-        /// response could not be delivered (client reset or write timeout). The
-        /// cached success/failure must not be shown to the retrying caller as if
-        /// nothing ran: replace it with an explicit unknown outcome. A request
-        /// that never reached the action cache (ping, reads, stale/refused writes)
-        /// is ignored.
+        /// response could not be delivered (client reset or write timeout).
+        ///
+        /// D1: only the delivery axis changes. The completed execution evidence and
+        /// the cached response body stay intact, so a retry with the same id sees
+        /// what really happened plus an explicit undelivered marker.
         /// </summary>
         public void MarkResponseUndelivered(string requestBody, string responseBody)
         {
@@ -290,16 +315,224 @@ namespace PawnMind.Bridge
             if (!TryReadActionId(request, out actionId, out actionIdError)) return;
             if (string.IsNullOrEmpty(actionId)) return;
 
-            string unknown = OutcomeUnknown(op, CurrentRevision(), "transport_undelivered");
-            if (!_gate.Replace(actionId, responseBody ?? string.Empty, unknown)) return;
+            if (!_gate.MarkUndelivered(actionId)) return;
 
+            OperationRecord record = _gate.Find(actionId);
             _history.Add(
                 HistoryText(Scrub(op)),
                 Scrub(JsonForAudit(request)),
-                false,
-                "outcome_unknown",
+                record != null && record.Ok,
+                "delivery_undelivered",
                 CurrentRevision());
-            Notify(new ActionOutcome(op, false, true, "outcome_unknown", CurrentRevision()));
+            Notify(new ActionOutcome(op, record != null && record.Ok, true,
+                "delivery_undelivered", CurrentRevision()));
+        }
+
+        // ------------------------------------------------------------- D2 query
+
+        /// <summary>
+        /// Read-only two-axis query for one action id. Never dispatches and never
+        /// builds the game snapshot. Unknown ids (including after a Mod restart or a
+        /// run change) return a structured refusal; the caller must re-read state
+        /// instead of replaying with a new action id.
+        /// </summary>
+        public JObject GetOperationJson(string operationId)
+        {
+            var payload = new JObject();
+
+            if (string.IsNullOrEmpty(operationId) || operationId.Trim().Length == 0
+                || operationId.Length > 128 || HasControlCharacter(operationId))
+            {
+                payload["ok"] = false;
+                payload["known"] = false;
+                payload["error"] = OperationErrors.BadOperationId;
+                return payload;
+            }
+
+            OperationRecord record = _gate.Find(operationId);
+            if (record == null)
+            {
+                payload["ok"] = false;
+                payload["known"] = false;
+                payload["operation_id"] = operationId;
+                payload["error"] = OperationErrors.UnknownOperation;
+                payload["next"] = "do not replay this id or start a new action id for"
+                    + " the same op; re-read get_state and decide again";
+                if (_operationsCleared || _gate.ClearCount > 0)
+                {
+                    payload["process_restarted"] = true;
+                    payload["detail"] = "the operation cache was reset by a run change"
+                        + " (new game / loaded save). Old evidence is not attributed to"
+                        + " the current run.";
+                }
+
+                return payload;
+            }
+
+            record = Verify(record);
+            payload["ok"] = record.Ok;
+            payload["known"] = true;
+            payload["operation_id"] = record.OperationId;
+            payload["op"] = record.Op;
+            payload["execution_status"] = record.Execution;
+            payload["delivery_status"] = record.Delivery;
+            payload["dispatched"] = record.Dispatched;
+            payload["error"] = record.Error == null ? JValue.CreateNull() : new JValue(record.Error);
+            payload["rev"] = record.Revision;
+            payload["result_rev"] = record.ResultRevision;
+            if (!ExecutionStatus.IsTerminal(record.Execution))
+            {
+                payload["next"] = record.Execution == ExecutionStatus.Uncertain
+                    ? "the outcome is unknown: do not retry with a new action id; read state and decide"
+                    : "still running: call wait_operation or read state again; do not re-dispatch";
+            }
+
+            return payload;
+        }
+
+        /// <summary>
+        /// Run/timeline change (new game, loaded save, restored timeline): every
+        /// old operation record is dropped so evidence from another run is never
+        /// attributed to this one. Returns the number of dropped records.
+        /// </summary>
+        public int ResetOperations()
+        {
+            int cleared = _gate.ClearOperations();
+            _operationsCleared = true;
+            return cleared;
+        }
+
+        private OperationRecord Verify(OperationRecord record)
+        {
+            if (record == null) return null;
+            if (ExecutionStatus.IsTerminal(record.Execution)) return record;
+            if (_operationVerifier == null) return record;
+
+            try
+            {
+                OperationRecord updated = _operationVerifier(record.Copy());
+                if (updated == null) return record;
+                _gate.Update(updated);
+                return updated.Copy();
+            }
+            catch (Exception)
+            {
+                // A failing verifier must never break the read or fake a success.
+                return record;
+            }
+        }
+
+        private string DecorateCached(string actionId, string cached)
+        {
+            OperationRecord record = _gate.Find(actionId);
+            if (record == null) return cached;
+
+            bool redelivered = record.Delivery == DeliveryStatus.Undelivered;
+            return DecorateResponse(actionId, cached, record.Execution, record.Delivery,
+                redelivered);
+        }
+
+        private string DecorateResponse(string actionId, string response,
+            string execution, string delivery, bool redelivered)
+        {
+            JObject json;
+            try
+            {
+                json = JObject.Parse(string.IsNullOrEmpty(response) ? "{}" : response);
+            }
+            catch (Exception)
+            {
+                // A malformed body is already a failure; do not invent fields on it.
+                return response;
+            }
+
+            bool completed = ExecutionStatus.IsSuccess(execution);
+            json["ok"] = completed;
+            json["operation_id"] = actionId;
+            json["execution_status"] = execution;
+            json["delivery_status"] = delivery;
+            if (execution == ExecutionStatus.Rejected)
+            {
+                json["dispatched"] = false;
+            }
+            else if (json["dispatched"] == null)
+            {
+                json["dispatched"] = true;
+            }
+
+            if (redelivered) json["redelivered"] = true;
+            return json.ToString(Formatting.None);
+        }
+
+        private string OperationPending(string op, OperationRecord pending)
+        {
+            var payload = new JObject();
+            payload["ok"] = false;
+            payload["error"] = OperationErrors.OperationPending;
+            payload["op"] = op;
+            payload["rev"] = CurrentRevision();
+            payload["blocking_operation_id"] = pending.OperationId;
+            payload["execution_status"] = pending.Execution;
+            payload["delivery_status"] = pending.Delivery;
+            payload["next"] = "call get_operation or wait_operation for the blocking id;"
+                + " do not start a new action id for the same op";
+            return payload.ToString(Formatting.None);
+        }
+
+        private static string Classify(ActionResult result, string response, out string error)
+        {
+            error = result == null ? null : result.Error;
+            JObject json = null;
+            try
+            {
+                json = JObject.Parse(string.IsNullOrEmpty(response) ? "{}" : response);
+            }
+            catch (Exception)
+            {
+            }
+
+            bool ok = result != null && result.Ok;
+            bool pending = JsonBool(json, "pending");
+            bool unknown = JsonBool(json, "uncertain")
+                || JsonBool(json, "unknown")
+                || string.Equals(error, "outcome_unknown", StringComparison.Ordinal);
+
+            bool dispatched;
+            if (json != null && json["dispatched"] != null)
+            {
+                dispatched = JsonBool(json, "dispatched");
+            }
+            else
+            {
+                // Raw services spell out dispatched; a bare ActionResult.Failure is a
+                // pre-dispatch guard refusal, which is the conservative reading.
+                dispatched = result != null && result.RawJson != null;
+            }
+
+            if (!ok && string.IsNullOrEmpty(error) && json != null)
+            {
+                JToken code = json["error"];
+                if (code != null && code.Type == JTokenType.String) error = (string)code;
+            }
+
+            return ExecutionStatus.Classify(ok, pending, unknown, dispatched);
+        }
+
+        private static bool HasControlCharacter(string value)
+        {
+            for (int i = 0; i < value.Length; i++)
+            {
+                if (char.IsControl(value[i])) return true;
+            }
+
+            return false;
+        }
+
+        private static bool JsonBool(JObject json, string name)
+        {
+            if (json == null) return false;
+            JToken token = json[name];
+            return token != null && token.Type == JTokenType.Boolean && (bool)token;
         }
 
         private string HandleRead(string op, JObject request)

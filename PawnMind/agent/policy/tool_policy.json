@@ -1768,6 +1768,36 @@
    },
    "live_evidence": [],
    "offline_tests": []
+  },
+  "get_operation": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "read-only two-axis operation query (GET /operation); never builds the game snapshot, never dispatches, and ok:true only for execution_status=completed",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   },
+   "live_evidence": [],
+   "offline_tests": []
+  },
+  "wait_operation": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "bounded client-side poll of get_operation; a timeout returns ok:false + status=pending + operation_id, never a fake success; Unity main thread is never blocked",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   },
+   "live_evidence": [],
+   "offline_tests": []
   }
  },
  "snapshot_readers": [

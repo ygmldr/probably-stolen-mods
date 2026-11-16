@@ -8,6 +8,7 @@ namespace PawnMind.Core
         State,
         Action,
         Events,
+        Operation,
         NotFound,
         MethodNotAllowed
     }
@@ -30,6 +31,11 @@ namespace PawnMind.Core
 
             if (normalizedPath == "/events")
                 return normalizedMethod == "GET" ? RouteKind.Events : RouteKind.MethodNotAllowed;
+
+            // D2: read-only operation query. It never builds the game snapshot and
+            // is not a SNAPSHOT_READER; it only reads the in-process action cache.
+            if (normalizedPath == "/operation")
+                return normalizedMethod == "GET" ? RouteKind.Operation : RouteKind.MethodNotAllowed;
 
             return RouteKind.NotFound;
         }

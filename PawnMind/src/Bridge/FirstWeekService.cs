@@ -202,10 +202,28 @@ namespace PawnMind.Bridge
                     false, null, null, readback);
             }
 
+            // D3: dispatching the shutter click is not the same as the shop being
+            // closed. The native close runs an animation; when the readback still
+            // shows OPEN the request is running, not a success and not a no-effect.
+            bool shopClosedAfter = after != null && after.Readable
+                && DayEndPolicy.IsClosed(after.ShopState);
+            string execution = ShopOperationSemantics.EndDayExecution(
+                true, readback.Readable, readback.Error, shopClosedAfter);
+
             var row = new JObject();
-            row["ok"] = true;
+            row["ok"] = execution == ExecutionStatus.Completed;
             row["op"] = op;
             row["dispatched"] = true;
+            row["execution_status"] = execution;
+            row["shop_closed_after"] = shopClosedAfter;
+            if (execution == ExecutionStatus.Running)
+            {
+                row["pending"] = true;
+                row["error"] = "shop_still_open";
+                row["next"] = "the shutter animation is still running; call"
+                    + " get_operation or wait_operation, do not re-dispatch";
+            }
+
             row["readback"] = JObject.FromObject(FirstWeekJson.Readback(readback));
             row["can_end_day_after"] = after.CanEndDay;
             return ActionResult.SuccessRaw(op, row.ToString(Formatting.None));

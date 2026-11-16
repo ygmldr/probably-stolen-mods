@@ -36,26 +36,19 @@ namespace PawnMind.Bridge
             if (button == null) return ActionResult.Failure("open_shop", "open_shop_unavailable");
 
             // Mirror the native predicates so the caller gets a stable code instead
-            // of a silently ignored click.
-            if (store.lockShutterButtonFlag > 0)
+            // of a silently ignored click. The rule lives in Core so the offline
+            // suite pins it (P0-OPEN-01): the animation lock and the MORNING gate
+            // must refuse a repeated open_shop, not swallow it.
+            string blocked = Core.OpenShopPolicy.Evaluate(
+                true,
+                store.lockShutterButtonFlag > 0,
+                store.isClientBeingArrested,
+                store.isHandlingShootout,
+                store.storeState.ToString(),
+                store.CanStartDay());
+            if (blocked != null)
             {
-                return ActionResult.Failure("open_shop", "shutter_busy");
-            }
-            if (store.isClientBeingArrested)
-            {
-                return ActionResult.Failure("open_shop", "busy_arrest");
-            }
-            if (store.isHandlingShootout)
-            {
-                return ActionResult.Failure("open_shop", "busy_shootout");
-            }
-            if (store.storeState != PlayerStore.StoreState.MORNING)
-            {
-                return ActionResult.Failure("open_shop", "shop_not_morning");
-            }
-            if (!store.CanStartDay())
-            {
-                return ActionResult.Failure("open_shop", "cannot_open_shop");
+                return ActionResult.Failure("open_shop", blocked);
             }
 
             try
@@ -469,49 +462,11 @@ namespace PawnMind.Bridge
         /// </summary>
         public static ActionResult ConfirmTrade(int itemId, string side)
         {
-            PlayerStore store;
-            if (!TryStore(out store)) return ActionResult.Failure("confirm_trade", "not_in_game");
-
-            GameItem item = GameState.FindItem(itemId);
-            if (item == null) return ActionResult.Failure("confirm_trade", "item_not_found");
-
-            if (!GameState.IsNegotiationOpen())
-            {
-                return ActionResult.Failure("confirm_trade", "no_negotiation");
-            }
-
-            GameItem staged = GameState.GetNegotiatedItem();
-            if (staged == null || staged.GetUniqueID() != itemId)
-            {
-                // The player can only accept the item that is on the table.
-                return ActionResult.Failure("confirm_trade", "item_not_staged");
-            }
-
-            bool owned = GameState.IsOwned(item);
-            if (string.Equals(side, "buy", StringComparison.OrdinalIgnoreCase) && owned)
-            {
-                return ActionResult.Failure("confirm_trade", "already_owned");
-            }
-            if (string.Equals(side, "sell", StringComparison.OrdinalIgnoreCase) && !owned)
-            {
-                return ActionResult.Failure("confirm_trade", "not_owned");
-            }
-            if (!string.Equals(side, "buy", StringComparison.OrdinalIgnoreCase)
-                && !string.Equals(side, "sell", StringComparison.OrdinalIgnoreCase))
-            {
-                return ActionResult.Failure("confirm_trade", "bad_side");
-            }
-
-            try
-            {
-                GameState.AcceptNegotiationOffer();
-            }
-            catch (Exception)
-            {
-                return ActionResult.Failure("confirm_trade", "confirm_failed");
-            }
-
-            return ActionResult.Success("confirm_trade");
+            // C module: one guarded path. TradeService pre-checks every known silent
+            // native refusal branch (B10-B16) before the click and only reports
+            // completed on trusted business-complete evidence for the same client.
+            return new TradeService(new GameTradePort()).Confirm(
+                itemId, side, StateSnapshot.CurrentRevision);
         }
 
         private static NegociationUIManager GetNegotiationUi()

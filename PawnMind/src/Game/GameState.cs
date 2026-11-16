@@ -752,6 +752,24 @@ namespace PawnMind.Game
             ui.OnOfferAcceptClick();
         }
 
+        /// <summary>
+        /// In-process identity of the current client (never serialized). Used by the
+        /// trade evidence layer so another client's state change cannot back this
+        /// trade (PP-TRADE-08).
+        /// </summary>
+        public static int GetCurrentClientHandle()
+        {
+            try
+            {
+                StoreClient client = GetCurrentClient();
+                return client == null ? 0 : RuntimeHelpers.GetHashCode(client);
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
         /// <summary>True once the current client's deal is recorded as done.</summary>
         public static bool IsCurrentClientBusinessComplete()
         {
