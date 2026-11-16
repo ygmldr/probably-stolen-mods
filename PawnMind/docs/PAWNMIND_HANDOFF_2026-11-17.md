@@ -125,7 +125,7 @@ rsync -a -e ssh root@192.168.1.101:/root/work/game_mods/ /mnt/d/code/game_mods/
 | 裸 HTTP 不能绕过读取限制 | ✅ `/state`、`/events` 在 provider 之前 403，计数实测 0 |
 | 拒绝先于快照/派发 | ✅ `EndpointGateTests` + `ActionRouterTests`（`refreshRevision` 计数 0） |
 
-审阅：`docs/reviews/NIGHTLY_A_MODE_POLICY_REVIEW.md`（独立审阅 agent 产出；若文件缺失说明该 agent 尚未写完，**不要**用实现者自述代替）。
+审阅：**`NOT_REVIEWED`**。独立审阅 agent 已启动但被用户叫停，`docs/reviews/NIGHTLY_A_MODE_POLICY_REVIEW.md` 未产出；接手者应重跑一次独立审阅，**不要**用实现者自述代替。
 
 ---
 
@@ -185,7 +185,7 @@ _decomp/BargainUIManager.cs:1103 → 重置 trackedClient/报价状态  ← 读�
 
 - 每模块一份 `docs/reviews/NIGHTLY_<X>_REVIEW.md`，按任务书固定结构写，**必须披露独立性**。
 - `NIGHTLY_F_INTEGRATION_REVIEW.md`：C#↔Python 策略、Snapshot↔LegalAction↔Skill、Trade↔Operation↔Dialogue、Gate↔Recorder、Async↔Save、Play gate↔live evidence、Build↔Installed。
-- A 的审阅已由独立 agent 产出。
+- A 的审阅 **未完成**（`NOT_REVIEWED`）：独立 agent 被叫停，需重跑。
 
 ### 5.7 A 的遗留项
 
@@ -274,7 +274,7 @@ PAWNMIND_BUILD_ONLY=1 ./build.sh            # 只编译 Mod（含 Unity 目标�
 | `docs/reports/NIGHTLY_BATCH_A_REPORT.md` | 批次阶段报告（含 12 问回答） |
 | `docs/plans/SERVER_MIGRATION_2026-11-17.md` | 服务器细节与同步命令 |
 | `docs/plans/NEXT_LIVE_SESSION.md` | 实机验收步骤与记录模板 |
-| `docs/reviews/NIGHTLY_A_MODE_POLICY_REVIEW.md` | A 模块独立审阅 |
+| `docs/reviews/NIGHTLY_A_MODE_POLICY_REVIEW.md` | A 模块独立审阅（**尚未产出**） |
 | `docs/audit/BASELINE_CURRENT.md` | 上一轮基线（R3） |
 | `docs/reviews/ROUND3_REMEDIATION.md` | 上一轮整改说明 |
 | `PawnMind/AGENTS.md`、根 `AGENTS.md` | 工程规则（TDD、分层、安全不变量） |

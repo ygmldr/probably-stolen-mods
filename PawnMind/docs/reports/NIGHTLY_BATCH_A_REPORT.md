@@ -53,7 +53,7 @@
 
 ## F — 独立审阅与集成：**部分**
 
-- A 模块独立审阅：`docs/reviews/NIGHTLY_A_MODE_POLICY_REVIEW.md`（由独立审阅 agent 产出）。
+- A 模块独立审阅：**`NOT_REVIEWED`**。独立审阅 agent 已启动，被用户叫停，未产出文档；接手者需重跑。
 - F1 跨层集成、F2 全量重跑：A 之后已跑一次全量（见基线），但 B/C/D 未合入，集成审阅尚不成立。
 
 ## 总测试摘要
