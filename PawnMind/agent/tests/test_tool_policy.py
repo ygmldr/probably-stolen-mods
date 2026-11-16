@@ -52,6 +52,18 @@ class ToolPolicyTests(unittest.TestCase):
         self.assertTrue(strict <= self.recording,
                         "strict must be generated from the recording surface")
 
+    def test_reads_are_classified_from_the_recorder_allowlist(self):
+        from tool_policy import READ_ONLY_TOOLS
+        self.assertGreater(len(READ_ONLY_TOOLS), 40, "recorder read-only set")
+        self.assertEqual("pure", purity("list_goods"), "a read must not count as a write")
+        self.assertEqual("write", purity("confirm_trade"), "a write stays a write")
+
+    def test_get_state_stays_out_until_d0a_has_evidence(self):
+        from tool_policy import PENDING_PURITY
+        self.assertIn("get_state", PENDING_PURITY, "documented blocker, not silent")
+        self.assertNotIn("get_state", strict_allowlist(self.inv["full"]),
+                         "the snapshot still refreshes the bargain UI")
+
     def test_deny_list_beats_every_mode_except_test(self):
         for name in STRICT_DENY:
             self.assertFalse(allowed_in("strict_player", name, True), name)
