@@ -1,21 +1,25 @@
-"""Read-only CLI over the P1 event store (``memory_history`` in CLI form).
+"""Read-only CLI over the event store and (optionally) the memory store.
 
 Usage (from ``PawnMind/``)::
 
     python -m agent.memory.cli --db play/memory/memory.db status
+    python -m agent.memory.cli --db play/memory/memory.db \
+        --memories-db play/memory/memories.db status
     python -m agent.memory.cli --db play/memory/memory.db timelines
     python -m agent.memory.cli --db play/memory/memory.db history --limit 20
     python -m agent.memory.cli --db play/memory/memory.db history --type intent
     python -m agent.memory.cli --db play/memory/memory.db reconcile
 
-P1 deliberately exposes no MCP tool: the memory MCP surface arrives with P2.
-The same functions back that tool later.
+The events DB and the memories DB are separate files.  ``status`` reports both
+when ``--memories-db`` is given; without it the memories section says
+``not configured`` and the old command line keeps working unchanged.
 """
 
 import argparse
 import json
 import sys
 
+from .memories import MemoryStore
 from .store import EventStore, MemoryUnavailable
 
 EXIT_OK = 0
@@ -80,12 +84,28 @@ def cmd_history(store, args):
 
 def cmd_status(store, args):
     pending = store.pending_events(args.timeline)
+    memory_store = getattr(args, "memory_store", None)
+    if memory_store is None:
+        memories = "not configured"
+        memories_by_status = "not configured"
+        memories_db = None
+        memory_schema_version = None
+    else:
+        info = memory_store.status()
+        memories = info["memories"]
+        memories_by_status = info["by_status"]
+        memories_db = info["db"]
+        memory_schema_version = info["schema_version"]
     payload = {
         "db": store.path,
         "schema_version": store.schema_version(),
         "timelines": len(store._require().execute(
             "SELECT timeline_id FROM timelines").fetchall()),
         "events": store.count_events(args.timeline),
+        "memories": memories,
+        "memories_by_status": memories_by_status,
+        "memories_db": memories_db,
+        "memory_schema_version": memory_schema_version,
         "pending": len(pending),
         "pending_actions": [
             {"tool": row["tool_name"], "action_id": row["action_id"],
@@ -122,7 +142,9 @@ def _emit(payload, args):
 
 def build_parser():
     parser = argparse.ArgumentParser(description="PawnMind interaction history")
-    parser.add_argument("--db", required=True, help="path to memory.db")
+    parser.add_argument("--db", required=True, help="path to the events memory.db")
+    parser.add_argument("--memories-db", default=None,
+                        help="path to the separate memories.db (status only)")
     parser.add_argument("--format", choices=("table", "json"), default="table")
 
     sub = parser.add_subparsers(dest="command", required=True)
@@ -170,12 +192,24 @@ def main(argv=None):
     except MemoryUnavailable as exc:
         print("memory unavailable: %s" % exc, file=sys.stderr)
         return EXIT_UNAVAILABLE
+
+    memory_store = None
     try:
+        if args.memories_db:
+            try:
+                memory_store = MemoryStore(
+                    args.memories_db, events_db=args.db)
+            except MemoryUnavailable as exc:
+                print("memories unavailable: %s" % exc, file=sys.stderr)
+                return EXIT_UNAVAILABLE
+        args.memory_store = memory_store
         return args.func(store, args)
     except MemoryUnavailable as exc:
         print("memory unavailable: %s" % exc, file=sys.stderr)
         return EXIT_UNAVAILABLE
     finally:
+        if memory_store is not None:
+            memory_store.close()
         store.close()
 
 

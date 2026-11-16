@@ -1,8 +1,8 @@
 {
-  "schema": 1,
-  "source": "seed",
+  "schema": 2,
+  "source": "seed_test_data",
   "test_data": true,
-  "notice": "TEST DATA ONLY. Every memory and evidence event in this file is synthetic and is imported into a throwaway database. None of it is a verified game mechanic, a real save observation, or a production recommendation.",
+  "notice": "TEST DATA ONLY. Every timeline, event and memory below is synthetic. It is imported into a throwaway database to exercise the memory store; none of it is a real save observation, a verified game mechanic, or a production recommendation.",
   "timelines": [
     {
       "timeline_id": "tl_seed_main",
@@ -13,7 +13,8 @@
       "run_id": "run-seed-a",
       "run_number": 1,
       "reason": "seed",
-      "instance_id": "local-01"
+      "instance_id": "local-01",
+      "created_at": "2026-11-01T00:00:00Z"
     },
     {
       "timeline_id": "tl_seed_other",
@@ -24,7 +25,8 @@
       "run_id": "run-seed-b",
       "run_number": 1,
       "reason": "seed",
-      "instance_id": "local-01"
+      "instance_id": "local-01",
+      "created_at": "2026-11-01T00:00:00Z"
     },
     {
       "timeline_id": "tl_seed_old",
@@ -35,7 +37,8 @@
       "run_id": "run-seed-old",
       "run_number": 1,
       "reason": "seed",
-      "instance_id": "local-01"
+      "instance_id": "local-01",
+      "created_at": "2026-10-15T00:00:00Z"
     }
   ],
   "memories": [
@@ -44,14 +47,33 @@
       "test_data": true,
       "kind": "warning",
       "text": "测试数据：库存占用超过九成时不要继续进货，先卖出或整理货架，否则新货可能放不下。",
-      "status": "verified",
-      "confidence": "high",
-      "source": "seed",
-      "scope_type": "game_version",
+      "target_status": "verified",
+      "confidence": 0.9,
+      "source": "seed_test_data",
+      "game_id": "probably_stolen",
       "game_version": "VERSION 100-Rev13",
-      "entities": ["inventory", "库存", "capacity", "货架"],
-      "conditions": {"requires_any": ["库存", "inventory", "capacity", "货架"]},
-      "why": "测试数据：一条已验证的库存失败警告，证据事件显示 95% 占用时进货失败。",
+      "save_id": null,
+      "run_id": null,
+      "timeline_id": "tl_seed_main",
+      "dedupe_key": "seed:mem_seed_inv_capacity",
+      "valid_from": "2026-11-01T00:00:00Z",
+      "scope_extra": {
+        "entities": [
+          "inventory",
+          "库存",
+          "capacity",
+          "货架"
+        ],
+        "conditions": {
+          "requires_any": [
+            "库存",
+            "inventory",
+            "capacity",
+            "货架"
+          ]
+        },
+        "why": "A verified inventory warning: the evidence event shows a failed listing at 95% occupancy."
+      },
       "evidence": [
         {
           "event_id": "ev_seed_inv_1",
@@ -61,8 +83,12 @@
           "result_status": "success",
           "capture_quality": "complete",
           "game_day": 3,
-          "result": {"inventory_occupancy": 0.95, "listing_failed": true},
-          "weight": 1.0
+          "result": {
+            "inventory_occupancy": 0.95,
+            "listing_failed": true
+          },
+          "weight": 1.0,
+          "evidence_grade": "observed"
         }
       ]
     },
@@ -71,25 +97,50 @@
       "test_data": true,
       "kind": "warning",
       "text": "测试数据：现金不足以支付本周租金时不要进货，先卖库存或取消订单。",
-      "status": "verified",
-      "confidence": "high",
-      "source": "seed",
-      "scope_type": "game_version",
+      "target_status": "verified",
+      "confidence": 0.9,
+      "source": "seed_test_data",
+      "game_id": "probably_stolen",
       "game_version": "VERSION 100-Rev13",
-      "entities": ["cash", "rent", "租金", "现金"],
-      "conditions": {"requires_any": ["现金", "租金", "rent", "cash"]},
-      "why": "测试数据：一条已验证的租金风险警告，证据事件显示现金 20、租金 50。",
+      "save_id": null,
+      "run_id": null,
+      "timeline_id": "tl_seed_main",
+      "dedupe_key": "seed:mem_seed_cash_rent",
+      "valid_from": "2026-11-01T00:00:00Z",
+      "scope_extra": {
+        "entities": [
+          "cash",
+          "rent",
+          "租金",
+          "现金"
+        ],
+        "conditions": {
+          "requires_any": [
+            "现金",
+            "租金",
+            "rent",
+            "cash"
+          ]
+        },
+        "why": "A verified rent warning: cash 20 against rent 50 was rejected."
+      },
       "evidence": [
         {
           "event_id": "ev_seed_rent_1",
           "timeline_id": "tl_seed_main",
-          "event_type": "result",
+          "event_type": "intent",
           "tool_name": "confirm_trade",
           "result_status": "rejected",
           "capture_quality": "complete",
           "game_day": 5,
-          "result": {"ok": false, "error": "insufficient_cash", "cash": 20, "rent": 50},
-          "weight": 1.0
+          "result": {
+            "ok": false,
+            "error": "insufficient_cash",
+            "cash": 20,
+            "rent": 50
+          },
+          "weight": 1.0,
+          "evidence_grade": "observed"
         }
       ]
     },
@@ -98,14 +149,33 @@
       "test_data": true,
       "kind": "procedure",
       "text": "测试数据：交易前先调用 get_state 核对 rev，再执行 confirm_trade；rev 不匹配时必须重新读取。",
-      "status": "verified",
-      "confidence": "medium",
-      "source": "seed",
-      "scope_type": "game_version",
+      "target_status": "verified",
+      "confidence": 0.65,
+      "source": "seed_test_data",
+      "game_id": "probably_stolen",
       "game_version": "VERSION 100-Rev13",
-      "entities": ["trade", "rev", "交易", "get_state"],
-      "conditions": {"requires_any": ["交易", "trade", "rev", "状态"]},
-      "why": "测试数据：两条已验证的流程事件，说明 rev 不匹配时交易会被拒绝。",
+      "save_id": null,
+      "run_id": null,
+      "timeline_id": "tl_seed_main",
+      "dedupe_key": "seed:mem_seed_trade_getstate",
+      "valid_from": "2026-11-01T00:00:00Z",
+      "scope_extra": {
+        "entities": [
+          "trade",
+          "rev",
+          "交易",
+          "get_state"
+        ],
+        "conditions": {
+          "requires_any": [
+            "交易",
+            "trade",
+            "rev",
+            "状态"
+          ]
+        },
+        "why": "Two verified procedure events: a successful read followed by a stale_rev rejection."
+      },
       "evidence": [
         {
           "event_id": "ev_seed_trade_1",
@@ -115,19 +185,28 @@
           "result_status": "success",
           "capture_quality": "complete",
           "game_day": 2,
-          "result": {"rev": 10, "ok": true},
-          "weight": 1.0
+          "result": {
+            "rev": 10,
+            "ok": true
+          },
+          "weight": 1.0,
+          "evidence_grade": "observed"
         },
         {
           "event_id": "ev_seed_trade_2",
           "timeline_id": "tl_seed_main",
-          "event_type": "result",
+          "event_type": "intent",
           "tool_name": "confirm_trade",
           "result_status": "rejected",
           "capture_quality": "complete",
           "game_day": 2,
-          "result": {"ok": false, "error": "stale_rev", "rev": 11},
-          "weight": 1.0
+          "result": {
+            "ok": false,
+            "error": "stale_rev",
+            "rev": 11
+          },
+          "weight": 1.0,
+          "evidence_grade": "observed"
         }
       ]
     },
@@ -136,14 +215,32 @@
       "test_data": true,
       "kind": "price_observation",
       "text": "测试数据：纯水在批发商处的进货价通常低于普通货架价，批量买入前先对比 list_goods。",
-      "status": "verified",
-      "confidence": "high",
-      "source": "seed",
-      "scope_type": "game_version",
+      "target_status": "verified",
+      "confidence": 0.9,
+      "source": "seed_test_data",
+      "game_id": "probably_stolen",
       "game_version": "VERSION 100-Rev13",
-      "entities": ["纯水", "water", "批发", "list_goods"],
-      "conditions": {"requires_any": ["纯水", "water", "批发"]},
-      "why": "测试数据：一条中文实体的价格观察，来自一次完整 list_goods 结果。",
+      "save_id": null,
+      "run_id": null,
+      "timeline_id": "tl_seed_main",
+      "dedupe_key": "seed:mem_seed_water_price",
+      "valid_from": "2026-11-01T00:00:00Z",
+      "scope_extra": {
+        "entities": [
+          "纯水",
+          "water",
+          "批发",
+          "list_goods"
+        ],
+        "conditions": {
+          "requires_any": [
+            "纯水",
+            "water",
+            "批发"
+          ]
+        },
+        "why": "A Chinese-entity price observation from one complete list_goods result."
+      },
       "evidence": [
         {
           "event_id": "ev_seed_water_1",
@@ -153,8 +250,13 @@
           "result_status": "success",
           "capture_quality": "complete",
           "game_day": 4,
-          "result": {"item": "纯水", "wholesale_price": 12, "shelf_price": 18},
-          "weight": 1.0
+          "result": {
+            "item": "纯水",
+            "wholesale_price": 12,
+            "shelf_price": 18
+          },
+          "weight": 1.0,
+          "evidence_grade": "observed"
         }
       ]
     },
@@ -163,16 +265,32 @@
       "test_data": true,
       "kind": "npc_profile",
       "text": "测试数据：房东来催租时，先看对话里的支付金额再回答；本存档私有标记 BETA-9。",
-      "status": "verified",
-      "confidence": "high",
-      "source": "seed",
-      "scope_type": "save",
+      "target_status": "verified",
+      "confidence": 0.9,
+      "source": "seed_test_data",
+      "game_id": "probably_stolen",
+      "game_version": "VERSION 100-Rev13",
       "save_id": "slot:40",
-      "run_id": "run-seed-a",
+      "run_id": null,
       "timeline_id": "tl_seed_main",
-      "entities": ["房东", "landlord", "BETA-9", "rent"],
-      "conditions": {"requires_any": ["房东", "landlord", "BETA-9"]},
-      "why": "测试数据：一条存档作用域内的房东观察，用于验证跨存档隔离。",
+      "dedupe_key": "seed:mem_seed_landlord",
+      "valid_from": "2026-11-01T00:00:00Z",
+      "scope_extra": {
+        "entities": [
+          "房东",
+          "landlord",
+          "BETA-9",
+          "rent"
+        ],
+        "conditions": {
+          "requires_any": [
+            "房东",
+            "landlord",
+            "BETA-9"
+          ]
+        },
+        "why": "A save-scoped landlord observation used to prove cross-save isolation."
+      },
       "evidence": [
         {
           "event_id": "ev_seed_landlord_1",
@@ -182,8 +300,13 @@
           "result_status": "success",
           "capture_quality": "complete",
           "game_day": 6,
-          "result": {"npc": "landlord", "choice": "pay", "rent": 50},
-          "weight": 1.0
+          "result": {
+            "npc": "landlord",
+            "choice": "pay",
+            "rent": 50
+          },
+          "weight": 1.0,
+          "evidence_grade": "observed"
         }
       ]
     },
@@ -192,25 +315,46 @@
       "test_data": true,
       "kind": "warning",
       "text": "测试数据：出售疑似违禁品前必须先查 contraband_status，确认安全再报价。",
-      "status": "verified",
-      "confidence": "medium",
-      "source": "seed",
-      "scope_type": "game_version",
+      "target_status": "verified",
+      "confidence": 0.65,
+      "source": "seed_test_data",
+      "game_id": "probably_stolen",
       "game_version": "VERSION 100-Rev13",
-      "entities": ["contraband", "违禁品", "security"],
-      "conditions": {"requires_any": ["违禁品", "contraband", "security"]},
-      "why": "测试数据：一条已验证的违禁品检查警告，证据是一次被拒绝的交易。",
+      "save_id": null,
+      "run_id": null,
+      "timeline_id": "tl_seed_main",
+      "dedupe_key": "seed:mem_seed_contraband_check",
+      "valid_from": "2026-11-01T00:00:00Z",
+      "scope_extra": {
+        "entities": [
+          "contraband",
+          "违禁品",
+          "security"
+        ],
+        "conditions": {
+          "requires_any": [
+            "违禁品",
+            "contraband",
+            "security"
+          ]
+        },
+        "why": "A verified contraband warning based on a rejected trade."
+      },
       "evidence": [
         {
           "event_id": "ev_seed_contraband_1",
           "timeline_id": "tl_seed_main",
-          "event_type": "result",
+          "event_type": "intent",
           "tool_name": "confirm_trade",
           "result_status": "rejected",
           "capture_quality": "complete",
           "game_day": 5,
-          "result": {"ok": false, "error": "contraband_forbidden"},
-          "weight": 1.0
+          "result": {
+            "ok": false,
+            "error": "contraband_forbidden"
+          },
+          "weight": 1.0,
+          "evidence_grade": "observed"
         }
       ]
     },
@@ -219,17 +363,34 @@
       "test_data": true,
       "kind": "strategy",
       "text": "测试数据：只有当库存占用达到 90% 以上且本次动作是买入时，才建议先清理库存再交易。",
-      "status": "verified",
-      "confidence": "medium",
-      "source": "seed",
-      "scope_type": "game_version",
+      "target_status": "verified",
+      "confidence": 0.65,
+      "source": "seed_test_data",
+      "game_id": "probably_stolen",
       "game_version": "VERSION 100-Rev13",
-      "entities": ["inventory", "库存", "capacity", "buy"],
-      "conditions": {
-        "requires_any": ["库存", "inventory"],
-        "state": {"inventory_occupancy_min": 0.9}
+      "save_id": null,
+      "run_id": null,
+      "timeline_id": "tl_seed_main",
+      "dedupe_key": "seed:mem_seed_inventory_condition",
+      "valid_from": "2026-11-01T00:00:00Z",
+      "scope_extra": {
+        "entities": [
+          "inventory",
+          "库存",
+          "capacity",
+          "buy"
+        ],
+        "conditions": {
+          "requires_any": [
+            "库存",
+            "inventory"
+          ],
+          "state": {
+            "inventory_occupancy_min": 0.9
+          }
+        },
+        "why": "A condition-restricted rule: only applies at >= 90% occupancy for buys."
       },
-      "why": "测试数据：条件受限规则，只在库存占用 >= 90% 且买入情景下适用。",
       "evidence": [
         {
           "event_id": "ev_seed_cond_1",
@@ -239,19 +400,27 @@
           "result_status": "success",
           "capture_quality": "complete",
           "game_day": 3,
-          "result": {"inventory_occupancy": 0.92, "ok": true},
-          "weight": 1.0
+          "result": {
+            "inventory_occupancy": 0.92,
+            "ok": true
+          },
+          "weight": 1.0,
+          "evidence_grade": "observed"
         },
         {
           "event_id": "ev_seed_cond_2",
           "timeline_id": "tl_seed_main",
-          "event_type": "result",
+          "event_type": "intent",
           "tool_name": "buy_wholesale",
           "result_status": "rejected",
           "capture_quality": "complete",
           "game_day": 3,
-          "result": {"ok": false, "error": "not_fillable"},
-          "weight": 1.0
+          "result": {
+            "ok": false,
+            "error": "not_fillable"
+          },
+          "weight": 1.0,
+          "evidence_grade": "observed"
         }
       ]
     },
@@ -260,15 +429,31 @@
       "test_data": true,
       "kind": "procedure",
       "text": "测试数据：旧规则主张每天结束前必须清空货架。",
-      "status": "deprecated",
-      "confidence": "low",
-      "source": "seed",
-      "scope_type": "game_version",
+      "target_status": "deprecated",
+      "confidence": 0.35,
+      "source": "seed_test_data",
+      "game_id": "probably_stolen",
       "game_version": "VERSION 100-Rev13",
-      "valid_until": "2026-11-01T00:00:00Z",
-      "entities": ["货架", "shelf", "结束"],
-      "conditions": {"requires_any": ["货架", "结束", "清空"]},
-      "why": "测试数据：已废弃规则，只用于验证默认检索不会返回 deprecated。",
+      "save_id": null,
+      "run_id": null,
+      "timeline_id": "tl_seed_main",
+      "dedupe_key": "seed:mem_seed_deprecated_clear_shelf",
+      "valid_from": "2026-10-01T00:00:00Z",
+      "scope_extra": {
+        "entities": [
+          "货架",
+          "shelf",
+          "结束"
+        ],
+        "conditions": {
+          "requires_any": [
+            "货架",
+            "结束",
+            "清空"
+          ]
+        },
+        "why": "A deliberately deprecated rule used to prove default retrieval hides it."
+      },
       "evidence": [
         {
           "event_id": "ev_seed_deprecated_1",
@@ -278,24 +463,46 @@
           "result_status": "success",
           "capture_quality": "complete",
           "game_day": 1,
-          "result": {"shelf_cleared": true},
-          "weight": 1.0
+          "result": {
+            "shelf_cleared": true
+          },
+          "weight": 1.0,
+          "evidence_grade": "observed"
         }
-      ]
+      ],
+      "valid_until": "2026-11-01T00:00:00Z"
     },
     {
       "memory_id": "mem_seed_conflict_high",
       "test_data": true,
       "kind": "strategy",
       "text": "测试数据：陈酿葡萄酒面向收藏家时应该报高价。",
-      "status": "verified",
-      "confidence": "low",
-      "source": "seed",
-      "scope_type": "game_version",
+      "target_status": "conflict",
+      "confidence": 0.4,
+      "source": "seed_test_data",
+      "game_id": "probably_stolen",
       "game_version": "VERSION 100-Rev13",
-      "entities": ["wine", "陈酿", "pricing", "报价"],
-      "conditions": {"requires_any": ["陈酿", "葡萄酒", "wine"]},
-      "why": "测试数据：冲突规则 A，用于验证冲突检测不会自动覆盖。",
+      "save_id": null,
+      "run_id": null,
+      "timeline_id": "tl_seed_main",
+      "dedupe_key": "seed:mem_seed_conflict_high",
+      "valid_from": "2026-11-01T00:00:00Z",
+      "scope_extra": {
+        "entities": [
+          "wine",
+          "陈酿",
+          "pricing",
+          "报价"
+        ],
+        "conditions": {
+          "requires_any": [
+            "陈酿",
+            "葡萄酒",
+            "wine"
+          ]
+        },
+        "why": "Conflict rule A: kept beside B without overwriting either text."
+      },
       "evidence": [
         {
           "event_id": "ev_seed_conflict_high_1",
@@ -305,8 +512,13 @@
           "result_status": "success",
           "capture_quality": "complete",
           "game_day": 4,
-          "result": {"wine": "陈酿葡萄酒", "buyer": "collector", "price": 120},
-          "weight": 1.0
+          "result": {
+            "wine": "陈酿葡萄酒",
+            "buyer": "collector",
+            "price": 120
+          },
+          "weight": 1.0,
+          "evidence_grade": "observed"
         },
         {
           "event_id": "ev_seed_conflict_high_2",
@@ -316,8 +528,13 @@
           "result_status": "success",
           "capture_quality": "complete",
           "game_day": 5,
-          "result": {"wine": "陈酿葡萄酒", "buyer": "collector", "price": 130},
-          "weight": 1.0
+          "result": {
+            "wine": "陈酿葡萄酒",
+            "buyer": "collector",
+            "price": 130
+          },
+          "weight": 1.0,
+          "evidence_grade": "observed"
         }
       ]
     },
@@ -326,14 +543,32 @@
       "test_data": true,
       "kind": "strategy",
       "text": "测试数据：陈酿葡萄酒面向收藏家时应该报低价。",
-      "status": "verified",
-      "confidence": "low",
-      "source": "seed",
-      "scope_type": "game_version",
+      "target_status": "conflict",
+      "confidence": 0.4,
+      "source": "seed_test_data",
+      "game_id": "probably_stolen",
       "game_version": "VERSION 100-Rev13",
-      "entities": ["wine", "陈酿", "pricing", "报价"],
-      "conditions": {"requires_any": ["陈酿", "葡萄酒", "wine"]},
-      "why": "测试数据：冲突规则 B，用于验证冲突检测不会自动覆盖。",
+      "save_id": null,
+      "run_id": null,
+      "timeline_id": "tl_seed_main",
+      "dedupe_key": "seed:mem_seed_conflict_low",
+      "valid_from": "2026-11-01T00:00:00Z",
+      "scope_extra": {
+        "entities": [
+          "wine",
+          "陈酿",
+          "pricing",
+          "报价"
+        ],
+        "conditions": {
+          "requires_any": [
+            "陈酿",
+            "葡萄酒",
+            "wine"
+          ]
+        },
+        "why": "Conflict rule B: kept beside A without overwriting either text."
+      },
       "evidence": [
         {
           "event_id": "ev_seed_conflict_low_1",
@@ -343,8 +578,13 @@
           "result_status": "success",
           "capture_quality": "complete",
           "game_day": 6,
-          "result": {"wine": "陈酿葡萄酒", "buyer": "collector", "price": 70},
-          "weight": 1.0
+          "result": {
+            "wine": "陈酿葡萄酒",
+            "buyer": "collector",
+            "price": 70
+          },
+          "weight": 1.0,
+          "evidence_grade": "observed"
         },
         {
           "event_id": "ev_seed_conflict_low_2",
@@ -354,8 +594,13 @@
           "result_status": "success",
           "capture_quality": "complete",
           "game_day": 7,
-          "result": {"wine": "陈酿葡萄酒", "buyer": "collector", "price": 60},
-          "weight": 1.0
+          "result": {
+            "wine": "陈酿葡萄酒",
+            "buyer": "collector",
+            "price": 60
+          },
+          "weight": 1.0,
+          "evidence_grade": "observed"
         }
       ]
     },
@@ -364,15 +609,29 @@
       "test_data": true,
       "kind": "warning",
       "text": "测试数据：旧规则建议库存不足时也先进货。",
-      "status": "superseded",
-      "confidence": "low",
-      "source": "seed",
-      "scope_type": "game_version",
+      "target_status": "superseded",
+      "confidence": 0.35,
+      "source": "seed_test_data",
+      "game_id": "probably_stolen",
       "game_version": "VERSION 100-Rev13",
-      "superseded_by": "mem_seed_inv_capacity",
-      "entities": ["inventory", "进货"],
-      "conditions": {"requires_any": ["库存", "进货"]},
-      "why": "测试数据：已被 mem_seed_inv_capacity 取代的旧规则。",
+      "save_id": null,
+      "run_id": null,
+      "timeline_id": "tl_seed_main",
+      "dedupe_key": "seed:mem_seed_superseded_old",
+      "valid_from": "2026-10-01T00:00:00Z",
+      "scope_extra": {
+        "entities": [
+          "inventory",
+          "进货"
+        ],
+        "conditions": {
+          "requires_any": [
+            "库存",
+            "进货"
+          ]
+        },
+        "why": "An old rule superseded by mem_seed_inv_capacity; the row is retained for audit."
+      },
       "evidence": [
         {
           "event_id": "ev_seed_superseded_1",
@@ -382,25 +641,46 @@
           "result_status": "success",
           "capture_quality": "complete",
           "game_day": 2,
-          "result": {"ok": true, "cash": 90},
-          "weight": 1.0
+          "result": {
+            "ok": true,
+            "cash": 90
+          },
+          "weight": 1.0,
+          "evidence_grade": "observed"
         }
-      ]
+      ],
+      "superseded_by": "mem_seed_inv_capacity"
     },
     {
       "memory_id": "mem_seed_old_version",
       "test_data": true,
       "kind": "mechanism",
       "text": "测试数据：VERSION 100-Rev12 中 sleep 后必须先观察 day 变化，再判断是否跨日。",
-      "status": "verified",
-      "confidence": "medium",
-      "source": "seed",
-      "scope_type": "game_version",
+      "target_status": "verified",
+      "confidence": 0.65,
+      "source": "seed_test_data",
+      "game_id": "probably_stolen",
       "game_version": "VERSION 100-Rev12",
+      "save_id": null,
+      "run_id": null,
       "timeline_id": "tl_seed_old",
-      "entities": ["sleep", "day", "旧版本"],
-      "conditions": {"requires_any": ["sleep", "day", "旧版本"]},
-      "why": "测试数据：旧版本机制，当前版本检索必须按 game_version 硬过滤掉。",
+      "dedupe_key": "seed:mem_seed_old_version",
+      "valid_from": "2026-11-01T00:00:00Z",
+      "scope_extra": {
+        "entities": [
+          "sleep",
+          "day",
+          "旧版本"
+        ],
+        "conditions": {
+          "requires_any": [
+            "sleep",
+            "day",
+            "旧版本"
+          ]
+        },
+        "why": "An old-version mechanism that must be hidden by the game_version hard filter."
+      },
       "evidence": [
         {
           "event_id": "ev_seed_old_1",
@@ -410,8 +690,12 @@
           "result_status": "success",
           "capture_quality": "complete",
           "game_day": 2,
-          "result": {"day": 2, "rev": 20},
-          "weight": 1.0
+          "result": {
+            "day": 2,
+            "rev": 20
+          },
+          "weight": 1.0,
+          "evidence_grade": "observed"
         },
         {
           "event_id": "ev_seed_old_2",
@@ -421,8 +705,12 @@
           "result_status": "success",
           "capture_quality": "complete",
           "game_day": 3,
-          "result": {"day": 3, "rev": 30},
-          "weight": 1.0
+          "result": {
+            "day": 3,
+            "rev": 30
+          },
+          "weight": 1.0,
+          "evidence_grade": "observed"
         }
       ]
     },
@@ -431,16 +719,29 @@
       "test_data": true,
       "kind": "fact",
       "text": "测试数据：本局私有代号 ALPHA-7，当前现金 250，库存占用 0.92。",
-      "status": "verified",
-      "confidence": "high",
-      "source": "seed",
-      "scope_type": "run",
+      "target_status": "verified",
+      "confidence": 0.9,
+      "source": "seed_test_data",
+      "game_id": "probably_stolen",
+      "game_version": "VERSION 100-Rev13",
       "save_id": "slot:40",
       "run_id": "run-seed-a",
       "timeline_id": "tl_seed_main",
-      "entities": ["ALPHA-7", "run-private", "现金"],
-      "conditions": {"requires_any": ["ALPHA-7"]},
-      "why": "测试数据：run 作用域私有事实，用于验证跨周目/跨存档隔离。",
+      "dedupe_key": "seed:mem_seed_run_private",
+      "valid_from": "2026-11-01T00:00:00Z",
+      "scope_extra": {
+        "entities": [
+          "ALPHA-7",
+          "run-private",
+          "现金"
+        ],
+        "conditions": {
+          "requires_any": [
+            "ALPHA-7"
+          ]
+        },
+        "why": "A run-scoped private fact used to prove cross-run isolation."
+      },
       "evidence": [
         {
           "event_id": "ev_seed_run_private_1",
@@ -450,8 +751,12 @@
           "result_status": "success",
           "capture_quality": "complete",
           "game_day": 3,
-          "result": {"cash": 250, "inventory_occupancy": 0.92},
-          "weight": 1.0
+          "result": {
+            "cash": 250,
+            "inventory_occupancy": 0.92
+          },
+          "weight": 1.0,
+          "evidence_grade": "observed"
         }
       ]
     },
@@ -460,25 +765,49 @@
       "test_data": true,
       "kind": "warning",
       "text": "Test data only: Never confirm a purchase when cash is below the weekly rent; sell stock first.",
-      "status": "verified",
-      "confidence": "high",
-      "source": "seed",
-      "scope_type": "game_version",
+      "target_status": "verified",
+      "confidence": 0.9,
+      "source": "seed_test_data",
+      "game_id": "probably_stolen",
       "game_version": "VERSION 100-Rev13",
-      "entities": ["cash", "rent", "purchase", "stock"],
-      "conditions": {"requires_any": ["cash", "rent", "purchase"]},
-      "why": "Test data: an English warning used to prove FTS/entity recall on ASCII tokens.",
+      "save_id": null,
+      "run_id": null,
+      "timeline_id": "tl_seed_main",
+      "dedupe_key": "seed:mem_seed_english_warning",
+      "valid_from": "2026-11-01T00:00:00Z",
+      "scope_extra": {
+        "entities": [
+          "cash",
+          "rent",
+          "purchase",
+          "stock"
+        ],
+        "conditions": {
+          "requires_any": [
+            "cash",
+            "rent",
+            "purchase"
+          ]
+        },
+        "why": "An English warning used to prove FTS recall on ASCII tokens."
+      },
       "evidence": [
         {
           "event_id": "ev_seed_english_1",
           "timeline_id": "tl_seed_main",
-          "event_type": "result",
+          "event_type": "intent",
           "tool_name": "confirm_trade",
           "result_status": "rejected",
           "capture_quality": "complete",
           "game_day": 5,
-          "result": {"ok": false, "error": "insufficient_cash", "cash": 10, "rent": 50},
-          "weight": 1.0
+          "result": {
+            "ok": false,
+            "error": "insufficient_cash",
+            "cash": 10,
+            "rent": 50
+          },
+          "weight": 1.0,
+          "evidence_grade": "observed"
         }
       ]
     },
@@ -487,15 +816,46 @@
       "test_data": true,
       "kind": "mechanism",
       "text": "测试数据：未验证假设——连续两天降价会提升顾客成交率。",
-      "status": "candidate",
-      "confidence": "low",
-      "source": "seed",
-      "scope_type": "game_version",
+      "target_status": "candidate",
+      "confidence": 0.35,
+      "source": "seed_test_data",
+      "game_id": "probably_stolen",
       "game_version": "VERSION 100-Rev13",
-      "entities": ["降价", "成交率"],
-      "conditions": {"requires_any": ["降价", "成交率"]},
-      "why": "测试数据：无证据候选，默认检索不得返回，也不能自动晋升。",
-      "evidence": []
+      "save_id": null,
+      "run_id": null,
+      "timeline_id": "tl_seed_main",
+      "dedupe_key": "seed:mem_seed_hypothesis",
+      "valid_from": "2026-11-01T00:00:00Z",
+      "scope_extra": {
+        "entities": [
+          "降价",
+          "成交率"
+        ],
+        "conditions": {
+          "requires_any": [
+            "降价",
+            "成交率"
+          ]
+        },
+        "why": "A candidate hypothesis with reported-only evidence; it must never auto-promote."
+      },
+      "evidence": [
+        {
+          "event_id": "ev_seed_hypothesis_1",
+          "timeline_id": "tl_seed_main",
+          "event_type": "observation",
+          "tool_name": "list_goods",
+          "result_status": "success",
+          "capture_quality": "partial",
+          "game_day": 8,
+          "result": {
+            "discount_days": 2,
+            "ok": true
+          },
+          "weight": 1.0,
+          "evidence_grade": "reported"
+        }
+      ]
     }
   ]
 }

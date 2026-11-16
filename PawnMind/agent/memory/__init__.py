@@ -1,1 +1,1 @@
-"""P1 interaction history: event store, recorder and read-only CLI."""
+"""PawnMind memory: event history (P1) and the standalone memory store (P2)."""

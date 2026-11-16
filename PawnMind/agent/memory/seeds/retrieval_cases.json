@@ -1,7 +1,7 @@
 {
-  "schema": 1,
+  "schema": 2,
   "test_data": true,
-  "notice": "TEST DATA ONLY. These 30 scenarios and their gold memories come from agent/memory/seeds/verified_rules.json, not from a real recording. They measure retrieval mechanics only.",
+  "notice": "TEST DATA ONLY. These 30 scenarios and their gold memories come from agent/memory/seeds/verified_rules.json, not from a real recording. They measure retrieval mechanics only. NOT YET WIRED: the P2 first half implements scope and FTS recall but not the state-condition filter, so cases whose expected set depends on 'state' are pending the next half.",
   "scope_presets": {
     "save40_runA": {
       "game_id": "probably_stolen",
