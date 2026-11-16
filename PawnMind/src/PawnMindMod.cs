@@ -46,6 +46,23 @@ public sealed class PawnMindMod : IMod
             BridgeConfig config = LoadOrCreateConfig();
             _allowTestItems = config.AllowTestItems;
 
+            // The run mode is resolved before any router exists, so a bad or
+            // missing configuration leaves the bridge Locked: /state, /events and
+            // every action are refused until the operator fixes bridge.conf and
+            // restarts. There is no request path that can widen the mode.
+            RunModePlan runModePlan = RunModeBinding.Apply(config.RunMode, config.AllowTestMode);
+            if (runModePlan.Error != null)
+            {
+                Debug.LogError("[PawnMind] run mode locked (" + runModePlan.Error
+                    + "): set run_mode=bootstrap|play|test in bridge.conf; test also needs"
+                    + " allow_test_mode=true. Until then every endpoint except /health is refused.");
+            }
+            else
+            {
+                Debug.Log("[PawnMind] run mode: " + RunModeBinding.ModeName(runModePlan.Mode)
+                    + " (" + runModePlan.Allow.Count + " operations allowed)");
+            }
+
             RecordingSettings recordingSettings = RecordingSettings.From(config);
             _recordingArmed = recordingSettings.Error == null;
 

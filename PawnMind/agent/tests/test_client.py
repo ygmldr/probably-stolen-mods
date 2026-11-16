@@ -371,3 +371,78 @@ class TokenRedactionTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class _PolicyHandler(BaseHTTPRequestHandler):
+    sha = "deadbeef"
+    posts = []
+
+    def log_message(self, *args):
+        pass
+
+    def _send(self, status, payload):
+        data = json.dumps(payload).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+    def do_GET(self):
+        if self.path == "/health":
+            self._send(200, {"ok": True, "policy_sha256": _PolicyHandler.sha})
+        else:
+            self._send(404, {"ok": False})
+
+    def do_POST(self):
+        _PolicyHandler.posts.append(self.path)
+        self._send(200, {"ok": True, "op": "ping"})
+
+
+class PolicyFingerprintTests(unittest.TestCase):
+    """A Python/C# policy mismatch must refuse the write before it is sent."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.server = HTTPServer(("127.0.0.1", 0), _PolicyHandler)
+        cls.port = cls.server.server_address[1]
+        cls.thread = threading.Thread(target=cls.server.serve_forever, daemon=True)
+        cls.thread.start()
+
+        handle, cls.config_path = tempfile.mkstemp()
+        with os.fdopen(handle, "w") as config:
+            config.write("port=%d\ntoken=%s\n" % (cls.port, TOKEN))
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.server.shutdown()
+        cls.server.server_close()
+        os.unlink(cls.config_path)
+
+    def setUp(self):
+        _PolicyHandler.posts = []
+
+    def test_mismatched_policy_refuses_without_sending(self):
+        client = BridgeClient(self.config_path, expected_policy_sha256="0" * 64)
+        result = client.action("open_shop")
+        self.assertFalse(result["ok"])
+        self.assertEqual("policy_mismatch", result["error"])
+        self.assertEqual([], _PolicyHandler.posts, "no write reached the bridge")
+
+    def test_matching_policy_sends_the_action(self):
+        _PolicyHandler.sha = "a" * 64
+        client = BridgeClient(self.config_path, expected_policy_sha256="a" * 64)
+        result = client.action("open_shop")
+        self.assertTrue(result["ok"])
+        self.assertEqual(["/action"], _PolicyHandler.posts)
+
+    def test_no_expectation_keeps_the_old_behaviour(self):
+        client = BridgeClient(self.config_path)
+        client.action("open_shop")
+        self.assertEqual(["/action"], _PolicyHandler.posts)
+
+    def test_bridge_without_a_fingerprint_does_not_block(self):
+        _PolicyHandler.sha = None  # older mod build reports nothing
+        client = BridgeClient(self.config_path, expected_policy_sha256="b" * 64)
+        result = client.action("open_shop")
+        self.assertTrue(result["ok"])

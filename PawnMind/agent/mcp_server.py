@@ -1198,8 +1198,17 @@ def main():
     )
     args = parser.parse_args()
 
+    # The bridge reports the policy build it was compiled with; a mismatch is
+    # refused before any write leaves the MCP server.
+    expected_policy_sha256 = None
     try:
-        client = BridgeClient(args.config)
+        import tool_policy as _tool_policy
+        expected_policy_sha256 = _tool_policy.policy_sha256(_tool_policy.load_policy())
+    except Exception:  # a missing policy file must not stop read-only use
+        expected_policy_sha256 = None
+
+    try:
+        client = BridgeClient(args.config, expected_policy_sha256=expected_policy_sha256)
     except (BridgeError, OSError) as error:
         print("pawnmind: " + str(error), file=sys.stderr)
         return 2

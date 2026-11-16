@@ -7,6 +7,7 @@ the entry matrix, then reviewed by hand. Nothing here infers safety from
 hand-writes an allowlist.
 """
 
+import hashlib
 import json
 import os
 
@@ -27,6 +28,17 @@ SNAPSHOT_READERS = frozenset({
     "wait_until",
 })
 DECISIONS = ("allow", "deny", "needs_evidence")
+
+
+def canonical_json(policy):
+    """The exact bytes both the generator and the runtime hash over."""
+    return json.dumps(policy, sort_keys=True, separators=(",", ":"),
+                      ensure_ascii=False)
+
+
+def policy_sha256(policy):
+    """Fingerprint of the tool policy; the C# catalog embeds the same value."""
+    return hashlib.sha256(canonical_json(policy).encode("utf-8")).hexdigest()
 
 
 def load_policy(path=None):

@@ -40,6 +40,10 @@ namespace PawnMind.Tests
             Func<BridgeHealth> healthProvider,
             Action<int> body)
         {
+            // These tests exercise HTTP behaviour, not the mode gate; enter Test
+            // explicitly because the runtime default is Locked.
+            ModePolicy.Configure(RunMode.Test, null);
+
             int port = FreePort();
             var logs = new List<string>();
             var server = new BridgeServer(
@@ -61,6 +65,7 @@ namespace PawnMind.Tests
             {
                 server.Stop();
                 _server = null;
+                ModePolicy.Reset();
             }
 
             foreach (string log in logs) Console.WriteLine("     server log: " + log);

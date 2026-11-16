@@ -526,6 +526,15 @@ namespace PawnMind.Bridge
                         return;
                     }
 
+                    // The snapshot is a read path; Bootstrap must not build it,
+                    // including when the caller bypasses the MCP tool layer.
+                    string stateRefusal = EndpointPolicy.Refusal(RouteKind.State);
+                    if (stateRefusal != null)
+                    {
+                        QueueResponse(client, 403, "Forbidden", ErrorJson(stateRefusal));
+                        return;
+                    }
+
                     QueueResponse(client, 200, "OK", _stateProvider());
                     return;
 
@@ -533,6 +542,13 @@ namespace PawnMind.Bridge
                     if (!Authorized(request))
                     {
                         QueueResponse(client, 401, "Unauthorized", ErrorJson("unauthorized"));
+                        return;
+                    }
+
+                    string actionRefusal = EndpointPolicy.Refusal(RouteKind.Action);
+                    if (actionRefusal != null)
+                    {
+                        QueueResponse(client, 403, "Forbidden", ErrorJson(actionRefusal));
                         return;
                     }
 
@@ -548,6 +564,13 @@ namespace PawnMind.Bridge
                     if (!Authorized(request))
                     {
                         QueueResponse(client, 401, "Unauthorized", ErrorJson("unauthorized"));
+                        return;
+                    }
+
+                    string eventsRefusal = EndpointPolicy.Refusal(RouteKind.Events);
+                    if (eventsRefusal != null)
+                    {
+                        QueueResponse(client, 403, "Forbidden", ErrorJson(eventsRefusal));
                         return;
                     }
 
@@ -722,6 +745,14 @@ namespace PawnMind.Bridge
             // installed build is the latest; S8 needs a manual confirmation.
             payload["latest"] = GameVersionGate.LatestUnverified;
             payload["latest_verified"] = false;
+
+            // Mode gate: the operator and the MCP client both need to see which
+            // mode is active, why it fell back, and which policy build is loaded.
+            payload["run_mode"] = RunModeBinding.ModeName(ModePolicy.Mode);
+            payload["run_mode_error"] = NullIfEmpty(ModePolicy.Error);
+            payload["policy_schema"] = PolicyCatalog.Schema;
+            payload["policy_sha256"] = PolicyCatalog.Sha256;
+            payload["play_ready"] = PolicyCatalog.PlayOps.Length > 0;
 
             return ScrubHealth(payload.ToString(Formatting.None));
         }

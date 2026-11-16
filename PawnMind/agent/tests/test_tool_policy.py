@@ -112,3 +112,25 @@ class ToolPolicyTests(unittest.TestCase):
             if entry["decision"] == "allow" and entry["purity"] == "write":
                 self.assertTrue(entry.get("evidence") or entry.get("status") == "fixed",
                                 "%s allowed without evidence" % name)
+
+    def test_generated_csharp_catalog_matches_the_policy(self):
+        """The C# runtime gate must read the same policy, not a second copy."""
+        import importlib.util
+        import os
+
+        here = os.path.dirname(os.path.abspath(__file__))
+        mod_dir = os.path.dirname(os.path.dirname(here))
+        script = os.path.join(mod_dir, "tools", "gen_policy_catalog.py")
+        spec = importlib.util.spec_from_file_location("gen_policy_catalog", script)
+        generator = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(generator)
+
+        generated = os.path.join(mod_dir, "src", "Core", "PolicyCatalog.g.cs")
+        with open(generated, encoding="utf-8") as handle:
+            current = handle.read()
+        self.assertEqual(generator.render(self.policy), current,
+                         "PolicyCatalog.g.cs is stale; run tools/gen_policy_catalog.py")
+
+        self.assertEqual("2", str(self.policy["schema"]))
+        self.assertIn(generator.canonical_sha256(self.policy), current,
+                      "the generated file must carry the canonical policy hash")

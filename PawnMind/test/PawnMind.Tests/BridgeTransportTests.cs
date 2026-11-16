@@ -188,6 +188,7 @@ namespace PawnMind.Tests
             public void Dispose()
             {
                 Server.Stop();
+                ModePolicy.Reset();
             }
         }
 
@@ -198,6 +199,10 @@ namespace PawnMind.Tests
             Func<long> revision = null,
             Action<string, string> undelivered = null)
         {
+            // Transport tests are not mode tests: enter Test explicitly so the
+            // fail-closed default (Locked) does not mask the behaviour under test.
+            ModePolicy.Configure(RunMode.Test, null);
+
             int port = FreePort();
             var harness = new Harness { Port = port };
             harness.Server = new BridgeServer(

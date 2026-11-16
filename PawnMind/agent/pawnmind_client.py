@@ -6,6 +6,7 @@ tested without the `mcp` package installed.
 
 import json
 import os
+import time
 import urllib.error
 import uuid
 import urllib.request
@@ -55,8 +56,16 @@ class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
 
 
 class BridgeClient:
-    def __init__(self, config_path=None, timeout=8.0):
+    #: How long a /health fingerprint is trusted before it is re-read.
+    POLICY_CACHE_SECONDS = 30.0
+
+    def __init__(self, config_path=None, timeout=8.0, expected_policy_sha256=None):
         self.config_path = config_path or DEFAULT_CONFIG
+        # The game-side catalog embeds the policy hash it was built from. When the
+        # MCP server runs a different policy build, writes are refused locally
+        # instead of being sent with rules the bridge does not implement.
+        self.expected_policy_sha256 = expected_policy_sha256
+        self._policy_checked_at = 0.0
         config = load_config(self.config_path)
         self.port = config["port"]
         self.token = config["token"]
@@ -104,7 +113,34 @@ class BridgeClient:
             # exception: hosts render those as "Error: [object Object]".
             return {"ok": False, "error": "wait_failed", "detail": str(error)}
 
+    def _policy_refusal(self):
+        """None when the bridge policy matches, else the stable refusal code."""
+        if not self.expected_policy_sha256:
+            return None
+        now = time.monotonic()
+        if now - self._policy_checked_at < self.POLICY_CACHE_SECONDS:
+            return None
+        try:
+            health = self.health()
+        except BridgeError:
+            # The bridge is unreachable; the action itself will report that.
+            return None
+        self._policy_checked_at = now
+        reported = (health or {}).get("policy_sha256")
+        if reported and reported != self.expected_policy_sha256:
+            return "policy_mismatch"
+        return None
+
     def action(self, op, **args):
+        refusal = self._policy_refusal()
+        if refusal:
+            return {
+                "ok": False,
+                "op": op,
+                "error": refusal,
+                "detail": "the in-game policy build differs from the MCP policy;"
+                          " restart the mod with a matching build before writing",
+            }
         payload = {"op": op, "action_id": args.pop("action_id", str(uuid.uuid4()))}
         payload.update(args)
         return self.request("POST", "/action", payload)

@@ -22,6 +22,19 @@ namespace PawnMind.Core
         public bool AllowTestItems { get; set; }
 
         /// <summary>
+        /// Raw "run_mode" text: bootstrap | play | test. Kept verbatim so a typo
+        /// is reported instead of silently defaulting to a permissive mode; the
+        /// binding turns anything unexpected into Locked.
+        /// </summary>
+        public string RunMode { get; set; }
+
+        /// <summary>
+        /// Second switch required before "run_mode=test" is honoured. Test is a
+        /// deliberate developer choice, never a fallback.
+        /// </summary>
+        public bool AllowTestMode { get; set; }
+
+        /// <summary>
         /// User-confirmed game identity for recording (set during S8 preflight).
         /// Empty means all write actions stay locked; the mod never fills these
         /// from the currently installed build.
@@ -80,6 +93,8 @@ namespace PawnMind.Core
             RecordingMode = string.Empty;
             RecordingIsolationAck = false;
             RecordingDedicatedSlotAck = false;
+            RunMode = string.Empty;
+            AllowTestMode = false;
         }
 
         public static BridgeConfig Create(int port, string token)
@@ -120,6 +135,11 @@ namespace PawnMind.Core
             return "# pawnmind bridge config v1\n"
                 + "port=" + Port.ToString(CultureInfo.InvariantCulture) + "\n"
                 + "token=" + Token + "\n"
+                + "# Run mode: bootstrap | play | test. Empty or unknown keeps every endpoint locked.\n"
+                + "# play only enables tools with reviewed live evidence; test also needs\n"
+                + "# allow_test_mode=true and must never be the default.\n"
+                + "run_mode=" + (RunMode ?? string.Empty) + "\n"
+                + "allow_test_mode=" + (AllowTestMode ? "true" : "false") + "\n"
                 + "# Set expected_* only after confirming the recording game build; empty locks writes.\n"
                 + "expected_game_version=" + (ExpectedGameVersion ?? string.Empty) + "\n"
                 + "expected_assembly_mvid=" + (ExpectedAssemblyMvid ?? string.Empty) + "\n"
@@ -180,6 +200,8 @@ namespace PawnMind.Core
             string recordingSlotRaw = string.Empty;
             bool recordingIsolationAck = false;
             bool recordingDedicatedSlotAck = false;
+            string runMode = string.Empty;
+            bool allowTestMode = false;
 
             string[] lines = text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
             for (int i = 0; i < lines.Length; i++)
@@ -212,6 +234,15 @@ namespace PawnMind.Core
                 else if (key == "allow_test_items")
                 {
                     allowTestItems = string.Equals(value, "true", StringComparison.OrdinalIgnoreCase)
+                        || value == "1";
+                }
+                else if (key == "run_mode")
+                {
+                    runMode = value;
+                }
+                else if (key == "allow_test_mode")
+                {
+                    allowTestMode = string.Equals(value, "true", StringComparison.OrdinalIgnoreCase)
                         || value == "1";
                 }
                 else if (key == "expected_game_version")
@@ -249,6 +280,8 @@ namespace PawnMind.Core
             parsed.RecordingMode = recordingMode;
             parsed.RecordingIsolationAck = recordingIsolationAck;
             parsed.RecordingDedicatedSlotAck = recordingDedicatedSlotAck;
+            parsed.RunMode = runMode;
+            parsed.AllowTestMode = allowTestMode;
             parsed.SetRecordingSlotText(recordingSlotRaw);
             if (!parsed.TryValidate(out error)) return false;
 
