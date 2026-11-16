@@ -65,6 +65,23 @@ FAKE_GAME_VERSION = "VERSION 100-Rev13"
 FAKE_ASSEMBLY_MVID = "911508a6-e0eb-4cc0-91e8-e14b16ea28d7"
 
 
+def _policy_sha256():
+    """The fake bridge mirrors the real /health policy fingerprint.
+
+    A real build reports the policy it was compiled from; the Python client
+    refuses writes when that fingerprint is missing (fail closed), so the test
+    double must report the canonical policy hash too.
+    """
+    try:
+        import tool_policy
+        return tool_policy.policy_sha256(tool_policy.load_policy())
+    except Exception:  # keep the fake importable if the policy file is absent
+        return None
+
+
+FAKE_POLICY_SHA256 = _policy_sha256()
+
+
 def _is_int(value):
     return isinstance(value, int) and not isinstance(value, bool)
 
@@ -180,6 +197,8 @@ class FakeGame:
             "expected_assembly_mvid": FAKE_ASSEMBLY_MVID,
             "write_gate": "open",
             "write_gate_reason": None,
+            "policy_schema": "2",
+            "policy_sha256": FAKE_POLICY_SHA256,
             "latest": "UNVERIFIED",
             "latest_verified": False,
         }
@@ -674,12 +693,16 @@ class FakeGame:
         actions = []
         if not self.in_game:
             return actions
+        # Mirror the C# contract: legal rows carry availability="available";
+        # candidate rows (never legal) would carry "unknown" + requires.
         for offer in self.offers:
             actions.append({"action": "confirm_trade",
-                            "args": {"item_id": offer["id"], "side": "buy"}})
+                            "args": {"item_id": offer["id"], "side": "buy"},
+                            "availability": "available"})
         for item in self.inventory:
             actions.append({"action": "confirm_trade",
-                            "args": {"item_id": item["id"], "side": "sell"}})
+                            "args": {"item_id": item["id"], "side": "sell"},
+                            "availability": "available"})
         if self.can_end_day:
             actions.append({"action": "end_day"})
         if self.dialogue and self.dialogue.get("available"):

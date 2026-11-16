@@ -1231,8 +1231,8 @@ def main():
         choices=TOOL_SET_CHOICES,
         default=TOOL_SET_FULL,
         help=(
-            "tool surface to register: full (all 114 tools, default) or "
-            "recording (104 player-equivalent tools; act/press/debug shortcuts, "
+            "tool surface to register: full (all 116 tools, default) or "
+            "recording (106 player-equivalent tools; act/press/debug shortcuts, "
             "save_game and the hardcoded new_game are left out)"
         ),
     )

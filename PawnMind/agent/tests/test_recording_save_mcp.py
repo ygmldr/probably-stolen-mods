@@ -16,6 +16,18 @@ import unittest
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+def _policy_sha256():
+    """The bridge reports the policy build it embeds; the client refuses writes
+    when that fingerprint is missing or different (fail closed)."""
+    try:
+        agent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        if agent_dir not in sys.path:
+            sys.path.insert(0, agent_dir)
+        import tool_policy
+        return tool_policy.policy_sha256(tool_policy.load_policy())
+    except Exception:
+        return None
+
 try:
     from mcp import ClientSession
     from mcp.client.stdio import StdioServerParameters, stdio_client
@@ -93,7 +105,8 @@ class _BridgeHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == "/health":
-            self._json({"ok": True, "name": "pawnmind"})
+            self._json({"ok": True, "name": "pawnmind",
+                        "policy_sha256": _policy_sha256()})
         elif self.path == "/state":
             self._json({"ok": True, "in_game": True, "rev": 7})
         else:

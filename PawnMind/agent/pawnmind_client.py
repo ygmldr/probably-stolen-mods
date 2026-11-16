@@ -127,7 +127,11 @@ class BridgeClient:
         # MCP server runs a different policy build, writes are refused locally
         # instead of being sent with rules the bridge does not implement.
         self.expected_policy_sha256 = expected_policy_sha256
+        # The cache stores the *conclusion* (a refusal code or None), not just the
+        # check time: a mismatch must keep refusing writes for the whole window.
         self._policy_checked_at = 0.0
+        self._policy_refusal_until = 0.0
+        self._policy_refusal_code = None
         config = load_config(self.config_path)
         self.port = config["port"]
         self.token = config["token"]
@@ -176,22 +180,38 @@ class BridgeClient:
             return {"ok": False, "error": "wait_failed", "detail": str(error)}
 
     def _policy_refusal(self):
-        """None when the bridge policy matches, else the stable refusal code."""
+        """None when the bridge policy matches, else the stable refusal code.
+
+        A-1/A-2 fixes:
+        - the 30s cache now caches the refusal itself; a mismatched bridge cannot
+          slip a second write through just because the check was recent;
+        - a bridge that reports no fingerprint is *unverifiable*, not a match:
+          the installed DLL can be a stale build, so writes fail closed.
+        """
         if not self.expected_policy_sha256:
             return None
         now = time.monotonic()
-        if now - self._policy_checked_at < self.POLICY_CACHE_SECONDS:
-            return None
+        if now < self._policy_refusal_until:
+            return self._policy_refusal_code
         try:
             health = self.health()
         except BridgeError:
             # The bridge is unreachable; the action itself will report that.
+            # Do not cache a pass: the next call must check again.
             return None
-        self._policy_checked_at = now
+
         reported = (health or {}).get("policy_sha256")
-        if reported and reported != self.expected_policy_sha256:
-            return "policy_mismatch"
-        return None
+        if not reported:
+            refusal = "policy_unverifiable"
+        elif reported != self.expected_policy_sha256:
+            refusal = "policy_mismatch"
+        else:
+            refusal = None
+
+        self._policy_checked_at = now
+        self._policy_refusal_until = now + self.POLICY_CACHE_SECONDS
+        self._policy_refusal_code = refusal
+        return refusal
 
     def get_operation(self, operation_id):
         """D2: read-only two-axis query; never builds the game snapshot."""

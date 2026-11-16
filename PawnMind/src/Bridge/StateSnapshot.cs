@@ -236,13 +236,11 @@ namespace PawnMind.Bridge
                 var row = new Dictionary<string, object>();
                 row["action"] = action.Action;
                 row["args"] = action.Args;
-                if (candidates)
-                {
-                    // Candidates are never reported as legal/executable: the write
-                    // path still needs the native guard to accept them.
-                    row["availability"] = action.ReportedAvailability;
-                    row["requires"] = action.Requires;
-                }
+                // Every row states its availability: legal rows are "available",
+                // candidates are "unknown" and additionally carry the native guard
+                // they still need. This matches the SKILL/schema contract.
+                row["availability"] = action.ReportedAvailability;
+                if (candidates) row["requires"] = action.Requires;
 
                 if (!string.IsNullOrEmpty(action.Hint)) row["hint"] = action.Hint;
                 described.Add(row);

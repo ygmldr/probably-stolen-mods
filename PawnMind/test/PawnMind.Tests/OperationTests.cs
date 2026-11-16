@@ -216,6 +216,24 @@ namespace PawnMind.Tests
         }
 
         [Test]
+        public static void Rejected_Operation_Reports_Dispatched_False()
+        {
+            ActionRouter router = Router(3, delegate(string op, JObject request)
+            {
+                return ActionResult.SuccessRaw(op,
+                    "{\"ok\":false,\"error\":\"trade_locked\",\"dispatched\":false}");
+            });
+
+            router.Handle("{\"op\":\"confirm_trade\",\"action_id\":\"rej-1\",\"rev\":3}");
+
+            JObject operation = router.GetOperationJson("rej-1");
+            Assert.Equal(ExecutionStatus.Rejected, (string)operation["execution_status"],
+                "a guard refusal is rejected");
+            Assert.False((bool)operation["dispatched"],
+                "a guard refusal dispatched nothing (reviewer D finding)");
+        }
+
+        [Test]
         public static void PP_ASYNC_02_Rejected_Writes_Are_Not_Marked_Undelivered()
         {
             int dispatches = 0;

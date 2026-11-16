@@ -198,7 +198,9 @@ namespace PawnMind.Core
                 : DeliveryStatus.Delivered;
             entry.Operation.ResultRevision = resultRevision;
             entry.Operation.Error = error;
-            entry.Operation.Dispatched = true;
+            // A pre-dispatch guard refusal never reached the game; only a real
+            // dispatch sets the flag (reviewer D finding).
+            entry.Operation.Dispatched = entry.Operation.Execution != ExecutionStatus.Rejected;
         }
 
         /// <summary>

@@ -429,6 +429,22 @@ class PolicyFingerprintTests(unittest.TestCase):
         self.assertEqual("policy_mismatch", result["error"])
         self.assertEqual([], _PolicyHandler.posts, "no write reached the bridge")
 
+    def test_policy_mismatch_is_not_forgotten_after_the_first_call(self):
+        # A-1 regression: the 30s fingerprint cache used to store only the
+        # timestamp, so the second write in the window was sent anyway.
+        _PolicyHandler.sha = "a" * 64
+        client = BridgeClient(self.config_path, expected_policy_sha256="0" * 64)
+
+        first = client.action("open_shop")
+        second = client.action("open_shop")
+        third = client.action("open_shop")
+
+        for index, result in enumerate((first, second, third), start=1):
+            self.assertFalse(result["ok"], "write %d must still be refused" % index)
+            self.assertEqual("policy_mismatch", result["error"], "write %d" % index)
+        self.assertEqual([], _PolicyHandler.posts,
+                         "no write may reach a mismatched bridge inside the 30s window")
+
     def test_matching_policy_sends_the_action(self):
         _PolicyHandler.sha = "a" * 64
         client = BridgeClient(self.config_path, expected_policy_sha256="a" * 64)
@@ -441,8 +457,13 @@ class PolicyFingerprintTests(unittest.TestCase):
         client.action("open_shop")
         self.assertEqual(["/action"], _PolicyHandler.posts)
 
-    def test_bridge_without_a_fingerprint_does_not_block(self):
+    def test_bridge_without_a_fingerprint_fails_closed(self):
+        # A-2: "old MCP + new/unknown bridge build" must not be treated as a
+        # match. The installed DLL is stale, so an unverifiable fingerprint is
+        # refused like a mismatch (fail closed).
         _PolicyHandler.sha = None  # older mod build reports nothing
         client = BridgeClient(self.config_path, expected_policy_sha256="b" * 64)
         result = client.action("open_shop")
-        self.assertTrue(result["ok"])
+        self.assertFalse(result["ok"], "an unverifiable bridge is not trusted")
+        self.assertEqual("policy_unverifiable", result["error"])
+        self.assertEqual([], _PolicyHandler.posts, "no write reached the bridge")

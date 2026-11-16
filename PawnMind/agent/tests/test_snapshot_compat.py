@@ -107,6 +107,15 @@ class FakeGameSchemaTests(unittest.TestCase):
         self.assertIsInstance(state["candidate_actions"], list)
         self.assertNotIn("can_report", state.get("client") or {})
 
+    def test_fake_legal_rows_carry_availability_available(self):
+        # The C# snapshot states availability on every legal-action row; the
+        # offline fake must mirror that contract (E module low finding).
+        game = FakeGame()
+        game.in_game = True
+        for row in game._legal_actions():
+            self.assertEqual("available", row.get("availability"),
+                             "legal rows must be explicitly available")
+
 
 if __name__ == "__main__":
     unittest.main()
