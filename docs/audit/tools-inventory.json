@@ -1,0 +1,1338 @@
+{
+ "schema": 2,
+ "full": [
+  {
+   "name": "get_state",
+   "description": "Return the current shop snapshot: cash, rent, customer and negotiated item.",
+   "readOnlyHint": null,
+   "required": [],
+   "properties": []
+  },
+  {
+   "name": "memory_bootstrap",
+   "description": "Read-only (no rev): verified, unexpired memories for session start, highest confidence/usage first. Its query is local and safe while the game write gate is locked. scope is the caller's identity (game_version/save_id/run_id/timeline_id); without it only version/global experience is returned, so another run's private facts never leak. Each item has memory_id/kind/text/confidence/why/evidence_count/contradict_count.",
+   "readOnlyHint": null,
+   "required": [],
+   "properties": [
+    "limit",
+    "scope"
+   ]
+  },
+  {
+   "name": "memory_retrieve",
+   "description": "Read-only (no rev): recall verified rules for the current situation using FTS5, keywords and declared entities. Hidden statuses (proposed/candidate/conflict/deprecated/superseded), expired rows and other scopes are hard-filtered. state is the current game snapshot (for example {\"in_game\": true, \"rent\": {\"days_left\": 1}}); a conditional rule is never returned when its condition is missing or false. Each item carries recall_reason (fulltext/keyword/entity), evidence_count and contradict_count. token_budget keeps the highest-priority warning and drops the rest.",
+   "readOnlyHint": null,
+   "required": [
+    "query"
+   ],
+   "properties": [
+    "limit",
+    "query",
+    "scope",
+    "state",
+    "token_budget"
+   ]
+  },
+  {
+   "name": "memory_get",
+   "description": "Read-only (no rev): one memory with its evidence events and full revision history. Evidence rows keep event_id, evidence_grade, evidence_role (support/contradict/context) and added_at; when the events DB is configured each row also carries the event metadata. Use it to audit why a rule exists before trusting it.",
+   "readOnlyHint": null,
+   "required": [
+    "memory_id"
+   ],
+   "properties": [
+    "memory_id"
+   ]
+  },
+  {
+   "name": "memory_status",
+   "description": "Read-only (no rev): counts, status/kind distribution, schema version and file paths for the memories database and the separate events database. If the events DB is not configured or missing the events section degrades to configured=false with a reason instead of failing.",
+   "readOnlyHint": null,
+   "required": [],
+   "properties": []
+  },
+  {
+   "name": "get_legal_actions",
+   "description": "Return the actions that are legal right now (state-derived, includes args).",
+   "readOnlyHint": null,
+   "required": [],
+   "properties": []
+  },
+  {
+   "name": "get_run_summary",
+   "description": "Compact run summary: day, shop state, cash, rent, inventory, current client.",
+   "readOnlyHint": null,
+   "required": [],
+   "properties": []
+  },
+  {
+   "name": "get_action_history",
+   "description": "Recent actions with their args, ok flag and revision.",
+   "readOnlyHint": null,
+   "required": [],
+   "properties": [
+    "limit"
+   ]
+  },
+  {
+   "name": "capture_screenshot",
+   "description": "Capture the current game frame as evidence (JPEG, short side 768) and return its path relative to ModData/pawnmind/screenshots/. Use it right before stopping on a hard failure, or when the screen disagrees with what the bridge reports. Server-side throttling applies; returns screenshot_unavailable when capture is off.",
+   "readOnlyHint": null,
+   "required": [],
+   "properties": [
+    "reason"
+   ]
+  },
+  {
+   "name": "get_pending_prompt",
+   "description": "Read the native confirmation modal that currently owns the input, if any: {ok, prompt:{body, confirm_text, cancel_text, single_button}|null}. Read-only, no rev. Call it whenever state.prompt is not null or a write returns confirmation_required, and read the text before deciding.",
+   "readOnlyHint": null,
+   "required": [],
+   "properties": []
+  },
+  {
+   "name": "close_windows",
+   "description": "Close the note/book/contract/deed panels and hide floating windows so the shop is visible again. Use it right after read_book/read_item/analyze_item and before ending the day; returns what was closed and what (if anything) is still open. One shot: if the screen is still dirty it reports window_readback_mismatch and you must stop, not retry.",
+   "readOnlyHint": null,
+   "required": [
+    "rev"
+   ],
+   "properties": [
+    "rev"
+   ]
+  },
+  {
+   "name": "answer_prompt",
+   "description": "Press exactly one button of the open modal. choice is 'confirm' or 'cancel'. Destructive confirmations (discarding ground items, leaving) default to 'cancel' unless you understand the consequence; always read get_pending_prompt first and re-read state afterwards.",
+   "readOnlyHint": null,
+   "required": [
+    "choice",
+    "rev"
+   ],
+   "properties": [
+    "choice",
+    "rev"
+   ]
+  },
+  {
+   "name": "list_screenshots",
+   "description": "List recent evidence captures, newest first, with total_count/total_bytes/budget_bytes/dropped/budget_exhausted. Read-only.",
+   "readOnlyHint": null,
+   "required": [],
+   "properties": [
+    "limit"
+   ]
+  },
+  {
+   "name": "act",
+   "description": "Generic entry point: run one legal action by name with its args.",
+   "readOnlyHint": null,
+   "required": [
+    "action",
+    "args",
+    "rev"
+   ],
+   "properties": [
+    "action",
+    "action_id",
+    "args",
+    "rev"
+   ]
+  },
+  {
+   "name": "wait_until",
+   "description": "Block until a state condition holds: rev_changed, client_present, client_arrived, can_call_next, dialogue_active, dialogue_choice, shop_open, shop_closed, negotiation_open.",
+   "readOnlyHint": null,
+   "required": [
+    "condition"
+   ],
+   "properties": [
+    "condition",
+    "since_rev",
+    "timeout_s"
+   ]
+  },
+  {
+   "name": "get_ui_snapshot",
+   "description": "List active UI controls (tablet buttons and plain buttons) with stable ids.",
+   "readOnlyHint": null,
+   "required": [
+    "rev"
+   ],
+   "properties": [
+    "rev"
+   ]
+  },
+  {
+   "name": "press",
+   "description": "Invoke a control from the last get_ui_snapshot by id (for windows without a typed adapter).",
+   "readOnlyHint": null,
+   "required": [
+    "control_id",
+    "rev"
+   ],
+   "properties": [
+    "control_id",
+    "rev"
+   ]
+  },
+  {
+   "name": "list_goods",
+   "description": "List goods on the front/back counters: scope=client (non-owned), sellable (owned+client wants), all.",
+   "readOnlyHint": null,
+   "required": [],
+   "properties": [
+    "scope"
+   ]
+  },
+  {
+   "name": "list_locations",
+   "description": "List discovered night locations (dumping ground / commissary / Dr Jackson) and availability.",
+   "readOnlyHint": null,
+   "required": [],
+   "properties": []
+  },
+  {
+   "name": "go_out",
+   "description": "Leave the shop and travel to a night location.",
+   "readOnlyHint": null,
+   "required": [
+    "location",
+    "rev"
+   ],
+   "properties": [
+    "location",
+    "rev"
+   ]
+  },
+  {
+   "name": "scavenge",
+   "description": "Scavenge at the dumping ground; returns gained items and remaining attempts.",
+   "readOnlyHint": null,
+   "required": [
+    "rev"
+   ],
+   "properties": [
+    "rev"
+   ]
+  },
+  {
+   "name": "return_home",
+   "description": "Return from a night location to the shop.",
+   "readOnlyHint": null,
+   "required": [
+    "rev"
+   ],
+   "properties": [
+    "rev"
+   ]
+  },
+  {
+   "name": "buy_wholesale",
+   "description": "Buy the current client's whole wholesale offer (requires isOfferWholesale).",
+   "readOnlyHint": null,
+   "required": [
+    "rev"
+   ],
+   "properties": [
+    "rev"
+   ]
+  },
+  {
+   "name": "commissary_buy",
+   "description": "Buy one item from the supply station (commissary) by identifier.",
+   "readOnlyHint": null,
+   "required": [
+    "identifier",
+    "rev"
+   ],
+   "properties": [
+    "identifier",
+    "rev"
+   ]
+  },
+  {
+   "name": "list_books",
+   "description": "List owned/unlocked books (vanilla BOOK_TAG and paper GUIDE_PAPER_TAG).",
+   "readOnlyHint": null,
+   "required": [],
+   "properties": []
+  },
+  {
+   "name": "read_book",
+   "description": "Read an owned book by item id or book id; returns pages and optionally one page.",
+   "readOnlyHint": null,
+   "required": [
+    "book_id"
+   ],
+   "properties": [
+    "book_id",
+    "page"
+   ]
+  },
+  {
+   "name": "read_item",
+   "description": "Read one item's visible details plus book/document flags.",
+   "readOnlyHint": null,
+   "required": [
+    "item_id"
+   ],
+   "properties": [
+    "item_id"
+   ]
+  },
+  {
+   "name": "list_interactions",
+   "description": "List available interactions for one item: activate/toggle/target.",
+   "readOnlyHint": null,
+   "required": [
+    "item_id"
+   ],
+   "properties": [
+    "item_id"
+   ]
+  },
+  {
+   "name": "activate_item",
+   "description": "Activate an owned item (books, lottery tickets, scanners).",
+   "readOnlyHint": null,
+   "required": [
+    "item_id",
+    "rev"
+   ],
+   "properties": [
+    "item_id",
+    "rev"
+   ]
+  },
+  {
+   "name": "toggle_item",
+   "description": "Toggle an owned item (gene scanner, machine switches).",
+   "readOnlyHint": null,
+   "required": [
+    "item_id",
+    "rev"
+   ],
+   "properties": [
+    "item_id",
+    "rev"
+   ]
+  },
+  {
+   "name": "use_tool",
+   "description": "Use an owned tool on a target item (screwdriver, UV, scanner, marking pen).",
+   "readOnlyHint": null,
+   "required": [
+    "tool_id",
+    "target_id",
+    "rev"
+   ],
+   "properties": [
+    "rev",
+    "target_id",
+    "tool_id"
+   ]
+  },
+  {
+   "name": "contraband_status",
+   "description": "Owned contraband/stolen items with levels and risk flags.",
+   "readOnlyHint": null,
+   "required": [],
+   "properties": []
+  },
+  {
+   "name": "security_status",
+   "description": "Security evidence, crimes, case officer and current inspection item.",
+   "readOnlyHint": null,
+   "required": [],
+   "properties": []
+  },
+  {
+   "name": "list_services",
+   "description": "Nightly services (insurance, janitorial, power, informant) and toggles.",
+   "readOnlyHint": null,
+   "required": [],
+   "properties": []
+  },
+  {
+   "name": "toggle_service",
+   "description": "Toggle a nightly service on/off.",
+   "readOnlyHint": null,
+   "required": [
+    "id",
+    "on",
+    "rev"
+   ],
+   "properties": [
+    "id",
+    "on",
+    "rev"
+   ]
+  },
+  {
+   "name": "husbandry_status",
+   "description": "Owned animals/fish with health/dead state.",
+   "readOnlyHint": null,
+   "required": [],
+   "properties": []
+  },
+  {
+   "name": "dispatch_expedition",
+   "description": "Send a hireling to an unlocked expedition location.",
+   "readOnlyHint": null,
+   "required": [
+    "hireling_id",
+    "location_id",
+    "rev"
+   ],
+   "properties": [
+    "hireling_id",
+    "location_id",
+    "rev"
+   ]
+  },
+  {
+   "name": "advance_expedition",
+   "description": "Advance an ongoing expedition one step.",
+   "readOnlyHint": null,
+   "required": [
+    "expedition_id",
+    "rev"
+   ],
+   "properties": [
+    "expedition_id",
+    "rev"
+   ]
+  },
+  {
+   "name": "expedition_status",
+   "description": "Expedition unlock, locations, hirelings and ongoing runs.",
+   "readOnlyHint": null,
+   "required": [],
+   "properties": []
+  },
+  {
+   "name": "events_status",
+   "description": "Active and queued store events.",
+   "readOnlyHint": null,
+   "required": [],
+   "properties": []
+  },
+  {
+   "name": "get_day_report",
+   "description": "Read this morning's report lines: power/electricity, insurance, security, storefront cleaning, rent warnings and the after-hours \"opened late, missed a customer\" line. Read-only, no rev. Call it after waking up (after sleep + wait_for_events) before deciding the day. `source` says which path was used: structured night_logs, the visible morning panel, or the bridge cache. `readable:false` with `reason:\"morning_pending\"` means the async day transition has not finished; wait for the day to change and read again instead of sleeping twice.",
+   "readOnlyHint": null,
+   "required": [],
+   "properties": []
+  },
+  {
+   "name": "get_calendar",
+   "description": "Read the store calendar for the next `days` days (default 7, max 14; it may cross the week boundary). Each day lists the active/queued events for that day plus `rent_due`; `rent` gives the next rent day, the amount and whether it falls in the current week. Day numbers come from the live day counter, not from guesses. Read-only, no rev. Use it at the start of a run to plan around rent day, inspections and threats.",
+   "readOnlyHint": null,
+   "required": [],
+   "properties": [
+    "days"
+   ]
+  },
+  {
+   "name": "get_clientele",
+   "description": "What kind of customers the display case attracts: showcase types, the discerning-shopper chance and cooldown, the predicted (client, chance %, item) rows shown by the clientele panel, and the number of random normal customers. Read-only, no rev. Use it to decide what to put in the showcase and whether to expect a rich buyer before opening. The reading is cached for the rest of the game day (cached=true), so repeated calls return the same snapshot instead of re-rolling the game's RNG.",
+   "readOnlyHint": null,
+   "required": [],
+   "properties": []
+  },
+  {
+   "name": "dismiss_tutorial_hints",
+   "description": "Hide the tutorial hint bubbles only: turns PlayerStore.tutorialEnable off once, closes the visible hints and hides the tutorial group. It does not unlock services, skip the intro, or change items, story clients, toggles or endless mode. Requires rev. Returns changed/tutorial_enabled/hints_hidden; re-read get_state.tutorial_hints afterwards. A tutorial_hints_readback_mismatch means stop, do not retry.",
+   "readOnlyHint": null,
+   "required": [
+    "rev"
+   ],
+   "properties": [
+    "rev"
+   ]
+  },
+  {
+   "name": "list_signs",
+   "description": "Owned marketing signs.",
+   "readOnlyHint": null,
+   "required": [],
+   "properties": []
+  },
+  {
+   "name": "deliver_request",
+   "description": "Deliver a fillable StoreRequest and claim rewards.",
+   "readOnlyHint": null,
+   "required": [
+    "id",
+    "rev"
+   ],
+   "properties": [
+    "id",
+    "rev"
+   ]
+  },
+  {
+   "name": "report_client",
+   "description": "Report the current customer (any reportable client; is_wanted tells the risk).",
+   "readOnlyHint": null,
+   "required": [
+    "rev"
+   ],
+   "properties": [
+    "rev"
+   ]
+  },
+  {
+   "name": "barter_accept",
+   "description": "Accept the current client's barter offer when acceptable.",
+   "readOnlyHint": null,
+   "required": [
+    "rev"
+   ],
+   "properties": [
+    "rev"
+   ]
+  },
+  {
+   "name": "arrest_wanted",
+   "description": "Report/arrest a wanted person by id.",
+   "readOnlyHint": null,
+   "required": [
+    "id",
+    "rev"
+   ],
+   "properties": [
+    "id",
+    "rev"
+   ]
+  },
+  {
+   "name": "list_factions",
+   "description": "Faction reputation amounts, influence and every reputation perk with threshold, unlock state, remaining points and direction (positive thresholds unlock by gaining reputation, negative ones by losing it).",
+   "readOnlyHint": null,
+   "required": [],
+   "properties": []
+  },
+  {
+   "name": "health_status",
+   "description": "Player wounds, luck, addiction timers.",
+   "readOnlyHint": null,
+   "required": [],
+   "properties": []
+  },
+  {
+   "name": "list_requests",
+   "description": "Active customer/faction requests and rewards.",
+   "readOnlyHint": null,
+   "required": [],
+   "properties": []
+  },
+  {
+   "name": "wanted_status",
+   "description": "Wanted-person visit state and wanted list.",
+   "readOnlyHint": null,
+   "required": [],
+   "properties": []
+  },
+  {
+   "name": "barter_status",
+   "description": "Current client's barter offer and conditions.",
+   "readOnlyHint": null,
+   "required": [],
+   "properties": []
+  },
+  {
+   "name": "list_wine",
+   "description": "List owned wine containers/bottles and finished state.",
+   "readOnlyHint": null,
+   "required": [],
+   "properties": []
+  },
+  {
+   "name": "wine_status",
+   "description": "Wine bottle fermentation/quality details.",
+   "readOnlyHint": null,
+   "required": [
+    "item_id"
+   ],
+   "properties": [
+    "item_id"
+   ]
+  },
+  {
+   "name": "wine_add_water",
+   "description": "Add water to a wine bottle (test/gameplay helper).",
+   "readOnlyHint": null,
+   "required": [
+    "item_id",
+    "rev"
+   ],
+   "properties": [
+    "item_id",
+    "ml",
+    "rev"
+   ]
+  },
+  {
+   "name": "wine_add_ingredient",
+   "description": "Move a berry/yeast into a wine bottle's ingredient grid.",
+   "readOnlyHint": null,
+   "required": [
+    "bottle_id",
+    "item_id",
+    "rev"
+   ],
+   "properties": [
+    "bottle_id",
+    "item_id",
+    "rev"
+   ]
+  },
+  {
+   "name": "start_fermentation",
+   "description": "Try to start fermentation on a wine bottle.",
+   "readOnlyHint": null,
+   "required": [
+    "item_id",
+    "rev"
+   ],
+   "properties": [
+    "item_id",
+    "rev"
+   ]
+  },
+  {
+   "name": "list_machines",
+   "description": "List owned standard machines with state, progress and slots.",
+   "readOnlyHint": null,
+   "required": [],
+   "properties": []
+  },
+  {
+   "name": "machine_grow_status",
+   "description": "Hydroponic grow status: power/water/seed/progress.",
+   "readOnlyHint": null,
+   "required": [
+    "machine_id"
+   ],
+   "properties": [
+    "machine_id"
+   ]
+  },
+  {
+   "name": "machine_status",
+   "description": "Show one machine's slots and contents.",
+   "readOnlyHint": null,
+   "required": [
+    "machine_id"
+   ],
+   "properties": [
+    "machine_id"
+   ]
+  },
+  {
+   "name": "machine_insert",
+   "description": "Insert an inventory item into a machine slot.",
+   "readOnlyHint": null,
+   "required": [
+    "machine_id",
+    "slot",
+    "item_id",
+    "rev"
+   ],
+   "properties": [
+    "item_id",
+    "machine_id",
+    "rev",
+    "slot"
+   ]
+  },
+  {
+   "name": "machine_collect",
+   "description": "Move items from a machine slot back to the backpack.",
+   "readOnlyHint": null,
+   "required": [
+    "machine_id",
+    "slot",
+    "rev"
+   ],
+   "properties": [
+    "machine_id",
+    "rev",
+    "slot"
+   ]
+  },
+  {
+   "name": "list_upgrades",
+   "description": "List network/store upgrades with cost/unlock/prerequisite state.",
+   "readOnlyHint": null,
+   "required": [],
+   "properties": []
+  },
+  {
+   "name": "buy_upgrade",
+   "description": "Buy a network upgrade by id (also unlocks supplier phone contacts).",
+   "readOnlyHint": null,
+   "required": [
+    "id",
+    "rev"
+   ],
+   "properties": [
+    "id",
+    "rev"
+   ]
+  },
+  {
+   "name": "lottery_status",
+   "description": "Lottery unlock state, edition, day and prize table.",
+   "readOnlyHint": null,
+   "required": [],
+   "properties": []
+  },
+  {
+   "name": "list_tickets",
+   "description": "List owned lottery tickets with number/edition/matches/prize.",
+   "readOnlyHint": null,
+   "required": [],
+   "properties": []
+  },
+  {
+   "name": "inspect_ticket",
+   "description": "Inspect one lottery ticket.",
+   "readOnlyHint": null,
+   "required": [
+    "item_id"
+   ],
+   "properties": [
+    "item_id"
+   ]
+  },
+  {
+   "name": "redeem_ticket",
+   "description": "Redeem a winning lottery ticket.",
+   "readOnlyHint": null,
+   "required": [
+    "item_id",
+    "rev"
+   ],
+   "properties": [
+    "item_id",
+    "rev"
+   ]
+  },
+  {
+   "name": "list_contacts",
+   "description": "List phone contacts, state, cooldown and spend.\n\n        include_hidden only expands contacts the phone book has not shown yet\n        when the bridge runs with allow_test_items=true (a debug profile) and\n        recording is not armed. Production and recording sessions return\n        hidden_contacts_forbidden and stay on the visible contact set.",
+   "readOnlyHint": null,
+   "required": [],
+   "properties": [
+    "include_hidden"
+   ]
+  },
+  {
+   "name": "call",
+   "description": "Open the phone and dial a contact.",
+   "readOnlyHint": null,
+   "required": [
+    "number",
+    "rev"
+   ],
+   "properties": [
+    "number",
+    "rev"
+   ]
+  },
+  {
+   "name": "phone_state",
+   "description": "Current phone call state and dialogue.",
+   "readOnlyHint": null,
+   "required": [],
+   "properties": []
+  },
+  {
+   "name": "phone_advance",
+   "description": "Advance the phone dialogue by one step.",
+   "readOnlyHint": null,
+   "required": [
+    "rev"
+   ],
+   "properties": [
+    "rev"
+   ]
+  },
+  {
+   "name": "phone_choose",
+   "description": "Choose a phone dialogue option by index.",
+   "readOnlyHint": null,
+   "required": [
+    "index",
+    "rev"
+   ],
+   "properties": [
+    "index",
+    "rev"
+   ]
+  },
+  {
+   "name": "end_call",
+   "description": "End the current phone call.",
+   "readOnlyHint": null,
+   "required": [
+    "rev"
+   ],
+   "properties": [
+    "rev"
+   ]
+  },
+  {
+   "name": "list_labels",
+   "description": "List editable label categories and conditions for an item.",
+   "readOnlyHint": null,
+   "required": [
+    "item_id"
+   ],
+   "properties": [
+    "item_id"
+   ]
+  },
+  {
+   "name": "set_label",
+   "description": "Set one editable label condition on an item.",
+   "readOnlyHint": null,
+   "required": [
+    "item_id",
+    "category",
+    "condition_id",
+    "rev"
+   ],
+   "properties": [
+    "category",
+    "condition_id",
+    "item_id",
+    "rev"
+   ]
+  },
+  {
+   "name": "list_analyzers",
+   "description": "List owned analyzers (water strip/aquascan, chem scanner, plant analyzer, gene scanner).",
+   "readOnlyHint": null,
+   "required": [],
+   "properties": []
+  },
+  {
+   "name": "analyze_item",
+   "description": "Run an analyzer on a target and return its visible result fields.",
+   "readOnlyHint": null,
+   "required": [
+    "analyzer_id",
+    "target_id",
+    "rev"
+   ],
+   "properties": [
+    "analyzer_id",
+    "rev",
+    "target_id"
+   ]
+  },
+  {
+   "name": "set_pen_mode",
+   "description": "Set marking pen mode: 0 red, 1 purple, 2 green, 3 blue, 4 orange, 5 eraser.",
+   "readOnlyHint": null,
+   "required": [
+    "pen_id",
+    "mode",
+    "rev"
+   ],
+   "properties": [
+    "mode",
+    "pen_id",
+    "rev"
+   ]
+  },
+  {
+   "name": "list_marks",
+   "description": "List marked fish/animals with their color.",
+   "readOnlyHint": null,
+   "required": [],
+   "properties": []
+  },
+  {
+   "name": "list_containers",
+   "description": "List player containers (main/front/back/showcase/hidden/afterhour/trash/sold) with counts.",
+   "readOnlyHint": null,
+   "required": [],
+   "properties": []
+  },
+  {
+   "name": "list_inventory",
+   "description": "Paginated inventory for one container; search matches item name or identifier.",
+   "readOnlyHint": null,
+   "required": [],
+   "properties": [
+    "container",
+    "page",
+    "page_size",
+    "search"
+   ]
+  },
+  {
+   "name": "move_item",
+   "description": "Move one item; omit x/y to auto-place. turns=0..3 rotates 0/90/180/270 degrees.",
+   "readOnlyHint": null,
+   "required": [
+    "item_id",
+    "target",
+    "rev"
+   ],
+   "properties": [
+    "item_id",
+    "rev",
+    "rotate",
+    "target",
+    "turns",
+    "x",
+    "y"
+   ]
+  },
+  {
+   "name": "get_layout",
+   "description": "Return the grid layout (width/height, rows of item ids) and item positions for a container.",
+   "readOnlyHint": null,
+   "required": [],
+   "properties": [
+    "container"
+   ]
+  },
+  {
+   "name": "get_item",
+   "description": "Full visible details for one item id: container, value, count, lock, size, descriptions.",
+   "readOnlyHint": null,
+   "required": [
+    "item_id"
+   ],
+   "properties": [
+    "item_id"
+   ]
+  },
+  {
+   "name": "ping",
+   "description": "Round-trip check used to verify the in-game bridge is alive.",
+   "readOnlyHint": null,
+   "required": [],
+   "properties": []
+  },
+  {
+   "name": "open_shop",
+   "description": "Open the shop shutter. Re-read get_state afterwards to confirm.",
+   "readOnlyHint": null,
+   "required": [
+    "rev"
+   ],
+   "properties": [
+    "rev"
+   ]
+  },
+  {
+   "name": "call_next_customer",
+   "description": "Call the next customer to the counter. Re-read get_state afterwards.",
+   "readOnlyHint": null,
+   "required": [
+    "rev"
+   ],
+   "properties": [
+    "rev"
+   ]
+  },
+  {
+   "name": "advance_dialogue",
+   "description": "Advance the current non-choice dialogue line. Re-read get_state afterwards.",
+   "readOnlyHint": null,
+   "required": [
+    "rev"
+   ],
+   "properties": [
+    "rev"
+   ]
+  },
+  {
+   "name": "choose_dialogue",
+   "description": "Pick a dialogue choice by index (0-based). Re-read get_state afterwards.",
+   "readOnlyHint": null,
+   "required": [
+    "index",
+    "rev"
+   ],
+   "properties": [
+    "index",
+    "rev"
+   ]
+  },
+  {
+   "name": "end_day",
+   "description": "Close the shop for the day. Refused with cannot_end_day while an important client (the landlord) is queued, and with customers_waiting when ordinary customers are still queued: the game asks before throwing them out, so pass dismiss_waiting=true only when you deliberately give up on them. Re-read get_state afterwards.",
+   "readOnlyHint": null,
+   "required": [
+    "rev"
+   ],
+   "properties": [
+    "dismiss_waiting",
+    "rev"
+   ]
+  },
+  {
+   "name": "bargain_preview",
+   "description": "Preview one bargain: success/leave/refuse chance, price before/after, reputation estimate.",
+   "readOnlyHint": null,
+   "required": [
+    "direction",
+    "percent"
+   ],
+   "properties": [
+    "direction",
+    "percent"
+   ]
+  },
+  {
+   "name": "bargain",
+   "description": "One bargain offer: direction is sell_discount|sell_markup|buy_markup|buy_discount; percent is 10|25|50|75.",
+   "readOnlyHint": null,
+   "required": [
+    "direction",
+    "percent",
+    "rev"
+   ],
+   "properties": [
+    "direction",
+    "percent",
+    "rev"
+   ]
+  },
+  {
+   "name": "get_new_game_options",
+   "description": "Read the current native new-game menu: visible options, current selection, rules and pagination. Read-only; no rev or id.",
+   "readOnlyHint": null,
+   "required": [],
+   "properties": []
+  },
+  {
+   "name": "open_new_game_menu",
+   "description": "Open the native new-game menu (one UI step). Re-read get_new_game_options afterwards.",
+   "readOnlyHint": null,
+   "required": [
+    "rev"
+   ],
+   "properties": [
+    "rev"
+   ]
+  },
+  {
+   "name": "select_new_game_option",
+   "description": "Select one scenario/perk/difficulty card in the open menu (one native click). Re-read get_new_game_options afterwards to verify the actual selection.",
+   "readOnlyHint": null,
+   "required": [
+    "kind",
+    "id",
+    "rev"
+   ],
+   "properties": [
+    "id",
+    "kind",
+    "rev"
+   ]
+  },
+  {
+   "name": "new_game_next_page",
+   "description": "Turn one new-game page: row=available|selected, direction=-1 (previous) or 1 (next). Re-read get_new_game_options afterwards.",
+   "readOnlyHint": null,
+   "required": [
+    "row",
+    "direction",
+    "rev"
+   ],
+   "properties": [
+    "direction",
+    "rev",
+    "row"
+   ]
+  },
+  {
+   "name": "focus_new_game_selected_perk",
+   "description": "Move native focus/hover onto one already-selected perk; this does not select or unselect it. Re-read get_new_game_options afterwards. Fails closed if the bridge cannot focus that card.",
+   "readOnlyHint": null,
+   "required": [
+    "id",
+    "rev"
+   ],
+   "properties": [
+    "id",
+    "rev"
+   ]
+  },
+  {
+   "name": "blur_new_game_option",
+   "description": "Trigger one native pointer-exit on the currently hovered perk card; this does not change the selection. Use it after focus_new_game_selected_perk returns hover_conflict (for example a same-id available card kept the hover). Single step; re-read get_new_game_options afterwards.",
+   "readOnlyHint": null,
+   "required": [
+    "id",
+    "rev"
+   ],
+   "properties": [
+    "id",
+    "rev"
+   ]
+  },
+  {
+   "name": "new_game_continue",
+   "description": "Continue one intermediate new-game page. Does not confirm the first-run prompt or press difficulty Start; re-read get_new_game_options afterwards.",
+   "readOnlyHint": null,
+   "required": [
+    "rev"
+   ],
+   "properties": [
+    "rev"
+   ]
+  },
+  {
+   "name": "get_recording_save_status",
+   "description": "Read-only status for the dedicated recording slot. Recording is locked by default. Returns only the configured/bound slot and its binding fingerprint (slot, run id, run number, start type, start scenario); it never lists other slots, previews or paths. No rev; never writes, saves or starts a game.",
+   "readOnlyHint": null,
+   "required": [],
+   "properties": []
+  },
+  {
+   "name": "save_recording_game",
+   "description": "Save once through the native save. Recording is locked by default; this only works after the dedicated recording slot is bound, and it only saves that bound slot (no slot parameter). Re-read get_recording_save_status afterwards.",
+   "readOnlyHint": null,
+   "required": [
+    "rev"
+   ],
+   "properties": [
+    "rev"
+   ]
+  },
+  {
+   "name": "load_recording_game",
+   "description": "Load the bound dedicated recording slot once. Recording is locked by default; only available after that slot is bound, and it can only load the bound slot (no slot parameter). Re-read get_recording_save_status afterwards.",
+   "readOnlyHint": null,
+   "required": [
+    "rev"
+   ],
+   "properties": [
+    "rev"
+   ]
+  },
+  {
+   "name": "confirm_new_game",
+   "description": "Grant exactly one native new-game write permission for the dedicated recording slot. Recording is locked by default; requires an armed bindable slot. The native Start triggers the game's InitialSave (a real disk write); when the first-run confirm prompt is visible, this op also clicks its native yes once. It does not retry or pick a slot. Re-read get_recording_save_status and get_new_game_options afterwards.",
+   "readOnlyHint": null,
+   "required": [
+    "rev"
+   ],
+   "properties": [
+    "rev"
+   ]
+  },
+  {
+   "name": "new_game",
+   "description": "Start a fresh apprentice run from the main menu. Never touches existing save slots.",
+   "readOnlyHint": null,
+   "required": [
+    "rev"
+   ],
+   "properties": [
+    "rev"
+   ]
+  },
+  {
+   "name": "load_game",
+   "description": "Load a save slot from the main menu (slot ids are listed in get_state.save_slots).",
+   "readOnlyHint": null,
+   "required": [
+    "slot",
+    "rev"
+   ],
+   "properties": [
+    "rev",
+    "slot"
+   ]
+  },
+  {
+   "name": "sleep",
+   "description": "Sleep into the next morning: settles night services, autosaves and advances the day. Only legal after the shop is CLOSED for the day (call end_day first): otherwise not_closed. It never skips the landlord: cannot_end_day while an important client waits, customers_waiting unless dismiss_waiting=true.",
+   "readOnlyHint": null,
+   "required": [
+    "rev"
+   ],
+   "properties": [
+    "dismiss_waiting",
+    "rev"
+   ]
+  },
+  {
+   "name": "save_game",
+   "description": "Save the current run. Re-read get_state afterwards; saving is synchronous.",
+   "readOnlyHint": null,
+   "required": [
+    "rev"
+   ],
+   "properties": [
+    "rev"
+   ]
+  },
+  {
+   "name": "dismiss_current_client",
+   "description": "Send the current client away through the game's own dismissal path. Escape hatch for a client you cannot serve (for example a seller who arrived with nothing on the table, so there is no trade to accept): while a client is present, call_next_customer and end_day both refuse. Refused with dialogue_active while a dialogue is running (finish it with advance_dialogue first).",
+   "readOnlyHint": null,
+   "required": [
+    "rev"
+   ],
+   "properties": [
+    "rev"
+   ]
+  },
+  {
+   "name": "confirm_trade",
+   "description": "Buy (side=buy) or sell (side=sell) one item currently on the back counter.",
+   "readOnlyHint": null,
+   "required": [
+    "item_id",
+    "side",
+    "rev"
+   ],
+   "properties": [
+    "item_id",
+    "rev",
+    "side"
+   ]
+  },
+  {
+   "name": "wait_for_events",
+   "description": "Block until the game revision changes; returns the fresh state (long-poll, no busy loop).",
+   "readOnlyHint": null,
+   "required": [],
+   "properties": [
+    "since_rev",
+    "timeout_ms"
+   ]
+  },
+  {
+   "name": "wait_for_change",
+   "description": "Block until the shop revision changes (customer arrives, dialogue advances).",
+   "readOnlyHint": null,
+   "required": [
+    "since_rev"
+   ],
+   "properties": [
+    "since_rev",
+    "timeout_s"
+   ]
+  }
+ ],
+ "recording": [
+  "get_state",
+  "memory_bootstrap",
+  "memory_retrieve",
+  "memory_get",
+  "memory_status",
+  "get_legal_actions",
+  "get_run_summary",
+  "get_action_history",
+  "capture_screenshot",
+  "get_pending_prompt",
+  "close_windows",
+  "answer_prompt",
+  "list_screenshots",
+  "list_goods",
+  "list_locations",
+  "go_out",
+  "scavenge",
+  "return_home",
+  "buy_wholesale",
+  "commissary_buy",
+  "list_books",
+  "read_book",
+  "read_item",
+  "list_interactions",
+  "activate_item",
+  "toggle_item",
+  "use_tool",
+  "contraband_status",
+  "security_status",
+  "list_services",
+  "toggle_service",
+  "husbandry_status",
+  "expedition_status",
+  "events_status",
+  "get_day_report",
+  "get_calendar",
+  "get_clientele",
+  "dismiss_tutorial_hints",
+  "list_signs",
+  "deliver_request",
+  "report_client",
+  "barter_accept",
+  "arrest_wanted",
+  "list_factions",
+  "health_status",
+  "list_requests",
+  "wanted_status",
+  "barter_status",
+  "list_wine",
+  "wine_status",
+  "wine_add_ingredient",
+  "start_fermentation",
+  "list_machines",
+  "machine_grow_status",
+  "machine_status",
+  "machine_insert",
+  "machine_collect",
+  "list_upgrades",
+  "buy_upgrade",
+  "lottery_status",
+  "list_tickets",
+  "inspect_ticket",
+  "redeem_ticket",
+  "list_contacts",
+  "call",
+  "phone_state",
+  "phone_advance",
+  "phone_choose",
+  "end_call",
+  "list_labels",
+  "set_label",
+  "list_analyzers",
+  "analyze_item",
+  "set_pen_mode",
+  "list_marks",
+  "list_containers",
+  "list_inventory",
+  "move_item",
+  "get_layout",
+  "get_item",
+  "ping",
+  "open_shop",
+  "call_next_customer",
+  "advance_dialogue",
+  "choose_dialogue",
+  "end_day",
+  "bargain_preview",
+  "bargain",
+  "get_new_game_options",
+  "open_new_game_menu",
+  "select_new_game_option",
+  "new_game_next_page",
+  "focus_new_game_selected_perk",
+  "blur_new_game_option",
+  "new_game_continue",
+  "get_recording_save_status",
+  "load_recording_game",
+  "confirm_new_game",
+  "load_game",
+  "sleep",
+  "dismiss_current_client",
+  "confirm_trade",
+  "wait_for_events",
+  "wait_for_change"
+ ]
+}
