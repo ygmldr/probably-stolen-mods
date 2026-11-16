@@ -1,1688 +1,693 @@
 {
-  "toolset": "recording",
-  "count": 96,
-  "tools": [
-    {
-      "name": "activate_item",
-      "description": "Activate an owned item (books, lottery tickets, scanners).",
-      "input_schema": {
-        "properties": {
-          "item_id": {
-            "title": "Item Id",
-            "type": "integer"
-          },
-          "rev": {
-            "title": "Rev",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "item_id",
-          "rev"
-        ],
-        "type": "object",
-        "title": "activate_itemArguments"
-      }
-    },
-    {
-      "name": "advance_dialogue",
-      "description": "Advance the current non-choice dialogue line. Re-read get_state afterwards.",
-      "input_schema": {
-        "properties": {
-          "rev": {
-            "title": "Rev",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "rev"
-        ],
-        "type": "object",
-        "title": "advance_dialogueArguments"
-      }
-    },
-    {
-      "name": "advance_expedition",
-      "description": "Advance an ongoing expedition one step.",
-      "input_schema": {
-        "properties": {
-          "expedition_id": {
-            "title": "Expedition Id",
-            "type": "string"
-          },
-          "rev": {
-            "title": "Rev",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "expedition_id",
-          "rev"
-        ],
-        "type": "object",
-        "title": "advance_expeditionArguments"
-      }
-    },
-    {
-      "name": "analyze_item",
-      "description": "Run an analyzer on a target and return its visible result fields.",
-      "input_schema": {
-        "properties": {
-          "analyzer_id": {
-            "title": "Analyzer Id",
-            "type": "integer"
-          },
-          "target_id": {
-            "title": "Target Id",
-            "type": "integer"
-          },
-          "rev": {
-            "title": "Rev",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "analyzer_id",
-          "target_id",
-          "rev"
-        ],
-        "type": "object",
-        "title": "analyze_itemArguments"
-      }
-    },
-    {
-      "name": "arrest_wanted",
-      "description": "Report/arrest a wanted person by id.",
-      "input_schema": {
-        "properties": {
-          "id": {
-            "title": "Id",
-            "type": "string"
-          },
-          "rev": {
-            "title": "Rev",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "id",
-          "rev"
-        ],
-        "type": "object",
-        "title": "arrest_wantedArguments"
-      }
-    },
-    {
-      "name": "bargain",
-      "description": "One bargain offer: direction is sell_discount|sell_markup|buy_markup|buy_discount; percent is 10|25|50|75.",
-      "input_schema": {
-        "properties": {
-          "direction": {
-            "title": "Direction",
-            "type": "string"
-          },
-          "percent": {
-            "title": "Percent",
-            "type": "integer"
-          },
-          "rev": {
-            "title": "Rev",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "direction",
-          "percent",
-          "rev"
-        ],
-        "type": "object",
-        "title": "bargainArguments"
-      }
-    },
-    {
-      "name": "bargain_preview",
-      "description": "Preview one bargain: success/leave/refuse chance, price before/after, reputation estimate.",
-      "input_schema": {
-        "properties": {
-          "direction": {
-            "title": "Direction",
-            "type": "string"
-          },
-          "percent": {
-            "title": "Percent",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "direction",
-          "percent"
-        ],
-        "type": "object",
-        "title": "bargain_previewArguments"
-      }
-    },
-    {
-      "name": "barter_accept",
-      "description": "Accept the current client's barter offer when acceptable.",
-      "input_schema": {
-        "properties": {
-          "rev": {
-            "title": "Rev",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "rev"
-        ],
-        "type": "object",
-        "title": "barter_acceptArguments"
-      }
-    },
-    {
-      "name": "barter_status",
-      "description": "Current client's barter offer and conditions.",
-      "input_schema": {
-        "properties": {},
-        "type": "object",
-        "title": "barter_statusArguments"
-      }
-    },
-    {
-      "name": "blur_new_game_option",
-      "description": "Trigger one native pointer-exit on the currently hovered perk card; this does not change the selection. Use it after focus_new_game_selected_perk returns hover_conflict (for example a same-id available card kept the hover). Single step; re-read get_new_game_options afterwards.",
-      "input_schema": {
-        "properties": {
-          "id": {
-            "title": "Id",
-            "type": "string"
-          },
-          "rev": {
-            "title": "Rev",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "id",
-          "rev"
-        ],
-        "type": "object",
-        "title": "blur_new_game_optionArguments"
-      }
-    },
-    {
-      "name": "buy_upgrade",
-      "description": "Buy a network upgrade by id (also unlocks supplier phone contacts).",
-      "input_schema": {
-        "properties": {
-          "id": {
-            "title": "Id",
-            "type": "string"
-          },
-          "rev": {
-            "title": "Rev",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "id",
-          "rev"
-        ],
-        "type": "object",
-        "title": "buy_upgradeArguments"
-      }
-    },
-    {
-      "name": "buy_wholesale",
-      "description": "Buy the current client's whole wholesale offer (requires isOfferWholesale).",
-      "input_schema": {
-        "properties": {
-          "rev": {
-            "title": "Rev",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "rev"
-        ],
-        "type": "object",
-        "title": "buy_wholesaleArguments"
-      }
-    },
-    {
-      "name": "call",
-      "description": "Open the phone and dial a contact.",
-      "input_schema": {
-        "properties": {
-          "number": {
-            "title": "Number",
-            "type": "integer"
-          },
-          "rev": {
-            "title": "Rev",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "number",
-          "rev"
-        ],
-        "type": "object",
-        "title": "callArguments"
-      }
-    },
-    {
-      "name": "call_next_customer",
-      "description": "Call the next customer to the counter. Re-read get_state afterwards.",
-      "input_schema": {
-        "properties": {
-          "rev": {
-            "title": "Rev",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "rev"
-        ],
-        "type": "object",
-        "title": "call_next_customerArguments"
-      }
-    },
-    {
-      "name": "capture_screenshot",
-      "description": "Capture the current game frame as evidence (JPEG, short side 768) and return its path relative to ModData/pawnmind/screenshots/. Use it right before stopping on a hard failure, or when the screen disagrees with what the bridge reports. Server-side throttling applies; returns screenshot_unavailable when capture is off.",
-      "input_schema": {
-        "properties": {
-          "reason": {
-            "default": "manual",
-            "title": "Reason",
-            "type": "string"
-          }
-        },
-        "type": "object",
-        "title": "capture_screenshotArguments"
-      }
-    },
-    {
-      "name": "choose_dialogue",
-      "description": "Pick a dialogue choice by index (0-based). Re-read get_state afterwards.",
-      "input_schema": {
-        "properties": {
-          "index": {
-            "title": "Index",
-            "type": "integer"
-          },
-          "rev": {
-            "title": "Rev",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "index",
-          "rev"
-        ],
-        "type": "object",
-        "title": "choose_dialogueArguments"
-      }
-    },
-    {
-      "name": "commissary_buy",
-      "description": "Buy one item from the supply station (commissary) by identifier.",
-      "input_schema": {
-        "properties": {
-          "identifier": {
-            "title": "Identifier",
-            "type": "string"
-          },
-          "rev": {
-            "title": "Rev",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "identifier",
-          "rev"
-        ],
-        "type": "object",
-        "title": "commissary_buyArguments"
-      }
-    },
-    {
-      "name": "confirm_new_game",
-      "description": "Grant exactly one native new-game write permission for the dedicated recording slot. Recording is locked by default; requires an armed bindable slot. The native Start triggers the game's InitialSave (a real disk write); when the first-run confirm prompt is visible, this op also clicks its native yes once. It does not retry or pick a slot. Re-read get_recording_save_status and get_new_game_options afterwards.",
-      "input_schema": {
-        "properties": {
-          "rev": {
-            "title": "Rev",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "rev"
-        ],
-        "type": "object",
-        "title": "confirm_new_gameArguments"
-      }
-    },
-    {
-      "name": "confirm_trade",
-      "description": "Buy (side=buy) or sell (side=sell) one item currently on the back counter.",
-      "input_schema": {
-        "properties": {
-          "item_id": {
-            "title": "Item Id",
-            "type": "integer"
-          },
-          "side": {
-            "title": "Side",
-            "type": "string"
-          },
-          "rev": {
-            "title": "Rev",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "item_id",
-          "side",
-          "rev"
-        ],
-        "type": "object",
-        "title": "confirm_tradeArguments"
-      }
-    },
-    {
-      "name": "contraband_status",
-      "description": "Owned contraband/stolen items with levels and risk flags.",
-      "input_schema": {
-        "properties": {},
-        "type": "object",
-        "title": "contraband_statusArguments"
-      }
-    },
-    {
-      "name": "deliver_request",
-      "description": "Deliver a fillable StoreRequest and claim rewards.",
-      "input_schema": {
-        "properties": {
-          "id": {
-            "title": "Id",
-            "type": "string"
-          },
-          "rev": {
-            "title": "Rev",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "id",
-          "rev"
-        ],
-        "type": "object",
-        "title": "deliver_requestArguments"
-      }
-    },
-    {
-      "name": "dispatch_expedition",
-      "description": "Send a hireling to an unlocked expedition location.",
-      "input_schema": {
-        "properties": {
-          "hireling_id": {
-            "title": "Hireling Id",
-            "type": "string"
-          },
-          "location_id": {
-            "title": "Location Id",
-            "type": "string"
-          },
-          "rev": {
-            "title": "Rev",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "hireling_id",
-          "location_id",
-          "rev"
-        ],
-        "type": "object",
-        "title": "dispatch_expeditionArguments"
-      }
-    },
-    {
-      "name": "end_call",
-      "description": "End the current phone call.",
-      "input_schema": {
-        "properties": {
-          "rev": {
-            "title": "Rev",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "rev"
-        ],
-        "type": "object",
-        "title": "end_callArguments"
-      }
-    },
-    {
-      "name": "end_day",
-      "description": "Close the day when the game allows it. Re-read get_state afterwards.",
-      "input_schema": {
-        "properties": {
-          "rev": {
-            "title": "Rev",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "rev"
-        ],
-        "type": "object",
-        "title": "end_dayArguments"
-      }
-    },
-    {
-      "name": "events_status",
-      "description": "Active and queued store events.",
-      "input_schema": {
-        "properties": {},
-        "type": "object",
-        "title": "events_statusArguments"
-      }
-    },
-    {
-      "name": "expedition_status",
-      "description": "Expedition unlock, locations, hirelings and ongoing runs.",
-      "input_schema": {
-        "properties": {},
-        "type": "object",
-        "title": "expedition_statusArguments"
-      }
-    },
-    {
-      "name": "focus_new_game_selected_perk",
-      "description": "Move native focus/hover onto one already-selected perk; this does not select or unselect it. Re-read get_new_game_options afterwards. Fails closed if the bridge cannot focus that card.",
-      "input_schema": {
-        "properties": {
-          "id": {
-            "title": "Id",
-            "type": "string"
-          },
-          "rev": {
-            "title": "Rev",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "id",
-          "rev"
-        ],
-        "type": "object",
-        "title": "focus_new_game_selected_perkArguments"
-      }
-    },
-    {
-      "name": "get_action_history",
-      "description": "Recent actions with their args, ok flag and revision.",
-      "input_schema": {
-        "properties": {
-          "limit": {
-            "default": 20,
-            "title": "Limit",
-            "type": "integer"
-          }
-        },
-        "type": "object",
-        "title": "get_action_historyArguments"
-      }
-    },
-    {
-      "name": "get_item",
-      "description": "Full visible details for one item id: container, value, count, lock, size, descriptions.",
-      "input_schema": {
-        "properties": {
-          "item_id": {
-            "title": "Item Id",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "item_id"
-        ],
-        "type": "object",
-        "title": "get_itemArguments"
-      }
-    },
-    {
-      "name": "get_layout",
-      "description": "Return the grid layout (width/height, rows of item ids) and item positions for a container.",
-      "input_schema": {
-        "properties": {
-          "container": {
-            "default": "main",
-            "title": "Container",
-            "type": "string"
-          }
-        },
-        "type": "object",
-        "title": "get_layoutArguments"
-      }
-    },
-    {
-      "name": "get_legal_actions",
-      "description": "Return the actions that are legal right now (state-derived, includes args).",
-      "input_schema": {
-        "properties": {},
-        "type": "object",
-        "title": "get_legal_actionsArguments"
-      }
-    },
-    {
-      "name": "get_new_game_options",
-      "description": "Read the current native new-game menu: visible options, current selection, rules and pagination. Read-only; no rev or id.",
-      "input_schema": {
-        "properties": {},
-        "type": "object",
-        "title": "get_new_game_optionsArguments"
-      }
-    },
-    {
-      "name": "get_recording_save_status",
-      "description": "Read-only status for the dedicated recording slot. Recording is locked by default. Returns only the configured/bound slot and its binding fingerprint (slot, run id, run number, start type, start scenario); it never lists other slots, previews or paths. No rev; never writes, saves or starts a game.",
-      "input_schema": {
-        "properties": {},
-        "type": "object",
-        "title": "get_recording_save_statusArguments"
-      }
-    },
-    {
-      "name": "get_run_summary",
-      "description": "Compact run summary: day, shop state, cash, rent, inventory, current client.",
-      "input_schema": {
-        "properties": {},
-        "type": "object",
-        "title": "get_run_summaryArguments"
-      }
-    },
-    {
-      "name": "get_state",
-      "description": "Return the current shop snapshot: cash, rent, customer and negotiated item.",
-      "input_schema": {
-        "properties": {},
-        "type": "object",
-        "title": "get_stateArguments"
-      }
-    },
-    {
-      "name": "go_out",
-      "description": "Leave the shop and travel to a night location.",
-      "input_schema": {
-        "properties": {
-          "location": {
-            "title": "Location",
-            "type": "string"
-          },
-          "rev": {
-            "title": "Rev",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "location",
-          "rev"
-        ],
-        "type": "object",
-        "title": "go_outArguments"
-      }
-    },
-    {
-      "name": "health_status",
-      "description": "Player wounds, luck, addiction timers.",
-      "input_schema": {
-        "properties": {},
-        "type": "object",
-        "title": "health_statusArguments"
-      }
-    },
-    {
-      "name": "husbandry_status",
-      "description": "Owned animals/fish with health/dead state.",
-      "input_schema": {
-        "properties": {},
-        "type": "object",
-        "title": "husbandry_statusArguments"
-      }
-    },
-    {
-      "name": "inspect_ticket",
-      "description": "Inspect one lottery ticket.",
-      "input_schema": {
-        "properties": {
-          "item_id": {
-            "title": "Item Id",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "item_id"
-        ],
-        "type": "object",
-        "title": "inspect_ticketArguments"
-      }
-    },
-    {
-      "name": "list_analyzers",
-      "description": "List owned analyzers (water strip/aquascan, chem scanner, plant analyzer, gene scanner).",
-      "input_schema": {
-        "properties": {},
-        "type": "object",
-        "title": "list_analyzersArguments"
-      }
-    },
-    {
-      "name": "list_books",
-      "description": "List owned/unlocked books (vanilla BOOK_TAG and paper GUIDE_PAPER_TAG).",
-      "input_schema": {
-        "properties": {},
-        "type": "object",
-        "title": "list_booksArguments"
-      }
-    },
-    {
-      "name": "list_contacts",
-      "description": "List phone contacts, state, cooldown and spend.\n\n        include_hidden only expands contacts the phone book has not shown yet\n        when the bridge runs with allow_test_items=true (a debug profile) and\n        recording is not armed. Production and recording sessions return\n        hidden_contacts_forbidden and stay on the visible contact set.",
-      "input_schema": {
-        "properties": {
-          "include_hidden": {
-            "default": false,
-            "title": "Include Hidden",
-            "type": "boolean"
-          }
-        },
-        "type": "object",
-        "title": "list_contactsArguments"
-      }
-    },
-    {
-      "name": "list_containers",
-      "description": "List player containers (main/front/back/showcase/hidden/afterhour/trash/sold) with counts.",
-      "input_schema": {
-        "properties": {},
-        "type": "object",
-        "title": "list_containersArguments"
-      }
-    },
-    {
-      "name": "list_factions",
-      "description": "Faction reputation amounts, perks and influence.",
-      "input_schema": {
-        "properties": {},
-        "type": "object",
-        "title": "list_factionsArguments"
-      }
-    },
-    {
-      "name": "list_goods",
-      "description": "List goods on the front/back counters: scope=client (non-owned), sellable (owned+client wants), all.",
-      "input_schema": {
-        "properties": {
-          "scope": {
-            "default": "all",
-            "title": "Scope",
-            "type": "string"
-          }
-        },
-        "type": "object",
-        "title": "list_goodsArguments"
-      }
-    },
-    {
-      "name": "list_interactions",
-      "description": "List available interactions for one item: activate/toggle/target.",
-      "input_schema": {
-        "properties": {
-          "item_id": {
-            "title": "Item Id",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "item_id"
-        ],
-        "type": "object",
-        "title": "list_interactionsArguments"
-      }
-    },
-    {
-      "name": "list_inventory",
-      "description": "Paginated inventory for one container; search matches item name or identifier.",
-      "input_schema": {
-        "properties": {
-          "container": {
-            "default": "main",
-            "title": "Container",
-            "type": "string"
-          },
-          "search": {
-            "default": "",
-            "title": "Search",
-            "type": "string"
-          },
-          "page": {
-            "default": 1,
-            "title": "Page",
-            "type": "integer"
-          },
-          "page_size": {
-            "default": 20,
-            "title": "Page Size",
-            "type": "integer"
-          }
-        },
-        "type": "object",
-        "title": "list_inventoryArguments"
-      }
-    },
-    {
-      "name": "list_labels",
-      "description": "List editable label categories and conditions for an item.",
-      "input_schema": {
-        "properties": {
-          "item_id": {
-            "title": "Item Id",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "item_id"
-        ],
-        "type": "object",
-        "title": "list_labelsArguments"
-      }
-    },
-    {
-      "name": "list_locations",
-      "description": "List discovered night locations (dumping ground / commissary / Dr Jackson) and availability.",
-      "input_schema": {
-        "properties": {},
-        "type": "object",
-        "title": "list_locationsArguments"
-      }
-    },
-    {
-      "name": "list_machines",
-      "description": "List owned standard machines with state, progress and slots.",
-      "input_schema": {
-        "properties": {},
-        "type": "object",
-        "title": "list_machinesArguments"
-      }
-    },
-    {
-      "name": "list_marks",
-      "description": "List marked fish/animals with their color.",
-      "input_schema": {
-        "properties": {},
-        "type": "object",
-        "title": "list_marksArguments"
-      }
-    },
-    {
-      "name": "list_requests",
-      "description": "Active customer/faction requests and rewards.",
-      "input_schema": {
-        "properties": {},
-        "type": "object",
-        "title": "list_requestsArguments"
-      }
-    },
-    {
-      "name": "list_screenshots",
-      "description": "List recent evidence captures, newest first, with total_count/total_bytes/budget_bytes/dropped/budget_exhausted. Read-only.",
-      "input_schema": {
-        "properties": {
-          "limit": {
-            "default": 20,
-            "title": "Limit",
-            "type": "integer"
-          }
-        },
-        "type": "object",
-        "title": "list_screenshotsArguments"
-      }
-    },
-    {
-      "name": "list_services",
-      "description": "Nightly services (insurance, janitorial, power, informant) and toggles.",
-      "input_schema": {
-        "properties": {},
-        "type": "object",
-        "title": "list_servicesArguments"
-      }
-    },
-    {
-      "name": "list_signs",
-      "description": "Owned marketing signs.",
-      "input_schema": {
-        "properties": {},
-        "type": "object",
-        "title": "list_signsArguments"
-      }
-    },
-    {
-      "name": "list_tickets",
-      "description": "List owned lottery tickets with number/edition/matches/prize.",
-      "input_schema": {
-        "properties": {},
-        "type": "object",
-        "title": "list_ticketsArguments"
-      }
-    },
-    {
-      "name": "list_upgrades",
-      "description": "List network/store upgrades with cost/unlock/prerequisite state.",
-      "input_schema": {
-        "properties": {},
-        "type": "object",
-        "title": "list_upgradesArguments"
-      }
-    },
-    {
-      "name": "list_wine",
-      "description": "List owned wine containers/bottles and finished state.",
-      "input_schema": {
-        "properties": {},
-        "type": "object",
-        "title": "list_wineArguments"
-      }
-    },
-    {
-      "name": "load_game",
-      "description": "Load a save slot from the main menu (slot ids are listed in get_state.save_slots).",
-      "input_schema": {
-        "properties": {
-          "slot": {
-            "title": "Slot",
-            "type": "integer"
-          },
-          "rev": {
-            "title": "Rev",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "slot",
-          "rev"
-        ],
-        "type": "object",
-        "title": "load_gameArguments"
-      }
-    },
-    {
-      "name": "load_recording_game",
-      "description": "Load the bound dedicated recording slot once. Recording is locked by default; only available after that slot is bound, and it can only load the bound slot (no slot parameter). Re-read get_recording_save_status afterwards.",
-      "input_schema": {
-        "properties": {
-          "rev": {
-            "title": "Rev",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "rev"
-        ],
-        "type": "object",
-        "title": "load_recording_gameArguments"
-      }
-    },
-    {
-      "name": "lottery_status",
-      "description": "Lottery unlock state, edition, day and prize table.",
-      "input_schema": {
-        "properties": {},
-        "type": "object",
-        "title": "lottery_statusArguments"
-      }
-    },
-    {
-      "name": "machine_collect",
-      "description": "Move items from a machine slot back to the backpack.",
-      "input_schema": {
-        "properties": {
-          "machine_id": {
-            "title": "Machine Id",
-            "type": "integer"
-          },
-          "slot": {
-            "title": "Slot",
-            "type": "integer"
-          },
-          "rev": {
-            "title": "Rev",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "machine_id",
-          "slot",
-          "rev"
-        ],
-        "type": "object",
-        "title": "machine_collectArguments"
-      }
-    },
-    {
-      "name": "machine_grow_status",
-      "description": "Hydroponic grow status: power/water/seed/progress.",
-      "input_schema": {
-        "properties": {
-          "machine_id": {
-            "title": "Machine Id",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "machine_id"
-        ],
-        "type": "object",
-        "title": "machine_grow_statusArguments"
-      }
-    },
-    {
-      "name": "machine_insert",
-      "description": "Insert an inventory item into a machine slot.",
-      "input_schema": {
-        "properties": {
-          "machine_id": {
-            "title": "Machine Id",
-            "type": "integer"
-          },
-          "slot": {
-            "title": "Slot",
-            "type": "integer"
-          },
-          "item_id": {
-            "title": "Item Id",
-            "type": "integer"
-          },
-          "rev": {
-            "title": "Rev",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "machine_id",
-          "slot",
-          "item_id",
-          "rev"
-        ],
-        "type": "object",
-        "title": "machine_insertArguments"
-      }
-    },
-    {
-      "name": "machine_status",
-      "description": "Show one machine's slots and contents.",
-      "input_schema": {
-        "properties": {
-          "machine_id": {
-            "title": "Machine Id",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "machine_id"
-        ],
-        "type": "object",
-        "title": "machine_statusArguments"
-      }
-    },
-    {
-      "name": "move_item",
-      "description": "Move one item; omit x/y to auto-place. turns=0..3 rotates 0/90/180/270 degrees.",
-      "input_schema": {
-        "properties": {
-          "item_id": {
-            "title": "Item Id",
-            "type": "integer"
-          },
-          "target": {
-            "title": "Target",
-            "type": "string"
-          },
-          "rev": {
-            "title": "Rev",
-            "type": "integer"
-          },
-          "x": {
-            "default": -1,
-            "title": "X",
-            "type": "integer"
-          },
-          "y": {
-            "default": -1,
-            "title": "Y",
-            "type": "integer"
-          },
-          "rotate": {
-            "default": false,
-            "title": "Rotate",
-            "type": "boolean"
-          },
-          "turns": {
-            "default": 0,
-            "title": "Turns",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "item_id",
-          "target",
-          "rev"
-        ],
-        "type": "object",
-        "title": "move_itemArguments"
-      }
-    },
-    {
-      "name": "new_game_continue",
-      "description": "Continue one intermediate new-game page. Does not confirm the first-run prompt or press difficulty Start; re-read get_new_game_options afterwards.",
-      "input_schema": {
-        "properties": {
-          "rev": {
-            "title": "Rev",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "rev"
-        ],
-        "type": "object",
-        "title": "new_game_continueArguments"
-      }
-    },
-    {
-      "name": "new_game_next_page",
-      "description": "Turn one new-game page: row=available|selected, direction=-1 (previous) or 1 (next). Re-read get_new_game_options afterwards.",
-      "input_schema": {
-        "properties": {
-          "row": {
-            "enum": [
-              "available",
-              "selected"
-            ],
-            "title": "Row",
-            "type": "string"
-          },
-          "direction": {
-            "enum": [
-              -1,
-              1
-            ],
-            "title": "Direction",
-            "type": "integer"
-          },
-          "rev": {
-            "title": "Rev",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "row",
-          "direction",
-          "rev"
-        ],
-        "type": "object",
-        "title": "new_game_next_pageArguments"
-      }
-    },
-    {
-      "name": "open_new_game_menu",
-      "description": "Open the native new-game menu (one UI step). Re-read get_new_game_options afterwards.",
-      "input_schema": {
-        "properties": {
-          "rev": {
-            "title": "Rev",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "rev"
-        ],
-        "type": "object",
-        "title": "open_new_game_menuArguments"
-      }
-    },
-    {
-      "name": "open_shop",
-      "description": "Open the shop shutter. Re-read get_state afterwards to confirm.",
-      "input_schema": {
-        "properties": {
-          "rev": {
-            "title": "Rev",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "rev"
-        ],
-        "type": "object",
-        "title": "open_shopArguments"
-      }
-    },
-    {
-      "name": "phone_advance",
-      "description": "Advance the phone dialogue by one step.",
-      "input_schema": {
-        "properties": {
-          "rev": {
-            "title": "Rev",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "rev"
-        ],
-        "type": "object",
-        "title": "phone_advanceArguments"
-      }
-    },
-    {
-      "name": "phone_choose",
-      "description": "Choose a phone dialogue option by index.",
-      "input_schema": {
-        "properties": {
-          "index": {
-            "title": "Index",
-            "type": "integer"
-          },
-          "rev": {
-            "title": "Rev",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "index",
-          "rev"
-        ],
-        "type": "object",
-        "title": "phone_chooseArguments"
-      }
-    },
-    {
-      "name": "phone_state",
-      "description": "Current phone call state and dialogue.",
-      "input_schema": {
-        "properties": {},
-        "type": "object",
-        "title": "phone_stateArguments"
-      }
-    },
-    {
-      "name": "ping",
-      "description": "Round-trip check used to verify the in-game bridge is alive.",
-      "input_schema": {
-        "properties": {},
-        "type": "object",
-        "title": "pingArguments"
-      }
-    },
-    {
-      "name": "read_book",
-      "description": "Read an owned book by item id or book id; returns pages and optionally one page.",
-      "input_schema": {
-        "properties": {
-          "book_id": {
-            "title": "Book Id",
-            "type": "string"
-          },
-          "page": {
-            "default": -1,
-            "title": "Page",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "book_id"
-        ],
-        "type": "object",
-        "title": "read_bookArguments"
-      }
-    },
-    {
-      "name": "read_item",
-      "description": "Read one item's visible details plus book/document flags.",
-      "input_schema": {
-        "properties": {
-          "item_id": {
-            "title": "Item Id",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "item_id"
-        ],
-        "type": "object",
-        "title": "read_itemArguments"
-      }
-    },
-    {
-      "name": "redeem_ticket",
-      "description": "Redeem a winning lottery ticket.",
-      "input_schema": {
-        "properties": {
-          "item_id": {
-            "title": "Item Id",
-            "type": "integer"
-          },
-          "rev": {
-            "title": "Rev",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "item_id",
-          "rev"
-        ],
-        "type": "object",
-        "title": "redeem_ticketArguments"
-      }
-    },
-    {
-      "name": "report_client",
-      "description": "Report the current customer (any reportable client; is_wanted tells the risk).",
-      "input_schema": {
-        "properties": {
-          "rev": {
-            "title": "Rev",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "rev"
-        ],
-        "type": "object",
-        "title": "report_clientArguments"
-      }
-    },
-    {
-      "name": "return_home",
-      "description": "Return from a night location to the shop.",
-      "input_schema": {
-        "properties": {
-          "rev": {
-            "title": "Rev",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "rev"
-        ],
-        "type": "object",
-        "title": "return_homeArguments"
-      }
-    },
-    {
-      "name": "save_game",
-      "description": "Save the current run. Re-read get_state afterwards; saving is synchronous.",
-      "input_schema": {
-        "properties": {
-          "rev": {
-            "title": "Rev",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "rev"
-        ],
-        "type": "object",
-        "title": "save_gameArguments"
-      }
-    },
-    {
-      "name": "save_recording_game",
-      "description": "Save once through the native save. Recording is locked by default; this only works after the dedicated recording slot is bound, and it only saves that bound slot (no slot parameter). Re-read get_recording_save_status afterwards.",
-      "input_schema": {
-        "properties": {
-          "rev": {
-            "title": "Rev",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "rev"
-        ],
-        "type": "object",
-        "title": "save_recording_gameArguments"
-      }
-    },
-    {
-      "name": "scavenge",
-      "description": "Scavenge at the dumping ground; returns gained items and remaining attempts.",
-      "input_schema": {
-        "properties": {
-          "rev": {
-            "title": "Rev",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "rev"
-        ],
-        "type": "object",
-        "title": "scavengeArguments"
-      }
-    },
-    {
-      "name": "security_status",
-      "description": "Security evidence, crimes, case officer and current inspection item.",
-      "input_schema": {
-        "properties": {},
-        "type": "object",
-        "title": "security_statusArguments"
-      }
-    },
-    {
-      "name": "select_new_game_option",
-      "description": "Select one scenario/perk/difficulty card in the open menu (one native click). Re-read get_new_game_options afterwards to verify the actual selection.",
-      "input_schema": {
-        "properties": {
-          "kind": {
-            "enum": [
-              "scenario",
-              "perk",
-              "difficulty"
-            ],
-            "title": "Kind",
-            "type": "string"
-          },
-          "id": {
-            "title": "Id",
-            "type": "string"
-          },
-          "rev": {
-            "title": "Rev",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "kind",
-          "id",
-          "rev"
-        ],
-        "type": "object",
-        "title": "select_new_game_optionArguments"
-      }
-    },
-    {
-      "name": "set_label",
-      "description": "Set one editable label condition on an item.",
-      "input_schema": {
-        "properties": {
-          "item_id": {
-            "title": "Item Id",
-            "type": "integer"
-          },
-          "category": {
-            "title": "Category",
-            "type": "string"
-          },
-          "condition_id": {
-            "title": "Condition Id",
-            "type": "string"
-          },
-          "rev": {
-            "title": "Rev",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "item_id",
-          "category",
-          "condition_id",
-          "rev"
-        ],
-        "type": "object",
-        "title": "set_labelArguments"
-      }
-    },
-    {
-      "name": "set_pen_mode",
-      "description": "Set marking pen mode: 0 red, 1 purple, 2 green, 3 blue, 4 orange, 5 eraser.",
-      "input_schema": {
-        "properties": {
-          "pen_id": {
-            "title": "Pen Id",
-            "type": "integer"
-          },
-          "mode": {
-            "title": "Mode",
-            "type": "integer"
-          },
-          "rev": {
-            "title": "Rev",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "pen_id",
-          "mode",
-          "rev"
-        ],
-        "type": "object",
-        "title": "set_pen_modeArguments"
-      }
-    },
-    {
-      "name": "sleep",
-      "description": "End the day: close the shutter, settle night services, save, advance to next morning.",
-      "input_schema": {
-        "properties": {
-          "rev": {
-            "title": "Rev",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "rev"
-        ],
-        "type": "object",
-        "title": "sleepArguments"
-      }
-    },
-    {
-      "name": "start_fermentation",
-      "description": "Try to start fermentation on a wine bottle.",
-      "input_schema": {
-        "properties": {
-          "item_id": {
-            "title": "Item Id",
-            "type": "integer"
-          },
-          "rev": {
-            "title": "Rev",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "item_id",
-          "rev"
-        ],
-        "type": "object",
-        "title": "start_fermentationArguments"
-      }
-    },
-    {
-      "name": "toggle_item",
-      "description": "Toggle an owned item (gene scanner, machine switches).",
-      "input_schema": {
-        "properties": {
-          "item_id": {
-            "title": "Item Id",
-            "type": "integer"
-          },
-          "rev": {
-            "title": "Rev",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "item_id",
-          "rev"
-        ],
-        "type": "object",
-        "title": "toggle_itemArguments"
-      }
-    },
-    {
-      "name": "toggle_service",
-      "description": "Toggle a nightly service on/off.",
-      "input_schema": {
-        "properties": {
-          "id": {
-            "title": "Id",
-            "type": "string"
-          },
-          "on": {
-            "title": "On",
-            "type": "boolean"
-          },
-          "rev": {
-            "title": "Rev",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "id",
-          "on",
-          "rev"
-        ],
-        "type": "object",
-        "title": "toggle_serviceArguments"
-      }
-    },
-    {
-      "name": "use_tool",
-      "description": "Use an owned tool on a target item (screwdriver, UV, scanner, marking pen).",
-      "input_schema": {
-        "properties": {
-          "tool_id": {
-            "title": "Tool Id",
-            "type": "integer"
-          },
-          "target_id": {
-            "title": "Target Id",
-            "type": "integer"
-          },
-          "rev": {
-            "title": "Rev",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "tool_id",
-          "target_id",
-          "rev"
-        ],
-        "type": "object",
-        "title": "use_toolArguments"
-      }
-    },
-    {
-      "name": "wait_for_change",
-      "description": "Block until the shop revision changes (customer arrives, dialogue advances).",
-      "input_schema": {
-        "properties": {
-          "since_rev": {
-            "title": "Since Rev",
-            "type": "integer"
-          },
-          "timeout_s": {
-            "default": 20.0,
-            "title": "Timeout S",
-            "type": "number"
-          }
-        },
-        "required": [
-          "since_rev"
-        ],
-        "type": "object",
-        "title": "wait_for_changeArguments"
-      }
-    },
-    {
-      "name": "wait_for_events",
-      "description": "Block until the game revision changes; returns the fresh state (long-poll, no busy loop).",
-      "input_schema": {
-        "properties": {
-          "since_rev": {
-            "default": -1,
-            "title": "Since Rev",
-            "type": "integer"
-          },
-          "timeout_ms": {
-            "default": 25000,
-            "title": "Timeout Ms",
-            "type": "integer"
-          }
-        },
-        "type": "object",
-        "title": "wait_for_eventsArguments"
-      }
-    },
-    {
-      "name": "wanted_status",
-      "description": "Wanted-person visit state and wanted list.",
-      "input_schema": {
-        "properties": {},
-        "type": "object",
-        "title": "wanted_statusArguments"
-      }
-    },
-    {
-      "name": "wine_add_ingredient",
-      "description": "Move a berry/yeast into a wine bottle's ingredient grid.",
-      "input_schema": {
-        "properties": {
-          "bottle_id": {
-            "title": "Bottle Id",
-            "type": "integer"
-          },
-          "item_id": {
-            "title": "Item Id",
-            "type": "integer"
-          },
-          "rev": {
-            "title": "Rev",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "bottle_id",
-          "item_id",
-          "rev"
-        ],
-        "type": "object",
-        "title": "wine_add_ingredientArguments"
-      }
-    },
-    {
-      "name": "wine_status",
-      "description": "Wine bottle fermentation/quality details.",
-      "input_schema": {
-        "properties": {
-          "item_id": {
-            "title": "Item Id",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "item_id"
-        ],
-        "type": "object",
-        "title": "wine_statusArguments"
-      }
-    }
-  ]
+ "mode": "recording",
+ "count": 104,
+ "tools": [
+  {
+   "name": "get_state",
+   "readOnlyHint": null,
+   "required": []
+  },
+  {
+   "name": "memory_bootstrap",
+   "readOnlyHint": null,
+   "required": []
+  },
+  {
+   "name": "memory_retrieve",
+   "readOnlyHint": null,
+   "required": [
+    "query"
+   ]
+  },
+  {
+   "name": "memory_get",
+   "readOnlyHint": null,
+   "required": [
+    "memory_id"
+   ]
+  },
+  {
+   "name": "memory_status",
+   "readOnlyHint": null,
+   "required": []
+  },
+  {
+   "name": "get_legal_actions",
+   "readOnlyHint": null,
+   "required": []
+  },
+  {
+   "name": "get_run_summary",
+   "readOnlyHint": null,
+   "required": []
+  },
+  {
+   "name": "get_action_history",
+   "readOnlyHint": null,
+   "required": []
+  },
+  {
+   "name": "capture_screenshot",
+   "readOnlyHint": null,
+   "required": []
+  },
+  {
+   "name": "get_pending_prompt",
+   "readOnlyHint": null,
+   "required": []
+  },
+  {
+   "name": "close_windows",
+   "readOnlyHint": null,
+   "required": [
+    "rev"
+   ]
+  },
+  {
+   "name": "answer_prompt",
+   "readOnlyHint": null,
+   "required": [
+    "choice",
+    "rev"
+   ]
+  },
+  {
+   "name": "list_screenshots",
+   "readOnlyHint": null,
+   "required": []
+  },
+  {
+   "name": "list_goods",
+   "readOnlyHint": null,
+   "required": []
+  },
+  {
+   "name": "list_locations",
+   "readOnlyHint": null,
+   "required": []
+  },
+  {
+   "name": "go_out",
+   "readOnlyHint": null,
+   "required": [
+    "location",
+    "rev"
+   ]
+  },
+  {
+   "name": "scavenge",
+   "readOnlyHint": null,
+   "required": [
+    "rev"
+   ]
+  },
+  {
+   "name": "return_home",
+   "readOnlyHint": null,
+   "required": [
+    "rev"
+   ]
+  },
+  {
+   "name": "buy_wholesale",
+   "readOnlyHint": null,
+   "required": [
+    "rev"
+   ]
+  },
+  {
+   "name": "commissary_buy",
+   "readOnlyHint": null,
+   "required": [
+    "identifier",
+    "rev"
+   ]
+  },
+  {
+   "name": "list_books",
+   "readOnlyHint": null,
+   "required": []
+  },
+  {
+   "name": "read_book",
+   "readOnlyHint": null,
+   "required": [
+    "book_id"
+   ]
+  },
+  {
+   "name": "read_item",
+   "readOnlyHint": null,
+   "required": [
+    "item_id"
+   ]
+  },
+  {
+   "name": "list_interactions",
+   "readOnlyHint": null,
+   "required": [
+    "item_id"
+   ]
+  },
+  {
+   "name": "activate_item",
+   "readOnlyHint": null,
+   "required": [
+    "item_id",
+    "rev"
+   ]
+  },
+  {
+   "name": "toggle_item",
+   "readOnlyHint": null,
+   "required": [
+    "item_id",
+    "rev"
+   ]
+  },
+  {
+   "name": "use_tool",
+   "readOnlyHint": null,
+   "required": [
+    "tool_id",
+    "target_id",
+    "rev"
+   ]
+  },
+  {
+   "name": "contraband_status",
+   "readOnlyHint": null,
+   "required": []
+  },
+  {
+   "name": "security_status",
+   "readOnlyHint": null,
+   "required": []
+  },
+  {
+   "name": "list_services",
+   "readOnlyHint": null,
+   "required": []
+  },
+  {
+   "name": "toggle_service",
+   "readOnlyHint": null,
+   "required": [
+    "id",
+    "on",
+    "rev"
+   ]
+  },
+  {
+   "name": "husbandry_status",
+   "readOnlyHint": null,
+   "required": []
+  },
+  {
+   "name": "expedition_status",
+   "readOnlyHint": null,
+   "required": []
+  },
+  {
+   "name": "events_status",
+   "readOnlyHint": null,
+   "required": []
+  },
+  {
+   "name": "get_day_report",
+   "readOnlyHint": null,
+   "required": []
+  },
+  {
+   "name": "get_calendar",
+   "readOnlyHint": null,
+   "required": []
+  },
+  {
+   "name": "get_clientele",
+   "readOnlyHint": null,
+   "required": []
+  },
+  {
+   "name": "dismiss_tutorial_hints",
+   "readOnlyHint": null,
+   "required": [
+    "rev"
+   ]
+  },
+  {
+   "name": "list_signs",
+   "readOnlyHint": null,
+   "required": []
+  },
+  {
+   "name": "deliver_request",
+   "readOnlyHint": null,
+   "required": [
+    "id",
+    "rev"
+   ]
+  },
+  {
+   "name": "report_client",
+   "readOnlyHint": null,
+   "required": [
+    "rev"
+   ]
+  },
+  {
+   "name": "barter_accept",
+   "readOnlyHint": null,
+   "required": [
+    "rev"
+   ]
+  },
+  {
+   "name": "arrest_wanted",
+   "readOnlyHint": null,
+   "required": [
+    "id",
+    "rev"
+   ]
+  },
+  {
+   "name": "list_factions",
+   "readOnlyHint": null,
+   "required": []
+  },
+  {
+   "name": "health_status",
+   "readOnlyHint": null,
+   "required": []
+  },
+  {
+   "name": "list_requests",
+   "readOnlyHint": null,
+   "required": []
+  },
+  {
+   "name": "wanted_status",
+   "readOnlyHint": null,
+   "required": []
+  },
+  {
+   "name": "barter_status",
+   "readOnlyHint": null,
+   "required": []
+  },
+  {
+   "name": "list_wine",
+   "readOnlyHint": null,
+   "required": []
+  },
+  {
+   "name": "wine_status",
+   "readOnlyHint": null,
+   "required": [
+    "item_id"
+   ]
+  },
+  {
+   "name": "wine_add_ingredient",
+   "readOnlyHint": null,
+   "required": [
+    "bottle_id",
+    "item_id",
+    "rev"
+   ]
+  },
+  {
+   "name": "start_fermentation",
+   "readOnlyHint": null,
+   "required": [
+    "item_id",
+    "rev"
+   ]
+  },
+  {
+   "name": "list_machines",
+   "readOnlyHint": null,
+   "required": []
+  },
+  {
+   "name": "machine_grow_status",
+   "readOnlyHint": null,
+   "required": [
+    "machine_id"
+   ]
+  },
+  {
+   "name": "machine_status",
+   "readOnlyHint": null,
+   "required": [
+    "machine_id"
+   ]
+  },
+  {
+   "name": "machine_insert",
+   "readOnlyHint": null,
+   "required": [
+    "machine_id",
+    "slot",
+    "item_id",
+    "rev"
+   ]
+  },
+  {
+   "name": "machine_collect",
+   "readOnlyHint": null,
+   "required": [
+    "machine_id",
+    "slot",
+    "rev"
+   ]
+  },
+  {
+   "name": "list_upgrades",
+   "readOnlyHint": null,
+   "required": []
+  },
+  {
+   "name": "buy_upgrade",
+   "readOnlyHint": null,
+   "required": [
+    "id",
+    "rev"
+   ]
+  },
+  {
+   "name": "lottery_status",
+   "readOnlyHint": null,
+   "required": []
+  },
+  {
+   "name": "list_tickets",
+   "readOnlyHint": null,
+   "required": []
+  },
+  {
+   "name": "inspect_ticket",
+   "readOnlyHint": null,
+   "required": [
+    "item_id"
+   ]
+  },
+  {
+   "name": "redeem_ticket",
+   "readOnlyHint": null,
+   "required": [
+    "item_id",
+    "rev"
+   ]
+  },
+  {
+   "name": "list_contacts",
+   "readOnlyHint": null,
+   "required": []
+  },
+  {
+   "name": "call",
+   "readOnlyHint": null,
+   "required": [
+    "number",
+    "rev"
+   ]
+  },
+  {
+   "name": "phone_state",
+   "readOnlyHint": null,
+   "required": []
+  },
+  {
+   "name": "phone_advance",
+   "readOnlyHint": null,
+   "required": [
+    "rev"
+   ]
+  },
+  {
+   "name": "phone_choose",
+   "readOnlyHint": null,
+   "required": [
+    "index",
+    "rev"
+   ]
+  },
+  {
+   "name": "end_call",
+   "readOnlyHint": null,
+   "required": [
+    "rev"
+   ]
+  },
+  {
+   "name": "list_labels",
+   "readOnlyHint": null,
+   "required": [
+    "item_id"
+   ]
+  },
+  {
+   "name": "set_label",
+   "readOnlyHint": null,
+   "required": [
+    "item_id",
+    "category",
+    "condition_id",
+    "rev"
+   ]
+  },
+  {
+   "name": "list_analyzers",
+   "readOnlyHint": null,
+   "required": []
+  },
+  {
+   "name": "analyze_item",
+   "readOnlyHint": null,
+   "required": [
+    "analyzer_id",
+    "target_id",
+    "rev"
+   ]
+  },
+  {
+   "name": "set_pen_mode",
+   "readOnlyHint": null,
+   "required": [
+    "pen_id",
+    "mode",
+    "rev"
+   ]
+  },
+  {
+   "name": "list_marks",
+   "readOnlyHint": null,
+   "required": []
+  },
+  {
+   "name": "list_containers",
+   "readOnlyHint": null,
+   "required": []
+  },
+  {
+   "name": "list_inventory",
+   "readOnlyHint": null,
+   "required": []
+  },
+  {
+   "name": "move_item",
+   "readOnlyHint": null,
+   "required": [
+    "item_id",
+    "target",
+    "rev"
+   ]
+  },
+  {
+   "name": "get_layout",
+   "readOnlyHint": null,
+   "required": []
+  },
+  {
+   "name": "get_item",
+   "readOnlyHint": null,
+   "required": [
+    "item_id"
+   ]
+  },
+  {
+   "name": "ping",
+   "readOnlyHint": null,
+   "required": []
+  },
+  {
+   "name": "open_shop",
+   "readOnlyHint": null,
+   "required": [
+    "rev"
+   ]
+  },
+  {
+   "name": "call_next_customer",
+   "readOnlyHint": null,
+   "required": [
+    "rev"
+   ]
+  },
+  {
+   "name": "advance_dialogue",
+   "readOnlyHint": null,
+   "required": [
+    "rev"
+   ]
+  },
+  {
+   "name": "choose_dialogue",
+   "readOnlyHint": null,
+   "required": [
+    "index",
+    "rev"
+   ]
+  },
+  {
+   "name": "end_day",
+   "readOnlyHint": null,
+   "required": [
+    "rev"
+   ]
+  },
+  {
+   "name": "bargain_preview",
+   "readOnlyHint": null,
+   "required": [
+    "direction",
+    "percent"
+   ]
+  },
+  {
+   "name": "bargain",
+   "readOnlyHint": null,
+   "required": [
+    "direction",
+    "percent",
+    "rev"
+   ]
+  },
+  {
+   "name": "get_new_game_options",
+   "readOnlyHint": null,
+   "required": []
+  },
+  {
+   "name": "open_new_game_menu",
+   "readOnlyHint": null,
+   "required": [
+    "rev"
+   ]
+  },
+  {
+   "name": "select_new_game_option",
+   "readOnlyHint": null,
+   "required": [
+    "kind",
+    "id",
+    "rev"
+   ]
+  },
+  {
+   "name": "new_game_next_page",
+   "readOnlyHint": null,
+   "required": [
+    "row",
+    "direction",
+    "rev"
+   ]
+  },
+  {
+   "name": "focus_new_game_selected_perk",
+   "readOnlyHint": null,
+   "required": [
+    "id",
+    "rev"
+   ]
+  },
+  {
+   "name": "blur_new_game_option",
+   "readOnlyHint": null,
+   "required": [
+    "id",
+    "rev"
+   ]
+  },
+  {
+   "name": "new_game_continue",
+   "readOnlyHint": null,
+   "required": [
+    "rev"
+   ]
+  },
+  {
+   "name": "get_recording_save_status",
+   "readOnlyHint": null,
+   "required": []
+  },
+  {
+   "name": "load_recording_game",
+   "readOnlyHint": null,
+   "required": [
+    "rev"
+   ]
+  },
+  {
+   "name": "confirm_new_game",
+   "readOnlyHint": null,
+   "required": [
+    "rev"
+   ]
+  },
+  {
+   "name": "load_game",
+   "readOnlyHint": null,
+   "required": [
+    "slot",
+    "rev"
+   ]
+  },
+  {
+   "name": "sleep",
+   "readOnlyHint": null,
+   "required": [
+    "rev"
+   ]
+  },
+  {
+   "name": "dismiss_current_client",
+   "readOnlyHint": null,
+   "required": [
+    "rev"
+   ]
+  },
+  {
+   "name": "confirm_trade",
+   "readOnlyHint": null,
+   "required": [
+    "item_id",
+    "side",
+    "rev"
+   ]
+  },
+  {
+   "name": "wait_for_events",
+   "readOnlyHint": null,
+   "required": []
+  },
+  {
+   "name": "wait_for_change",
+   "readOnlyHint": null,
+   "required": [
+    "since_rev"
+   ]
+  }
+ ]
 }
