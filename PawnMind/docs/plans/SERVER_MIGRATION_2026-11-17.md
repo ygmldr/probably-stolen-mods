@@ -1,7 +1,20 @@
 # PawnMind 离线开发服务器迁移记录
 
 日期：2026-11-17（跨夜批次 Nightly Batch A 期间）
-目的：把跨夜离线开发从 WSL 工作站迁到常开服务器，让批次可以在主机休眠时继续。
+目的：把跨夜离线开发从 WSL 工作站迁到常开服务器 `CT101`，让批次可以在主机休眠时继续。
+
+## 0. 接手入口
+
+按顺序读：
+
+1. 本文件（环境、路径、同步方式、未完成项）
+2. `docs/audit/NIGHTLY_BASELINE.md`（冻结基线：HEAD、测试数、策略指纹、DLL 一致性）
+3. `docs/audit/NIGHTLY_TEST_MATRIX.md`（每个 `PP-*` 的真实状态：PASS / PARTIAL / NOT_RUN）
+4. `docs/reports/NIGHTLY_BATCH_A_REPORT.md`（A 已完成、B/C/D/E/G 未开始的证据）
+5. `docs/plans/NEXT_LIVE_SESSION.md`（需要真人在场才能做的部分）
+6. 任务书：`docs/PAWNMIND_OVERNIGHT_LARGE_BATCH_AGENT_HANDOFF_2026-11-17.md`
+
+**当前提交**：`63ae0ef`（A 模块）。工作树干净。
 
 ## 1. 目标主机
 
@@ -118,12 +131,77 @@ rsync -a -e ssh root@192.168.1.101:/root/work/game_mods/ /mnt/d/code/game_mods/
 
 | 项 | 状态 |
 |---|---|
-| HEAD | `70e9d0d` 之后新增一次 A 模块提交（见下） |
+| HEAD | `63ae0ef`（A 模块） |
 | 工作树 | 干净 |
 | H0 基线 | 本地已完成（见第 3 节数字）；`docs/audit/NIGHTLY_BASELINE.md` 待写 |
 | A 模块 | **已完成离线部分**：`run_mode` 配置、fail-closed、`PolicyCatalog.g.cs` 单源生成、`/state` `/events` HTTP 级门禁、`/health` 报告；C# 683 + 门禁 53 + 契约 491 全绿，Python 套件全绿 |
 | B/C/D/E/G | 未开始 |
 
-A 模块之后本地测试计数：`passed=683 failed=0`、`contract gate tests: passed=53 failed=0`、`contract checks: 491`。
+A 模块之后本地测试计数：`passed=683 failed=0`、`contract gate tests: passed=53 failed=0`、`contract checks: 491`、Python `253 OK`。
 
 服务器侧 agent 接手时，从 A 模块的 Red 测试开始：先 `./test.sh RunMode` 确认失败原因，再实现 `Core/RunModeBinding.cs`、`Core/PolicyCatalog.g.cs`、`ModePolicy` 的 `Locked` 模式与 `EndpointPolicy`。
+
+## 9. 未完成工作（按优先级，接手请照此推进）
+
+### 9.1 B — 快照纯度（最高优先级，任务书 B1/B2）
+
+已知**仍然存在**的缺陷（本轮只定位，未修）：
+
+```
+StateSnapshot.DescribeClient
+  → StoreClient.CanReport()                     src/Bridge/StateSnapshot.cs
+  → BargainUIManager.IsCurrentClientCoerced()   _decomp/BargainUIManager.cs:635
+  → Refresh()                                   _decomp/BargainUIManager.cs:1103  ← 会重置谈判状态
+```
+
+做法：
+
+1. 把 `client.can_report` 从快照里删掉，或换成不需要 `Refresh()` 的纯字段（例如直接用 `client.reported` / `client.isWanted`）。
+2. 建立 `docs/audit/NIGHTLY_SNAPSHOT_CALLGRAPH.md`：`BuildJson → BuildState/BuildFlags → GameState.* → 原生 getter` 的**完整**树，每个节点标 `pure | unknown | impure` + 证据（`_decomp/` 行号）。未知不得默认 pure。
+3. 加 `Core/SnapshotFieldMap.cs`（字段 → 来源 → 纯度）与**漂移测试**：解析 `StateSnapshot.cs` 的调用，出现未登记成员即失败。
+4. fake 计数装置：`PP-READ-01-fake` 连续 10 次构建，`Refresh`/`RNG.Roll`/UI setter 计数必须为 0。
+5. `PP-READ-05`：`get_legal_actions` 把 bargain 四向标成 `candidate`/`availability:"unknown"`，不要伪装成合法；同步改 `agent/mcp_server.py` 的说明与 Skill。
+6. 不要声称 fake 能证明 Unity 运行时纯度；`PP-READ-01` 实机仍是 `NOT_RUN`，需要插桩构建。
+
+### 9.2 D — 执行/投递双轴 + `get_operation`（其次，C 依赖它）
+
+1. `ActionGate` 增加 `execution_status`（prepared/running/completed/rejected/failed/uncertain）与 `delivery_status`（pending/delivered/undelivered）。
+2. `MarkResponseUndelivered` 只改投递轴，**不得**把已完成结果覆盖成 `outcome_unknown`。
+3. `BridgeServer` 增 `GET /operation?id=`；`mcp_server` 增 `get_operation` / `wait_operation`（Python 侧有界轮询，不阻塞主线程）。
+4. 新增工具必须同步：`agent/policy/tool_policy.json` 条目、`tools/gen_policy_catalog.py` 重跑、`tools-inventory`/工具数测试、`PP-MODE-02d`。
+5. 测试：`PP-ASYNC-01..05`、`PP-SAVE-01`、`PP-RECOVERY-01`。
+
+### 9.3 C — 交易守卫（依赖 9.1 的读路径与 9.2 的状态轴）
+
+- 只改 `confirm_trade` 核心路径 + `advance_dialogue` / `call_next_customer` 的最低适配。
+- B10–B16 七个静默拒绝分支逐个预检查，**派发 0 次**的失败测试；删掉任何手拼 `BuyItem`/`SellItem`。
+- 结果证据分层（返回值/异常、物品归属、`IsClientBusinessDone`），现金变化不能单独作证。
+- 交易 Operation 与顾客对话 Workflow 分离。
+
+### 9.4 E / G / F
+
+- E：`skills/pawnmind-first-week/SKILL.md`、`docs/eval/FIRST_WEEK_BENCHMARK_SPEC.md`、trace validator（禁止新 `action_id` 重试 uncertain）。
+- G：`docs/audit/NIGHTLY_MOD_COMPAT_MATRIX.md`（反射、后台线程、HTTP listener、打包脚本），Scanner 仍 `NOT_RUN`。
+- F：每模块独立审阅 + `NIGHTLY_F_INTEGRATION_REVIEW.md`；A 的审阅已产出（`docs/reviews/NIGHTLY_A_MODE_POLICY_REVIEW.md`）。
+
+### 9.5 A 模块遗留
+
+| 项 | 状态 | 说明 |
+|---|---|---|
+| `PP-MODE-02b` | NOT_RUN | 依赖 9.2：模式切换/重载后旧 `action_id` 不得重放 |
+| `PP-MODE-02d` 负向用例 | PARTIAL | 需要"把 `readOnlyHint` 改成 true 也不会放宽"的显式测试 |
+| C# 校验 Python 策略 | 不可能 | C# 只报告自己的哈希；方向是 Python 查 C# |
+| `.env.server` | 未生成 | 服务器装好 SDK 后由 `tools/setup_remote_host.sh` 生成 |
+
+### 9.6 服务器侧必须先做的事
+
+```bash
+cd /root/work/game_mods/PawnMind
+./tools/setup_remote_host.sh     # 安装 .NET 9 SDK + 建 venv + 跑两套测试
+# 装完后：
+set -a; . .env.server; set +a
+./test.sh                        # 期望 683 / 53 / 491
+.venv/bin/python -B -m unittest discover -s agent/tests   # 期望 253
+```
+
+服务器下载 SDK 约 51 KB/s（200 MB ≈ 66 分钟），可以后台跑，或换成 apt/内网镜像。
