@@ -1,0 +1,1542 @@
+{
+ "schema": 1,
+ "game_version": "VERSION 100-Rev13",
+ "game_mvid": "911508a6-e0eb-4cc0-91e8-e14b16ea28d7",
+ "generated_from": [
+  "docs/audit/tools-inventory.json",
+  "docs/audit/PLAYER_ENTRY_MATRIX.csv"
+ ],
+ "modes": {
+  "bootstrap": "read-only warm-up; no world mutation",
+  "play": "strict_player; requires live evidence (currently empty)",
+  "test": "everything, only on a throwaway save"
+ },
+ "tools": {
+  "get_state": {
+   "purity": "cached_impure",
+   "player_reachable": null,
+   "status": "d0a_pending",
+   "decision": "needs_evidence",
+   "evidence": [],
+   "reason": "snapshot getters call BargainUIManager.Refresh(); blocked until D0a",
+   "modes": {
+    "bootstrap": true,
+    "play": false,
+    "test": true
+   }
+  },
+  "memory_bootstrap": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "read-only per recorder classification; no known side effect",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   }
+  },
+  "memory_retrieve": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "read-only per recorder classification; no known side effect",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   }
+  },
+  "memory_get": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "read-only per recorder classification; no known side effect",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   }
+  },
+  "memory_status": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "read-only per recorder classification; no known side effect",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   }
+  },
+  "get_legal_actions": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "read-only per recorder classification; no known side effect",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   }
+  },
+  "get_run_summary": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "read-only per recorder classification; no known side effect",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   }
+  },
+  "get_action_history": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "read-only per recorder classification; no known side effect",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   }
+  },
+  "capture_screenshot": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "read-only per recorder classification; no known side effect",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   }
+  },
+  "get_pending_prompt": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "read-only per recorder classification; no known side effect",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   }
+  },
+  "close_windows": {
+   "purity": "write",
+   "player_reachable": true,
+   "status": "open",
+   "decision": "needs_evidence",
+   "evidence": [],
+   "reason": "open guard gap: -",
+   "modes": {
+    "bootstrap": false,
+    "play": false,
+    "test": true
+   }
+  },
+  "answer_prompt": {
+   "purity": "write",
+   "player_reachable": true,
+   "status": "fixed",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "guard fixed in 3d85963/3fed61c with regression tests",
+   "modes": {
+    "bootstrap": false,
+    "play": true,
+    "test": true
+   }
+  },
+  "list_screenshots": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "read-only per recorder classification; no known side effect",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   }
+  },
+  "act": {
+   "purity": "privileged",
+   "player_reachable": null,
+   "status": "denied",
+   "decision": "deny",
+   "evidence": [],
+   "reason": "no player-reachable path; diagnostic/privileged entry",
+   "modes": {
+    "bootstrap": false,
+    "play": false,
+    "test": true
+   }
+  },
+  "wait_until": {
+   "purity": "privileged",
+   "player_reachable": null,
+   "status": "denied",
+   "decision": "deny",
+   "evidence": [],
+   "reason": "no player-reachable path; diagnostic/privileged entry",
+   "modes": {
+    "bootstrap": false,
+    "play": false,
+    "test": true
+   }
+  },
+  "get_ui_snapshot": {
+   "purity": "privileged",
+   "player_reachable": null,
+   "status": "denied",
+   "decision": "deny",
+   "evidence": [],
+   "reason": "no player-reachable path; diagnostic/privileged entry",
+   "modes": {
+    "bootstrap": false,
+    "play": false,
+    "test": true
+   }
+  },
+  "press": {
+   "purity": "privileged",
+   "player_reachable": null,
+   "status": "denied",
+   "decision": "deny",
+   "evidence": [],
+   "reason": "no player-reachable path; diagnostic/privileged entry",
+   "modes": {
+    "bootstrap": false,
+    "play": false,
+    "test": true
+   }
+  },
+  "list_goods": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "read-only per recorder classification; no known side effect",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   }
+  },
+  "list_locations": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "read-only per recorder classification; no known side effect",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   }
+  },
+  "go_out": {
+   "purity": "write",
+   "player_reachable": true,
+   "status": "open",
+   "decision": "needs_evidence",
+   "evidence": [
+    "B23,B24,B25"
+   ],
+   "reason": "open guard gap: B23|B24|B25",
+   "modes": {
+    "bootstrap": false,
+    "play": false,
+    "test": true
+   }
+  },
+  "scavenge": {
+   "purity": "write",
+   "player_reachable": true,
+   "status": "fixed",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "guard fixed in 3d85963/3fed61c with regression tests",
+   "modes": {
+    "bootstrap": false,
+    "play": true,
+    "test": true
+   }
+  },
+  "return_home": {
+   "purity": "write",
+   "player_reachable": true,
+   "status": "fixed",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "guard fixed in 3d85963/3fed61c with regression tests",
+   "modes": {
+    "bootstrap": false,
+    "play": true,
+    "test": true
+   }
+  },
+  "buy_wholesale": {
+   "purity": "write",
+   "player_reachable": true,
+   "status": "open",
+   "decision": "needs_evidence",
+   "evidence": [
+    "B17,B18,B19"
+   ],
+   "reason": "open guard gap: B17|B18|B19",
+   "modes": {
+    "bootstrap": false,
+    "play": false,
+    "test": true
+   }
+  },
+  "commissary_buy": {
+   "purity": "write",
+   "player_reachable": true,
+   "status": "fixed",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "guard fixed in 3d85963/3fed61c with regression tests",
+   "modes": {
+    "bootstrap": false,
+    "play": true,
+    "test": true
+   }
+  },
+  "list_books": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "read-only per recorder classification; no known side effect",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   }
+  },
+  "read_book": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "read-only per recorder classification; no known side effect",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   }
+  },
+  "read_item": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "read-only per recorder classification; no known side effect",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   }
+  },
+  "list_interactions": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "read-only per recorder classification; no known side effect",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   }
+  },
+  "activate_item": {
+   "purity": "write",
+   "player_reachable": true,
+   "status": "open",
+   "decision": "needs_evidence",
+   "evidence": [],
+   "reason": "open guard gap: -",
+   "modes": {
+    "bootstrap": false,
+    "play": false,
+    "test": true
+   }
+  },
+  "toggle_item": {
+   "purity": "write",
+   "player_reachable": true,
+   "status": "open",
+   "decision": "needs_evidence",
+   "evidence": [],
+   "reason": "open guard gap: -",
+   "modes": {
+    "bootstrap": false,
+    "play": false,
+    "test": true
+   }
+  },
+  "use_tool": {
+   "purity": "write",
+   "player_reachable": true,
+   "status": "open",
+   "decision": "needs_evidence",
+   "evidence": [],
+   "reason": "open guard gap: -",
+   "modes": {
+    "bootstrap": false,
+    "play": false,
+    "test": true
+   }
+  },
+  "contraband_status": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "read-only per recorder classification; no known side effect",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   }
+  },
+  "security_status": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "read-only per recorder classification; no known side effect",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   }
+  },
+  "list_services": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "read-only per recorder classification; no known side effect",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   }
+  },
+  "toggle_service": {
+   "purity": "write",
+   "player_reachable": true,
+   "status": "fixed",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "guard fixed in 3d85963/3fed61c with regression tests",
+   "modes": {
+    "bootstrap": false,
+    "play": true,
+    "test": true
+   }
+  },
+  "husbandry_status": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "read-only per recorder classification; no known side effect",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   }
+  },
+  "dispatch_expedition": {
+   "purity": "privileged",
+   "player_reachable": null,
+   "status": "denied",
+   "decision": "deny",
+   "evidence": [],
+   "reason": "no player-reachable path; diagnostic/privileged entry",
+   "modes": {
+    "bootstrap": false,
+    "play": false,
+    "test": true
+   }
+  },
+  "advance_expedition": {
+   "purity": "privileged",
+   "player_reachable": null,
+   "status": "denied",
+   "decision": "deny",
+   "evidence": [],
+   "reason": "no player-reachable path; diagnostic/privileged entry",
+   "modes": {
+    "bootstrap": false,
+    "play": false,
+    "test": true
+   }
+  },
+  "expedition_status": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "read-only per recorder classification; no known side effect",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   }
+  },
+  "events_status": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "read-only per recorder classification; no known side effect",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   }
+  },
+  "get_day_report": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "read-only per recorder classification; no known side effect",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   }
+  },
+  "get_calendar": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "read-only per recorder classification; no known side effect",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   }
+  },
+  "get_clientele": {
+   "purity": "cached_impure",
+   "player_reachable": null,
+   "status": "needs_evidence",
+   "decision": "needs_evidence",
+   "evidence": [],
+   "reason": "read path mutates UI/RNG (audit S1-S4) or purity unproven",
+   "modes": {
+    "bootstrap": false,
+    "play": false,
+    "test": true
+   }
+  },
+  "dismiss_tutorial_hints": {
+   "purity": "write",
+   "player_reachable": true,
+   "status": "unverified",
+   "decision": "needs_evidence",
+   "evidence": [],
+   "reason": "open guard gap: -",
+   "modes": {
+    "bootstrap": false,
+    "play": false,
+    "test": true
+   }
+  },
+  "list_signs": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "read-only per recorder classification; no known side effect",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   }
+  },
+  "deliver_request": {
+   "purity": "write",
+   "player_reachable": true,
+   "status": "fixed",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "guard fixed in 3d85963/3fed61c with regression tests",
+   "modes": {
+    "bootstrap": false,
+    "play": true,
+    "test": true
+   }
+  },
+  "report_client": {
+   "purity": "write",
+   "player_reachable": true,
+   "status": "open",
+   "decision": "needs_evidence",
+   "evidence": [
+    "B41"
+   ],
+   "reason": "open guard gap: B41",
+   "modes": {
+    "bootstrap": false,
+    "play": false,
+    "test": true
+   }
+  },
+  "barter_accept": {
+   "purity": "write",
+   "player_reachable": true,
+   "status": "open",
+   "decision": "needs_evidence",
+   "evidence": [
+    "B26"
+   ],
+   "reason": "open guard gap: B26",
+   "modes": {
+    "bootstrap": false,
+    "play": false,
+    "test": true
+   }
+  },
+  "arrest_wanted": {
+   "purity": "write",
+   "player_reachable": true,
+   "status": "open",
+   "decision": "needs_evidence",
+   "evidence": [],
+   "reason": "open guard gap: -",
+   "modes": {
+    "bootstrap": false,
+    "play": false,
+    "test": true
+   }
+  },
+  "list_factions": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "read-only per recorder classification; no known side effect",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   }
+  },
+  "health_status": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "read-only per recorder classification; no known side effect",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   }
+  },
+  "list_requests": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "read-only per recorder classification; no known side effect",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   }
+  },
+  "wanted_status": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "read-only per recorder classification; no known side effect",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   }
+  },
+  "barter_status": {
+   "purity": "cached_impure",
+   "player_reachable": null,
+   "status": "needs_evidence",
+   "decision": "needs_evidence",
+   "evidence": [],
+   "reason": "read path mutates UI/RNG (audit S1-S4) or purity unproven",
+   "modes": {
+    "bootstrap": false,
+    "play": false,
+    "test": true
+   }
+  },
+  "list_wine": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "read-only per recorder classification; no known side effect",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   }
+  },
+  "wine_status": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "read-only per recorder classification; no known side effect",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   }
+  },
+  "wine_add_water": {
+   "purity": "privileged",
+   "player_reachable": null,
+   "status": "denied",
+   "decision": "deny",
+   "evidence": [],
+   "reason": "no player-reachable path; diagnostic/privileged entry",
+   "modes": {
+    "bootstrap": false,
+    "play": false,
+    "test": true
+   }
+  },
+  "wine_add_ingredient": {
+   "purity": "write",
+   "player_reachable": true,
+   "status": "open",
+   "decision": "needs_evidence",
+   "evidence": [
+    "B30"
+   ],
+   "reason": "open guard gap: B30",
+   "modes": {
+    "bootstrap": false,
+    "play": false,
+    "test": true
+   }
+  },
+  "start_fermentation": {
+   "purity": "write",
+   "player_reachable": true,
+   "status": "open",
+   "decision": "needs_evidence",
+   "evidence": [
+    "B36"
+   ],
+   "reason": "open guard gap: B36",
+   "modes": {
+    "bootstrap": false,
+    "play": false,
+    "test": true
+   }
+  },
+  "list_machines": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "read-only per recorder classification; no known side effect",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   }
+  },
+  "machine_grow_status": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "read-only per recorder classification; no known side effect",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   }
+  },
+  "machine_status": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "read-only per recorder classification; no known side effect",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   }
+  },
+  "machine_insert": {
+   "purity": "write",
+   "player_reachable": true,
+   "status": "open",
+   "decision": "needs_evidence",
+   "evidence": [
+    "B32"
+   ],
+   "reason": "open guard gap: B32",
+   "modes": {
+    "bootstrap": false,
+    "play": false,
+    "test": true
+   }
+  },
+  "machine_collect": {
+   "purity": "write",
+   "player_reachable": true,
+   "status": "open",
+   "decision": "needs_evidence",
+   "evidence": [
+    "B33"
+   ],
+   "reason": "open guard gap: B33",
+   "modes": {
+    "bootstrap": false,
+    "play": false,
+    "test": true
+   }
+  },
+  "list_upgrades": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "read-only per recorder classification; no known side effect",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   }
+  },
+  "buy_upgrade": {
+   "purity": "write",
+   "player_reachable": true,
+   "status": "open",
+   "decision": "needs_evidence",
+   "evidence": [
+    "B27,B28"
+   ],
+   "reason": "open guard gap: B27|B28",
+   "modes": {
+    "bootstrap": false,
+    "play": false,
+    "test": true
+   }
+  },
+  "lottery_status": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "read-only per recorder classification; no known side effect",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   }
+  },
+  "list_tickets": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "read-only per recorder classification; no known side effect",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   }
+  },
+  "inspect_ticket": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "read-only per recorder classification; no known side effect",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   }
+  },
+  "redeem_ticket": {
+   "purity": "write",
+   "player_reachable": true,
+   "status": "fixed",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "guard fixed in 3d85963/3fed61c with regression tests",
+   "modes": {
+    "bootstrap": false,
+    "play": true,
+    "test": true
+   }
+  },
+  "list_contacts": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "read-only per recorder classification; no known side effect",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   }
+  },
+  "call": {
+   "purity": "write",
+   "player_reachable": true,
+   "status": "open",
+   "decision": "needs_evidence",
+   "evidence": [
+    "B40"
+   ],
+   "reason": "open guard gap: B40",
+   "modes": {
+    "bootstrap": false,
+    "play": false,
+    "test": true
+   }
+  },
+  "phone_state": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "read-only per recorder classification; no known side effect",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   }
+  },
+  "phone_advance": {
+   "purity": "write",
+   "player_reachable": true,
+   "status": "open",
+   "decision": "needs_evidence",
+   "evidence": [
+    "B38"
+   ],
+   "reason": "open guard gap: B38",
+   "modes": {
+    "bootstrap": false,
+    "play": false,
+    "test": true
+   }
+  },
+  "phone_choose": {
+   "purity": "write",
+   "player_reachable": true,
+   "status": "open",
+   "decision": "needs_evidence",
+   "evidence": [
+    "B38"
+   ],
+   "reason": "open guard gap: B38",
+   "modes": {
+    "bootstrap": false,
+    "play": false,
+    "test": true
+   }
+  },
+  "end_call": {
+   "purity": "write",
+   "player_reachable": true,
+   "status": "open",
+   "decision": "needs_evidence",
+   "evidence": [
+    "B39"
+   ],
+   "reason": "open guard gap: B39",
+   "modes": {
+    "bootstrap": false,
+    "play": false,
+    "test": true
+   }
+  },
+  "list_labels": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "read-only per recorder classification; no known side effect",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   }
+  },
+  "set_label": {
+   "purity": "write",
+   "player_reachable": true,
+   "status": "open",
+   "decision": "needs_evidence",
+   "evidence": [
+    "B37"
+   ],
+   "reason": "open guard gap: B37",
+   "modes": {
+    "bootstrap": false,
+    "play": false,
+    "test": true
+   }
+  },
+  "list_analyzers": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "read-only per recorder classification; no known side effect",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   }
+  },
+  "analyze_item": {
+   "purity": "write",
+   "player_reachable": true,
+   "status": "open",
+   "decision": "needs_evidence",
+   "evidence": [
+    "B42"
+   ],
+   "reason": "open guard gap: B42",
+   "modes": {
+    "bootstrap": false,
+    "play": false,
+    "test": true
+   }
+  },
+  "set_pen_mode": {
+   "purity": "write",
+   "player_reachable": true,
+   "status": "fixed",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "guard fixed in 3d85963/3fed61c with regression tests",
+   "modes": {
+    "bootstrap": false,
+    "play": true,
+    "test": true
+   }
+  },
+  "list_marks": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "read-only per recorder classification; no known side effect",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   }
+  },
+  "list_containers": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "read-only per recorder classification; no known side effect",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   }
+  },
+  "list_inventory": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "read-only per recorder classification; no known side effect",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   }
+  },
+  "move_item": {
+   "purity": "write",
+   "player_reachable": true,
+   "status": "open",
+   "decision": "needs_evidence",
+   "evidence": [
+    "B29,B30,B31"
+   ],
+   "reason": "open guard gap: B29|B30|B31",
+   "modes": {
+    "bootstrap": false,
+    "play": false,
+    "test": true
+   }
+  },
+  "get_layout": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "read-only per recorder classification; no known side effect",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   }
+  },
+  "get_item": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "read-only per recorder classification; no known side effect",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   }
+  },
+  "ping": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "read-only per recorder classification; no known side effect",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   }
+  },
+  "open_shop": {
+   "purity": "write",
+   "player_reachable": true,
+   "status": "fixed",
+   "decision": "allow",
+   "evidence": [
+    "B1,B2,B3,B4"
+   ],
+   "reason": "guard fixed in 3d85963/3fed61c with regression tests",
+   "modes": {
+    "bootstrap": false,
+    "play": true,
+    "test": true
+   }
+  },
+  "call_next_customer": {
+   "purity": "write",
+   "player_reachable": true,
+   "status": "open",
+   "decision": "needs_evidence",
+   "evidence": [],
+   "reason": "open guard gap: -",
+   "modes": {
+    "bootstrap": false,
+    "play": false,
+    "test": true
+   }
+  },
+  "advance_dialogue": {
+   "purity": "write",
+   "player_reachable": true,
+   "status": "open",
+   "decision": "needs_evidence",
+   "evidence": [
+    "B43"
+   ],
+   "reason": "open guard gap: B43",
+   "modes": {
+    "bootstrap": false,
+    "play": false,
+    "test": true
+   }
+  },
+  "choose_dialogue": {
+   "purity": "write",
+   "player_reachable": true,
+   "status": "fixed",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "guard fixed in 3d85963/3fed61c with regression tests",
+   "modes": {
+    "bootstrap": false,
+    "play": true,
+    "test": true
+   }
+  },
+  "end_day": {
+   "purity": "write",
+   "player_reachable": true,
+   "status": "fixed",
+   "decision": "allow",
+   "evidence": [
+    "B5,B6,B7"
+   ],
+   "reason": "guard fixed in 3d85963/3fed61c with regression tests",
+   "modes": {
+    "bootstrap": false,
+    "play": true,
+    "test": true
+   }
+  },
+  "bargain_preview": {
+   "purity": "mutating",
+   "player_reachable": null,
+   "status": "needs_evidence",
+   "decision": "deny",
+   "evidence": [],
+   "reason": "read path mutates UI/RNG (audit S1-S4) or purity unproven",
+   "modes": {
+    "bootstrap": false,
+    "play": false,
+    "test": true
+   }
+  },
+  "bargain": {
+   "purity": "write",
+   "player_reachable": true,
+   "status": "open",
+   "decision": "needs_evidence",
+   "evidence": [],
+   "reason": "open guard gap: -",
+   "modes": {
+    "bootstrap": false,
+    "play": false,
+    "test": true
+   }
+  },
+  "get_new_game_options": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "read-only per recorder classification; no known side effect",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   }
+  },
+  "open_new_game_menu": {
+   "purity": "write",
+   "player_reachable": true,
+   "status": "fixed",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "guard fixed in 3d85963/3fed61c with regression tests",
+   "modes": {
+    "bootstrap": false,
+    "play": true,
+    "test": true
+   }
+  },
+  "select_new_game_option": {
+   "purity": "write",
+   "player_reachable": true,
+   "status": "fixed",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "guard fixed in 3d85963/3fed61c with regression tests",
+   "modes": {
+    "bootstrap": false,
+    "play": true,
+    "test": true
+   }
+  },
+  "new_game_next_page": {
+   "purity": "write",
+   "player_reachable": true,
+   "status": "fixed",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "guard fixed in 3d85963/3fed61c with regression tests",
+   "modes": {
+    "bootstrap": false,
+    "play": true,
+    "test": true
+   }
+  },
+  "focus_new_game_selected_perk": {
+   "purity": "write",
+   "player_reachable": true,
+   "status": "fixed",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "guard fixed in 3d85963/3fed61c with regression tests",
+   "modes": {
+    "bootstrap": false,
+    "play": true,
+    "test": true
+   }
+  },
+  "blur_new_game_option": {
+   "purity": "write",
+   "player_reachable": true,
+   "status": "fixed",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "guard fixed in 3d85963/3fed61c with regression tests",
+   "modes": {
+    "bootstrap": false,
+    "play": true,
+    "test": true
+   }
+  },
+  "new_game_continue": {
+   "purity": "write",
+   "player_reachable": true,
+   "status": "fixed",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "guard fixed in 3d85963/3fed61c with regression tests",
+   "modes": {
+    "bootstrap": false,
+    "play": true,
+    "test": true
+   }
+  },
+  "get_recording_save_status": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "read-only per recorder classification; no known side effect",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   }
+  },
+  "save_recording_game": {
+   "purity": "privileged",
+   "player_reachable": null,
+   "status": "denied",
+   "decision": "deny",
+   "evidence": [],
+   "reason": "no player-reachable path; diagnostic/privileged entry",
+   "modes": {
+    "bootstrap": false,
+    "play": false,
+    "test": true
+   }
+  },
+  "load_recording_game": {
+   "purity": "write",
+   "player_reachable": true,
+   "status": "fixed",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "guard fixed in 3d85963/3fed61c with regression tests",
+   "modes": {
+    "bootstrap": false,
+    "play": true,
+    "test": true
+   }
+  },
+  "confirm_new_game": {
+   "purity": "write",
+   "player_reachable": true,
+   "status": "fixed",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "guard fixed in 3d85963/3fed61c with regression tests",
+   "modes": {
+    "bootstrap": false,
+    "play": true,
+    "test": true
+   }
+  },
+  "new_game": {
+   "purity": "privileged",
+   "player_reachable": null,
+   "status": "denied",
+   "decision": "deny",
+   "evidence": [],
+   "reason": "no player-reachable path; diagnostic/privileged entry",
+   "modes": {
+    "bootstrap": false,
+    "play": false,
+    "test": true
+   }
+  },
+  "load_game": {
+   "purity": "write",
+   "player_reachable": true,
+   "status": "fixed",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "guard fixed in 3d85963/3fed61c with regression tests",
+   "modes": {
+    "bootstrap": false,
+    "play": true,
+    "test": true
+   }
+  },
+  "sleep": {
+   "purity": "write",
+   "player_reachable": true,
+   "status": "partial",
+   "decision": "needs_evidence",
+   "evidence": [
+    "B8,B9"
+   ],
+   "reason": "open guard gap: B8|B9",
+   "modes": {
+    "bootstrap": false,
+    "play": false,
+    "test": true
+   }
+  },
+  "save_game": {
+   "purity": "privileged",
+   "player_reachable": null,
+   "status": "denied",
+   "decision": "deny",
+   "evidence": [],
+   "reason": "no player-reachable path; diagnostic/privileged entry",
+   "modes": {
+    "bootstrap": false,
+    "play": false,
+    "test": true
+   }
+  },
+  "dismiss_current_client": {
+   "purity": "write",
+   "player_reachable": true,
+   "status": "partial",
+   "decision": "needs_evidence",
+   "evidence": [
+    "B20,B21,B22"
+   ],
+   "reason": "open guard gap: B20|B21|B22",
+   "modes": {
+    "bootstrap": false,
+    "play": false,
+    "test": true
+   }
+  },
+  "confirm_trade": {
+   "purity": "write",
+   "player_reachable": true,
+   "status": "open",
+   "decision": "needs_evidence",
+   "evidence": [
+    "B10,B11,B12,B13,B14,B15,B16"
+   ],
+   "reason": "open guard gap: B10|B11|B12|B13|B14|B15|B16",
+   "modes": {
+    "bootstrap": false,
+    "play": false,
+    "test": true
+   }
+  },
+  "wait_for_events": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "read-only per recorder classification; no known side effect",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   }
+  },
+  "wait_for_change": {
+   "purity": "pure",
+   "player_reachable": null,
+   "status": "implemented",
+   "decision": "allow",
+   "evidence": [],
+   "reason": "read-only per recorder classification; no known side effect",
+   "modes": {
+    "bootstrap": true,
+    "play": true,
+    "test": true
+   }
+  }
+ }
+}

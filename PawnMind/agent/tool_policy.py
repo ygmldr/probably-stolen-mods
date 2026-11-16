@@ -1,94 +1,74 @@
-"""Per-tool purity / mode policy, derived from the audit matrix.
+"""Declarative tool policy: one source, generated allowlists, deny by default.
 
-Every MCP tool must be classified here before it may appear in a mode's
-allowlist. The consistency test fails when a tool is added to the server but not
-classified, so a new tool cannot silently inherit "safe by default".
-
-Read/write defaults come from the recorder's own classification
-(``agent/memory/classification.READ_ONLY_OPS``), not from the MCP
-``readOnlyHint`` annotation: the SDK leaves that hint null for every tool here, so
-using it as the default silently labelled every read as a write.
+``agent/policy/tool_policy.json`` is the only place that decides whether a tool
+may appear in a mode. It is generated from the real ``tools/list`` snapshot and
+the entry matrix, then reviewed by hand. Nothing here infers safety from
+``readOnlyHint`` (it is null for every tool this server exports) and nothing
+hand-writes an allowlist.
 """
 
-# Reads that change game state on the read path. Kept explicit even while the
-# write paths are being fixed: a tool here never enters strict_player.
-IMPURE_READS = {
-    "bargain_preview": "mutating",   # GetBargainSuccessChance -> Refresh()
-    "get_state": "cached_impure",    # snapshot getters call Refresh() when the client changes
-    "get_clientele": "cached_impure",  # first read rolls RNG twice, then caches per day
-    "barter_status": "cached_impure",  # delegate-based, currently pure but not proven
-}
+import json
+import os
 
-# Tools that exist for diagnostics/privilege and have no player-reachable path.
-PRIVILEGED = {
-    "save_game",
-    "save_recording_game",
-    "new_game",
-    "act",
-    "press",
-    "get_ui_snapshot",
-    "wait_until",
-    "wine_add_water",
-    "dispatch_expedition",
-    "advance_expedition",
-}
+POLICY_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                           "policy", "tool_policy.json")
 
-# Never exported in a recording session, regardless of what the server registers.
-STRICT_DENY = PRIVILEGED | {"bargain_preview", "get_clientele"}
+MODES = ("bootstrap", "play", "test")
+DECISIONS = ("allow", "deny", "needs_evidence")
 
 
-def _read_only_names():
-    """The recorder's allowlist is the source of truth for read-only ops."""
-    try:
-        from memory.classification import READ_ONLY_OPS
-        return frozenset(READ_ONLY_OPS)
-    except Exception:  # pragma: no cover - only when imported outside agent/
-        return frozenset()
+def load_policy(path=None):
+    with open(path or POLICY_PATH, encoding="utf-8") as handle:
+        return json.load(handle)
 
 
-READ_ONLY_TOOLS = _read_only_names()
+def decision_for(policy, tool_name):
+    """Unknown tools are denied: a new tool must be reviewed, not inherited."""
+    entry = policy.get("tools", {}).get(tool_name)
+    if entry is None:
+        return "deny"
+    return entry.get("decision", "deny")
 
 
-def purity(tool_name, read_only_hint=None):
-    """Classify a tool: pure | cached_impure | mutating | write.
-
-    ``read_only_hint`` is accepted for call-site compatibility but is not trusted:
-    it is null for every tool exported by this server.
-    """
-    if tool_name in IMPURE_READS:
-        return IMPURE_READS[tool_name]
-    if tool_name in READ_ONLY_TOOLS:
-        return "pure"
-    return "write"
-
-
-def allowed_in(mode, tool_name, read_only_hint=None):
-    """The one authoritative answer for whether a mode may expose a tool."""
-    if mode == "test":
-        return True
-    if tool_name in STRICT_DENY:
-        return False
-    if mode == "assisted":
-        return True
-    if mode == "strict_player":
-        return purity(tool_name, read_only_hint) in ("pure", "write")
-    raise ValueError("unknown mode %s" % mode)
-
-
-# Tools whose purity is not yet proven by D0a/real-machine instrumentation.
-# ``get_state`` is the hard case: the agent cannot play without it, but the
-# snapshot path still calls Refresh() through CanOffer*/CanReport.  Keep it out of
-# strict until D0a lands and records evidence; do not paper over it by calling it
-# pure.
-PENDING_PURITY = {
-    "get_state": "d0a_required",
-}
-
-
-def strict_allowlist(full_tools):
-    """Strict-mode allowlist generated from the registry, never hand written."""
+def allowlist(policy, mode):
+    """Tools a mode may expose, sorted. Unknown modes expose nothing."""
+    if mode not in MODES:
+        return []
     return sorted(
-        t["name"] for t in full_tools
-        if t["name"] not in PENDING_PURITY
-        and allowed_in("strict_player", t["name"], t.get("readOnlyHint"))
+        name for name, entry in policy.get("tools", {}).items()
+        if entry.get("decision") == "allow" and entry.get("modes", {}).get(mode) is True
     )
+
+
+def live_ready(policy):
+    """Tools with real-machine evidence; empty until live tests are recorded."""
+    return sorted(
+        name for name, entry in policy.get("tools", {}).items()
+        if entry.get("status") == "verified_live" and entry.get("decision") == "allow"
+    )
+
+
+def validate(policy):
+    """Structural checks; returns a list of problems (empty means valid)."""
+    problems = []
+    tools = policy.get("tools", {})
+    if not tools:
+        problems.append("policy has no tools")
+    for name, entry in tools.items():
+        decision = entry.get("decision")
+        purity = entry.get("purity")
+        if decision not in DECISIONS:
+            problems.append("%s: bad decision %r" % (name, decision))
+        if not entry.get("reason"):
+            problems.append("%s: allow/deny without a reason" % name)
+        if purity == "privileged" and decision != "deny":
+            problems.append("%s: privileged tool must be denied" % name)
+        if purity in ("mutating",) and decision == "allow":
+            problems.append("%s: mutating read must be denied" % name)
+        if decision == "allow" and purity == "write" and entry.get("status") != "fixed":
+            problems.append("%s: allowed write without fixed evidence" % name)
+        if entry.get("modes", {}).get("play") is True and decision != "allow":
+            problems.append("%s: play mode with non-allow decision" % name)
+    if tools.get("get_state", {}).get("modes", {}).get("play") is True:
+        problems.append("get_state: play mode before D0a purity evidence")
+    return problems
