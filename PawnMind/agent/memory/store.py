@@ -403,6 +403,14 @@ class EventStore(object):
             raise MemoryUnavailable("unknown event %s" % event_id)
         return dict(row)
 
+    def recent_events(self, timeline_id, limit=50):
+        """Newest-first window; history() is oldest-first and truncates the tail."""
+        conn = self._require()
+        rows = conn.execute(
+            "SELECT * FROM events WHERE timeline_id=? ORDER BY seq DESC LIMIT ?",
+            (timeline_id, int(limit))).fetchall()
+        return [dict(row) for row in rows]
+
     def history(self, timeline_id=None, limit=200, event_types=None,
                 since_seq=0):
         conn = self._require()

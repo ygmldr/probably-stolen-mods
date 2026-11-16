@@ -231,6 +231,26 @@ class SnapshotAndScopeTests(RecorderTestBase):
         self.assertEqual(1, len(external),
                          "a state change with no preceding write is external")
 
+    def test_change_after_a_successful_write_is_not_external(self):
+        self.client.get_state()
+        self.client.action("confirm_trade")
+        self.bridge.state_value = state(day=2, cash=100, rev=14)
+        self.client.get_state()
+
+        self.assertEqual(0, len(self.events(EVENT_EXTERNAL)),
+                         "our own successful write explains the change")
+
+    def test_change_after_success_then_rejection_is_not_external(self):
+        self.client.get_state()
+        self.client.action("confirm_trade")
+        self.bridge.responses["bargain"] = {"ok": False, "error": "stale_rev", "rev": 12}
+        self.client.action("bargain")
+        self.bridge.state_value = state(day=2, cash=100, rev=14)
+        self.client.get_state()
+
+        self.assertEqual(0, len(self.events(EVENT_EXTERNAL)),
+                         "an earlier success still explains the change")
+
     def test_binding_attaches_identity(self):
         self.bridge.responses["get_recording_save_status"] = {
             "ok": True, "recording_mode": "bound", "bound": True,

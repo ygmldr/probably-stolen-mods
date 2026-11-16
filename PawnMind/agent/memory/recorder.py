@@ -219,14 +219,26 @@ class RecordingClient(object):
             self.lost_events += 1
 
     def _had_success_since_last_snapshot(self):
+        """Did any of our own actions succeed since the previous snapshot?
+
+        Intent rows are updated in place (append_result), so a RESULT event is
+        never written; the old check therefore always answered "no" and every
+        observed change after a successful write was mislabelled as external.
+        Look at the newest events instead, and stop at the previous snapshot.
+        """
         try:
-            recent = self.store.history(self.timeline_id, limit=20)
+            recent = self.store.recent_events(self.timeline_id, limit=50)
         except MemoryUnavailable:
             return True
-        for row in reversed(recent):
-            if row["event_type"] != EVENT_RESULT:
-                continue
-            return row["result_status"] == STATUS_SUCCESS
+        for row in recent:  # newest first
+            event_type = row["event_type"]
+            if event_type in (EVENT_OBSERVATION, EVENT_EXTERNAL):
+                return False
+            if event_type == EVENT_SLEEP_COMPLETED:
+                return True
+            if event_type in (EVENT_INTENT, EVENT_RESULT) \
+                    and row["result_status"] == STATUS_SUCCESS:
+                return True
         return False
 
     def _maybe_external_change(self, observation, has_success_before):
