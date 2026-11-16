@@ -154,7 +154,9 @@ def _state_summary(state):
     if isinstance(client, dict):
         summary["client"] = {
             key: client.get(key)
-            for key in ("name", "intent", "is_wanted", "can_report")
+            # can_report was removed from the snapshot (it called
+            # BargainUIManager.Refresh()); reported is the pure field.
+            for key in ("name", "intent", "is_wanted", "reported")
             if key in client
         }
     return summary

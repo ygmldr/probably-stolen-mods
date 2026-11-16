@@ -56,12 +56,12 @@
 | `get_day_report` | pure | implemented | allow | Y/Y/Y | - | read-only per recorder classification; no known side effect |
 | `get_item` | pure | implemented | allow | Y/Y/Y | - | read-only per recorder classification; no known side effect |
 | `get_layout` | pure | implemented | allow | Y/Y/Y | - | read-only per recorder classification; no known side effect |
-| `get_legal_actions` | pure | d0a_fixed | allow | -/Y/Y | - | snapshot path no longer reads Refresh()-backed getters (D0a); live PPT-READ evidence still missing |
+| `get_legal_actions` | pure | d0a_fixed | allow | -/Y/Y | - | B1: client.can_report removed; snapshot path static-pure (PP-READ-03); live PP-READ-01 still NOT_RUN |
 | `get_new_game_options` | pure | implemented | allow | Y/Y/Y | - | read-only per recorder classification; no known side effect |
 | `get_pending_prompt` | pure | implemented | allow | Y/Y/Y | - | read-only per recorder classification; no known side effect |
 | `get_recording_save_status` | pure | implemented | allow | Y/Y/Y | - | read-only per recorder classification; no known side effect |
-| `get_run_summary` | pure | d0a_fixed | allow | -/Y/Y | - | snapshot path no longer reads Refresh()-backed getters (D0a); live PPT-READ evidence still missing |
-| `get_state` | pure | d0a_fixed | allow | -/Y/Y | - | snapshot path no longer reads Refresh()-backed getters (D0a); live PPT-READ evidence still missing |
+| `get_run_summary` | pure | d0a_fixed | allow | -/Y/Y | - | B1: client.can_report removed; snapshot path static-pure (PP-READ-03); live PP-READ-01 still NOT_RUN |
+| `get_state` | pure | d0a_fixed | allow | -/Y/Y | - | B1: client.can_report removed; snapshot path static-pure (PP-READ-03); live PP-READ-01 still NOT_RUN |
 | `health_status` | pure | implemented | allow | Y/Y/Y | - | read-only per recorder classification; no known side effect |
 | `husbandry_status` | pure | implemented | allow | Y/Y/Y | - | read-only per recorder classification; no known side effect |
 | `inspect_ticket` | pure | implemented | allow | Y/Y/Y | - | read-only per recorder classification; no known side effect |
@@ -108,8 +108,8 @@
 | `select_new_game_option` | write | fixed | allow | -/Y/Y | - | guard fixed in 3d85963/3fed61c with regression tests |
 | `set_pen_mode` | write | fixed | allow | -/Y/Y | - | guard fixed in 3d85963/3fed61c with regression tests |
 | `toggle_service` | write | fixed | allow | -/Y/Y | - | guard fixed in 3d85963/3fed61c with regression tests |
-| `wait_for_change` | pure | d0a_fixed | allow | -/Y/Y | - | snapshot path no longer reads Refresh()-backed getters (D0a); live PPT-READ evidence still missing |
-| `wait_for_events` | pure | d0a_fixed | allow | -/Y/Y | - | snapshot path no longer reads Refresh()-backed getters (D0a); live PPT-READ evidence still missing |
+| `wait_for_change` | pure | d0a_fixed | allow | -/Y/Y | - | B1: client.can_report removed; snapshot path static-pure (PP-READ-03); live PP-READ-01 still NOT_RUN |
+| `wait_for_events` | pure | d0a_fixed | allow | -/Y/Y | - | B1: client.can_report removed; snapshot path static-pure (PP-READ-03); live PP-READ-01 still NOT_RUN |
 | `wanted_status` | pure | implemented | allow | Y/Y/Y | - | read-only per recorder classification; no known side effect |
 | `wine_status` | pure | implemented | allow | Y/Y/Y | - | read-only per recorder classification; no known side effect |
 

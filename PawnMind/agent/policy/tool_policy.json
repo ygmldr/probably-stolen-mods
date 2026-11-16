@@ -18,7 +18,7 @@
    "status": "d0a_fixed",
    "decision": "allow",
    "evidence": [],
-   "reason": "snapshot path no longer reads Refresh()-backed getters (D0a); live PPT-READ evidence still missing",
+   "reason": "B1: client.can_report removed (it reached BargainUIManager.Refresh()); snapshot path is static-pure per PP-READ-03; live PP-READ-01 Refresh() instrumentation still NOT_RUN",
    "modes": {
     "bootstrap": false,
     "play": true,
@@ -96,7 +96,7 @@
    "status": "d0a_fixed",
    "decision": "allow",
    "evidence": [],
-   "reason": "snapshot path no longer reads Refresh()-backed getters (D0a); live PPT-READ evidence still missing",
+   "reason": "B1: client.can_report removed (it reached BargainUIManager.Refresh()); snapshot path is static-pure per PP-READ-03; live PP-READ-01 Refresh() instrumentation still NOT_RUN",
    "modes": {
     "bootstrap": false,
     "play": true,
@@ -111,7 +111,7 @@
    "status": "d0a_fixed",
    "decision": "allow",
    "evidence": [],
-   "reason": "snapshot path no longer reads Refresh()-backed getters (D0a); live PPT-READ evidence still missing",
+   "reason": "B1: client.can_report removed (it reached BargainUIManager.Refresh()); snapshot path is static-pure per PP-READ-03; live PP-READ-01 Refresh() instrumentation still NOT_RUN",
    "modes": {
     "bootstrap": false,
     "play": true,
@@ -1745,7 +1745,7 @@
    "status": "d0a_fixed",
    "decision": "allow",
    "evidence": [],
-   "reason": "snapshot path no longer reads Refresh()-backed getters (D0a); live PPT-READ evidence still missing",
+   "reason": "B1: client.can_report removed (it reached BargainUIManager.Refresh()); snapshot path is static-pure per PP-READ-03; live PP-READ-01 Refresh() instrumentation still NOT_RUN",
    "modes": {
     "bootstrap": false,
     "play": true,
@@ -1760,7 +1760,7 @@
    "status": "d0a_fixed",
    "decision": "allow",
    "evidence": [],
-   "reason": "snapshot path no longer reads Refresh()-backed getters (D0a); live PPT-READ evidence still missing",
+   "reason": "B1: client.can_report removed (it reached BargainUIManager.Refresh()); snapshot path is static-pure per PP-READ-03; live PP-READ-01 Refresh() instrumentation still NOT_RUN",
    "modes": {
     "bootstrap": false,
     "play": true,

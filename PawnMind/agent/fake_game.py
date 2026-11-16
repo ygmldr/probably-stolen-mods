@@ -604,7 +604,10 @@ class FakeGame:
 
     def _build_state(self):
         state = {"in_game": self.in_game,
-                 "legal_actions": self._legal_actions()}
+                 "legal_actions": self._legal_actions(),
+                 # Mirror the B-module split: the fake never claims a candidate
+                 # is legal, it simply has no unconfirmed actions.
+                 "candidate_actions": []}
         if not self.in_game:
             state.update({
                 "client": None,

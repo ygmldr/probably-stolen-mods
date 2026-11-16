@@ -57,6 +57,7 @@
     <Compile Include="DayEndPolicyTests.cs" />
     <Compile Include="ShopBellPolicyTests.cs" />
     <Compile Include="SnapshotRulesTests.cs" />
+    <Compile Include="SnapshotPurityTests.cs" />
     <Compile Include="ModePolicyTests.cs" />
     <Compile Include="RunModeTests.cs" />
     <Compile Include="EndpointGateTests.cs" />

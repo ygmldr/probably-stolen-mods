@@ -4,14 +4,31 @@ namespace PawnMind.Core
 {
     public sealed class LegalAction
     {
+        /// <summary>The native guards accepted this action with no further check.</summary>
+        public const string AvailabilityAvailable = "available";
+
+        /// <summary>
+        /// A plausible action that still needs a native predicate to confirm it.
+        /// Candidates are never reported as legal/executable: the write path may
+        /// still refuse them (for example a bargain direction that is already spent).
+        /// </summary>
+        public const string AvailabilityCandidate = "candidate";
+
+        /// <summary>Serialized availability for candidates: never "available".</summary>
+        public const string UnknownAvailability = "unknown";
+
         public string Action { get; private set; }
         public Dictionary<string, object> Args { get; private set; }
         public string Hint { get; private set; }
+        public string Availability { get; private set; }
+        public string Requires { get; private set; }
 
         public LegalAction(string action)
         {
             Action = action;
             Args = new Dictionary<string, object>();
+            Availability = AvailabilityAvailable;
+            Requires = null;
         }
 
         public LegalAction With(string key, object value)
@@ -24,6 +41,30 @@ namespace PawnMind.Core
         {
             Hint = hint;
             return this;
+        }
+
+        /// <summary>Marks the action as a candidate; a native guard still decides.</summary>
+        public LegalAction AsCandidate(string requires)
+        {
+            Availability = AvailabilityCandidate;
+            Requires = requires;
+            return this;
+        }
+
+        /// <summary>Serialized availability value (candidates are always "unknown").</summary>
+        public string ReportedAvailability
+        {
+            get
+            {
+                return Availability == AvailabilityCandidate
+                    ? UnknownAvailability
+                    : AvailabilityAvailable;
+            }
+        }
+
+        public bool IsAvailable
+        {
+            get { return Availability == AvailabilityAvailable; }
         }
     }
 
@@ -55,6 +96,7 @@ namespace PawnMind.Core
 
     public static class LegalActionBuilder
     {
+        /// <summary>All plausible actions, with availability already classified.</summary>
         public static List<LegalAction> Build(GameFlags flags)
         {
             var actions = new List<LegalAction>();
@@ -111,12 +153,13 @@ namespace PawnMind.Core
                 if (flags.BargainOpen)
                 {
                     // The per-direction flags live behind Refresh()-backed getters,
-                    // so the read path only reports that bargaining is possible; the
-                    // bargain action itself is the authority on which offers remain.
-                    actions.Add(Bargain("sell_discount"));
-                    actions.Add(Bargain("sell_markup"));
-                    actions.Add(Bargain("buy_markup"));
-                    actions.Add(Bargain("buy_discount"));
+                    // so the read path only reports that bargaining *may* be possible.
+                    // The bargain action itself is the authority on which offers remain;
+                    // that is why these are candidates, never legal actions.
+                    actions.Add(Bargain("sell_discount").AsCandidate("native_guard"));
+                    actions.Add(Bargain("sell_markup").AsCandidate("native_guard"));
+                    actions.Add(Bargain("buy_markup").AsCandidate("native_guard"));
+                    actions.Add(Bargain("buy_discount").AsCandidate("native_guard"));
                 }
             }
 
@@ -127,6 +170,33 @@ namespace PawnMind.Core
             }
 
             return actions;
+        }
+
+        /// <summary>Only the rows whose native guards already accepted.</summary>
+        public static List<LegalAction> Available(List<LegalAction> actions)
+        {
+            return Filter(actions, true);
+        }
+
+        /// <summary>Rows that still need a native check before they may be executed.</summary>
+        public static List<LegalAction> Candidates(List<LegalAction> actions)
+        {
+            return Filter(actions, false);
+        }
+
+        private static List<LegalAction> Filter(List<LegalAction> actions, bool available)
+        {
+            var filtered = new List<LegalAction>();
+            if (actions == null) return filtered;
+
+            for (int i = 0; i < actions.Count; i++)
+            {
+                LegalAction action = actions[i];
+                if (action == null) continue;
+                if (action.IsAvailable == available) filtered.Add(action);
+            }
+
+            return filtered;
         }
 
         private static LegalAction Bargain(string direction)

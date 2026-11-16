@@ -234,6 +234,27 @@ def _check_id(identifier):
     return None
 
 
+def _legal_action_payload(state):
+    """Split a snapshot into legal vs candidate actions, tolerating old payloads.
+
+    The C# snapshot only emits ``legal_actions`` rows whose native guards already
+    accepted. ``candidate_actions`` (schema 1.1, B module) carries actions that
+    still need a native check, e.g. the four bargain directions while the panel is
+    open. Older snapshots have neither section; they must degrade to empty lists,
+    never raise, and never be interpreted as "everything is legal".
+    """
+    if not isinstance(state, dict):
+        return {"rev": -1, "legal_actions": [], "candidate_actions": []}
+
+    legal = state.get("legal_actions")
+    candidates = state.get("candidate_actions")
+    return {
+        "rev": state.get("rev", -1),
+        "legal_actions": legal if isinstance(legal, list) else [],
+        "candidate_actions": candidates if isinstance(candidates, list) else [],
+    }
+
+
 def _first_error(*errors):
     for error in errors:
         if error is not None:
@@ -418,7 +439,7 @@ def build_server(client, tool_set=TOOL_SET_FULL, memory_provider=None):
 
     @tool()
     def get_state() -> dict:
-        """Return the current shop snapshot: cash, rent, customer and negotiated item."""
+        """Return the current shop snapshot: cash, rent, customer and negotiated item. legal_actions contains only actions whose native guards accepted; candidate_actions lists plausible actions that still need a native check (for example bargain directions while the panel is open) and must not be treated as legal."""
         return client.get_state()
 
     @tool()
@@ -507,9 +528,8 @@ def build_server(client, tool_set=TOOL_SET_FULL, memory_provider=None):
 
     @tool()
     def get_legal_actions() -> dict:
-        """Return the actions that are legal right now (state-derived, includes args)."""
-        state = client.get_state()
-        return {"rev": state.get("rev", -1), "legal_actions": state.get("legal_actions", [])}
+        """Return the actions that are legal right now (state-derived, includes args) plus candidate_actions. legal_actions rows were accepted by the native guards; candidate actions (availability=unknown, requires=native_guard) are plausible but unproven - execute one only through its write tool and treat an unavailable/refused result as normal, not as a bug. Old snapshots without candidate_actions degrade to an empty list."""
+        return _legal_action_payload(client.get_state())
 
     @tool()
     def get_run_summary() -> dict:

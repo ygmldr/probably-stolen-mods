@@ -8,7 +8,7 @@ namespace PawnMind.Core
     public static class PolicyCatalog
     {
         public const string Schema = "2";
-        public const string Sha256 = "48213300cc4544c1f082a1e683aaa1a1430ada07bbafa7214566cecb731d3ea4";
+        public const string Sha256 = "fe5c6b647ef6645aa504b43f3cdb106c67aa2807f431ae5911936818cb130984";
 
         /// <summary>Tools that read the state snapshot; never allowed in Bootstrap.</summary>
         public static readonly string[] SnapshotReaders = { "get_legal_actions", "get_run_summary", "get_state", "wait_for_change", "wait_for_events", "wait_until" };

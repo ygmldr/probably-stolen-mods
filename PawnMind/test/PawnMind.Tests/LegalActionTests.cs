@@ -124,11 +124,12 @@ namespace PawnMind.Tests
         }
 
         [Test]
-        public static void Bargain_Offers_Every_Direction_When_Open()
+        public static void Bargain_Directions_Are_Candidates_Not_Legal()
         {
-            // The per-direction flags come from Refresh()-backed getters, so the
-            // snapshot no longer carries them; the bargain action reports
-            // "unavailable" when a direction is actually spent.
+            // PP-READ-05: the panel being open only means bargaining *may* be
+            // possible. The per-direction flags live behind Refresh()-backed
+            // getters, so the read path must report candidates with
+            // availability=unknown and let the native guard decide on write.
             var flags = new GameFlags
             {
                 InGame = true,
@@ -140,8 +141,31 @@ namespace PawnMind.Tests
 
             foreach (string direction in new[] { "sell_discount", "sell_markup", "buy_markup", "buy_discount" })
             {
-                Assert.NotNull(Find(actions, "bargain", "direction", direction), direction);
+                LegalAction action = Find(actions, "bargain", "direction", direction);
+                Assert.NotNull(action, direction);
+                Assert.Equal(LegalAction.AvailabilityCandidate, action.Availability,
+                    direction + " is a candidate");
+                Assert.Equal("unknown", action.ReportedAvailability,
+                    direction + " must not claim availability=available");
+                Assert.Equal("native_guard", action.Requires, direction + " needs a native guard");
+                Assert.False(action.IsAvailable, direction + " is not available");
             }
+
+            Assert.Equal(0, LegalActionBuilder.Available(actions).Count - CountNonBargain(actions),
+                "no bargain direction is reported as legal");
+            Assert.Equal(4, LegalActionBuilder.Candidates(actions).Count,
+                "all four directions are candidates");
+        }
+
+        private static int CountNonBargain(List<LegalAction> actions)
+        {
+            int count = 0;
+            for (int i = 0; i < actions.Count; i++)
+            {
+                if (actions[i].Action != "bargain") count++;
+            }
+
+            return count;
         }
 
         [Test]

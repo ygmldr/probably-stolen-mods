@@ -35,7 +35,13 @@ namespace PawnMind.Bridge
             state["in_game"] = inGame;
 
             GameFlags flags = BuildFlags();
-            state["legal_actions"] = DescribeLegalActions(LegalActionBuilder.Build(flags));
+            List<LegalAction> legal = LegalActionBuilder.Build(flags);
+            // legal_actions only carries rows whose native guards already accepted.
+            // Bargain directions are candidates: the panel being open does not prove
+            // that a given direction is still available, and reading the per-direction
+            // flags would call BargainUIManager.Refresh() on every snapshot.
+            state["legal_actions"] = DescribeLegalActions(legal, false);
+            state["candidate_actions"] = DescribeLegalActions(legal, true);
 
             // A native confirmation owns the input while it is open. Exposing it
             // here means the model can never silently ignore a modal (losing
@@ -216,15 +222,28 @@ namespace PawnMind.Bridge
             return source.ContainsKey(key) && source[key] is bool && (bool)source[key];
         }
 
-        private static List<Dictionary<string, object>> DescribeLegalActions(List<LegalAction> actions)
+        private static List<Dictionary<string, object>> DescribeLegalActions(
+            List<LegalAction> actions, bool candidates)
         {
+            List<LegalAction> selected = candidates
+                ? LegalActionBuilder.Candidates(actions)
+                : LegalActionBuilder.Available(actions);
+
             var described = new List<Dictionary<string, object>>();
-            for (int i = 0; i < actions.Count; i++)
+            for (int i = 0; i < selected.Count; i++)
             {
-                LegalAction action = actions[i];
+                LegalAction action = selected[i];
                 var row = new Dictionary<string, object>();
                 row["action"] = action.Action;
                 row["args"] = action.Args;
+                if (candidates)
+                {
+                    // Candidates are never reported as legal/executable: the write
+                    // path still needs the native guard to accept them.
+                    row["availability"] = action.ReportedAvailability;
+                    row["requires"] = action.Requires;
+                }
+
                 if (!string.IsNullOrEmpty(action.Hint)) row["hint"] = action.Hint;
                 described.Add(row);
             }
@@ -285,29 +304,38 @@ namespace PawnMind.Bridge
             return described;
         }
 
-        private static Dictionary<string, object> DescribeClient(StoreClient client)
+        /// <summary>
+        /// Read-only view of the current client for
+        /// <see cref="ClientSnapshotProjection"/>. Every member is a plain field or
+        /// a field getter; StoreClient.CanReport() is deliberately not exposed
+        /// because it calls BargainUIManager.Refresh(), which resets the bargain
+        /// state when the tracked client changes.
+        /// </summary>
+        private sealed class StoreClientSnapshot : IClientSnapshotSource
         {
-            var description = new Dictionary<string, object>();
-            description["name"] = client.displayName;
-            description["intent"] = client.clientIntent.ToString();
-            // S6A: the private wallet field is not shown by the game (only the
-            // negotiation budget is); omit it instead of exposing a hidden value.
-            description["uses_budget"] = client.useClientBudget;
-            description["impatience"] = client.clientImpatience;
-            description["is_wanted"] = client.isWanted;
-            description["report_reward"] = client.reportReward;
-            description["reported"] = client.reported;
-            description["can_report"] = SafeCanReport(client);
-            description["wanted_poster_id"] = client.wantedPosterId;
-            description["bargain_available"] = client.isBargainAvailable;
-            description["faction"] = client.clientFaction;
-            description["budget"] = GameState.GetClientBudget(client);
-            return description;
+            private readonly StoreClient _client;
+
+            public StoreClientSnapshot(StoreClient client)
+            {
+                _client = client;
+            }
+
+            public string DisplayName { get { return _client.displayName; } }
+            public string Intent { get { return _client.clientIntent.ToString(); } }
+            public bool UsesBudget { get { return _client.useClientBudget; } }
+            public int Impatience { get { return _client.clientImpatience; } }
+            public bool IsWanted { get { return _client.isWanted; } }
+            public int ReportReward { get { return _client.reportReward; } }
+            public bool Reported { get { return _client.reported; } }
+            public string WantedPosterId { get { return _client.wantedPosterId; } }
+            public bool BargainAvailable { get { return _client.isBargainAvailable; } }
+            public string Faction { get { return _client.clientFaction; } }
+            public int Budget { get { return GameState.GetClientBudget(_client); } }
         }
 
-        private static bool SafeCanReport(StoreClient client)
+        private static Dictionary<string, object> DescribeClient(StoreClient client)
         {
-            try { return client.CanReport(); } catch { return false; }
+            return ClientSnapshotProjection.Describe(new StoreClientSnapshot(client));
         }
 
         private static Dictionary<string, object> DescribeItem(GameItem item)
