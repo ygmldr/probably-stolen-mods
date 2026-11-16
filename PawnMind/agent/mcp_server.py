@@ -17,6 +17,7 @@ Run:
 import argparse
 import os
 import sys
+import threading
 import time
 import uuid
 from typing import Annotated
@@ -133,6 +134,10 @@ RECORDING_TOOL_NAMES = frozenset({
     "machine_grow_status",
     "machine_insert",
     "machine_status",
+    "memory_bootstrap",
+    "memory_get",
+    "memory_retrieve",
+    "memory_status",
     "move_item",
     "new_game_continue",
     "new_game_next_page",
@@ -166,6 +171,10 @@ RECORDING_TOOL_NAMES = frozenset({
 
 CALENDAR_MIN_DAYS = 1
 CALENDAR_MAX_DAYS = 14
+
+MEMORY_MAX_LIMIT = 50
+MEMORY_MAX_TOKEN_BUDGET = 100000
+MEMORY_MAX_QUERY_CHARS = 500
 
 NEW_GAME_OPTION_KINDS = ("scenario", "perk", "difficulty")
 NEW_GAME_PAGE_ROWS = ("available", "selected")
@@ -232,7 +241,138 @@ def _first_error(*errors):
     return None
 
 
-def build_server(client, tool_set=TOOL_SET_FULL):
+_MEMORY_API = None
+
+
+def _memory_api():
+    """Import the memory domain lazily so `--tools full` never needs the DB."""
+    global _MEMORY_API
+    if _MEMORY_API is None:
+        try:
+            from .memory.memories import (
+                MemoryNotFound,
+                MemoryStore,
+                MemoryUnavailable,
+                MemoryValidationError,
+            )
+        except ImportError:  # `python agent/mcp_server.py` form
+            from memory.memories import (
+                MemoryNotFound,
+                MemoryStore,
+                MemoryUnavailable,
+                MemoryValidationError,
+            )
+        _MEMORY_API = (MemoryStore, MemoryNotFound, MemoryUnavailable,
+                       MemoryValidationError)
+    return _MEMORY_API
+
+
+class _MemoryStoreProvider(object):
+    """Open ``memories.db`` on first use, never for ``tools/list``.
+
+    Tests start the server without ``--memories-db`` to enumerate tools; an
+    eager open would create ``PawnMind/play/memory/memories.db`` as a side
+    effect.  Lazy opening also keeps a memory-only server usable while the
+    game/bridge is down.
+    """
+
+    def __init__(self, path, events_db=None):
+        self.path = path
+        self.events_db = events_db
+        self._store = None
+        self._lock = threading.Lock()
+
+    def get(self):
+        with self._lock:
+            if self._store is None:
+                MemoryStore = _memory_api()[0]
+                self._store = MemoryStore(self.path,
+                                          events_db=self.events_db)
+            return self._store
+
+    def close(self):
+        with self._lock:
+            if self._store is not None:
+                try:
+                    self._store.close()
+                finally:
+                    self._store = None
+
+
+def _check_memory_limit(limit):
+    if type(limit) is not int or limit < 1 or limit > MEMORY_MAX_LIMIT:
+        return _invalid_argument("limit")
+    return None
+
+
+def _check_token_budget(token_budget):
+    if (type(token_budget) is not int or token_budget < 1
+            or token_budget > MEMORY_MAX_TOKEN_BUDGET):
+        return _invalid_argument("token_budget")
+    return None
+
+
+def _memory_scope(item):
+    return {
+        "game_id": item.get("game_id"),
+        "game_version": item.get("game_version"),
+        "save_id": item.get("save_id"),
+        "run_id": item.get("run_id"),
+        "timeline_id": item.get("timeline_id"),
+    }
+
+
+def _memory_conditions(item):
+    extra = item.get("scope_extra") or {}
+    conditions = extra.get("conditions") or {}
+    return conditions if isinstance(conditions, dict) else {}
+
+
+def _memory_entities(item):
+    extra = item.get("scope_extra") or {}
+    entities = extra.get("entities") or []
+    return entities if isinstance(entities, list) else []
+
+
+def _bootstrap_payload(item):
+    return {
+        "memory_id": item["memory_id"],
+        "kind": item["kind"],
+        "text": item["text"],
+        "status": item["status"],
+        "confidence": item["confidence"],
+        "why": item.get("why", ""),
+        "evidence_count": item.get("evidence_count", 0),
+        "contradict_count": item.get("contradict_count", 0),
+        "scope": _memory_scope(item),
+    }
+
+
+def _retrieve_why(item):
+    return ("%s match confidence=%.2f evidence=%d contradict=%d"
+            % (item.get("recall_reason", "keyword"), item.get("confidence", 0.0),
+               item.get("evidence_count", 0),
+               item.get("contradict_count", 0)))
+
+
+def _retrieve_payload(item):
+    return {
+        "memory_id": item["memory_id"],
+        "kind": item["kind"],
+        "text": item["text"],
+        "status": item["status"],
+        "confidence": item["confidence"],
+        "recall_reason": item.get("recall_reason"),
+        "matched_terms": item.get("matched_terms", []),
+        "conditions": _memory_conditions(item),
+        "entities": _memory_entities(item),
+        "evidence_count": item.get("evidence_count", 0),
+        "contradict_count": item.get("contradict_count", 0),
+        "why": _retrieve_why(item),
+    }
+
+
+def build_server(client, tool_set=TOOL_SET_FULL, memory_provider=None):
     if tool_set not in TOOL_SET_CHOICES:
         raise ValueError("unknown tool set: %r" % (tool_set,))
 
@@ -256,10 +396,114 @@ def build_server(client, tool_set=TOOL_SET_FULL):
 
         return decorator
 
+    def with_memory(callback):
+        """Run a local memory query, mapping domain errors to stable results."""
+        if memory_provider is None:
+            return {"ok": False, "error": "memory_unavailable",
+                    "detail": "no memories database configured"}
+        _, MemoryNotFound, MemoryUnavailable, MemoryValidationError = (
+            _memory_api())
+        try:
+            store = (memory_provider.get()
+                     if hasattr(memory_provider, "get") else memory_provider)
+            return callback(store)
+        except MemoryNotFound as exc:
+            return {"ok": False, "error": "not_found", "detail": str(exc)}
+        except MemoryUnavailable as exc:
+            return {"ok": False, "error": "memory_unavailable",
+                    "detail": str(exc)}
+        except MemoryValidationError as exc:
+            return {"ok": False, "error": "invalid_argument",
+                    "detail": str(exc)}
+
     @tool()
     def get_state() -> dict:
         """Return the current shop snapshot: cash, rent, customer and negotiated item."""
         return client.get_state()
+
+    @tool()
+    def memory_bootstrap(limit: int = 8, scope: dict | None = None) -> dict:
+        """Read-only (no rev): verified, unexpired memories for session start, highest confidence/usage first. Its query is local and safe while the game write gate is locked. scope is the caller's identity (game_version/save_id/run_id/timeline_id); without it only version/global experience is returned, so another run's private facts never leak. Each item has memory_id/kind/text/confidence/why/evidence_count/contradict_count."""
+        error = _check_memory_limit(limit)
+        if error is not None:
+            return error
+        if scope is not None and not isinstance(scope, dict):
+            return _invalid_argument("scope")
+
+        def run(store):
+            items = store.bootstrap(limit=limit, scope=scope)
+            return {"ok": True, "count": len(items), "scope": scope,
+                    "memories": [_bootstrap_payload(item) for item in items]}
+
+        return with_memory(run)
+
+    @tool()
+    def memory_retrieve(query: str, limit: int = 5, scope: dict | None = None,
+                        state: dict | None = None,
+                        token_budget: int = 900) -> dict:
+        """Read-only (no rev): recall verified rules for the current situation using FTS5, keywords and declared entities. Hidden statuses (proposed/candidate/conflict/deprecated/superseded), expired rows and other scopes are hard-filtered. state is the current game snapshot (for example {"in_game": true, "rent": {"days_left": 1}}); a conditional rule is never returned when its condition is missing or false. Each item carries recall_reason (fulltext/keyword/entity), evidence_count and contradict_count. token_budget keeps the highest-priority warning and drops the rest."""
+        error = _check_memory_limit(limit)
+        if error is not None:
+            return error
+        error = _check_token_budget(token_budget)
+        if error is not None:
+            return error
+        if not isinstance(query, str) or not query.strip():
+            return _invalid_argument("query")
+        if len(query) > MEMORY_MAX_QUERY_CHARS:
+            return _invalid_argument("query")
+        if scope is not None and not isinstance(scope, dict):
+            return _invalid_argument("scope")
+        if state is not None and not isinstance(state, dict):
+            return _invalid_argument("state")
+
+        def run(store):
+            result = store.retrieve(
+                query, limit=limit, scope=scope, state=state,
+                token_budget=token_budget)
+            memories = [_retrieve_payload(item)
+                        for item in result["items"]]
+            return {
+                "ok": True,
+                "query": query,
+                "count": len(memories),
+                "memories": memories,
+                "candidates": result["candidates"],
+                "state_filtered": result["state_filtered"],
+                "token_estimate": result["token_estimate"],
+                "token_budget": result["token_budget"],
+                "truncated": result["truncated"],
+                "dropped": result["dropped"],
+            }
+
+        return with_memory(run)
+
+    @tool()
+    def memory_get(memory_id: str) -> dict:
+        """Read-only (no rev): one memory with its evidence events and full revision history. Evidence rows keep event_id, evidence_grade, evidence_role (support/contradict/context) and added_at; when the events DB is configured each row also carries the event metadata. Use it to audit why a rule exists before trusting it."""
+        if type(memory_id) is not str or not memory_id.strip():
+            return _invalid_argument("memory_id")
+
+        def run(store):
+            memory = store.get_memory(memory_id)
+            event_ids = [row["event_id"] for row in memory["evidence"]]
+            details = store.event_details(event_ids)
+            for row in memory["evidence"]:
+                if row["event_id"] in details:
+                    row["event"] = details[row["event_id"]]
+            return {"ok": True, "memory": memory,
+                    "revisions": store.revisions(memory_id)}
+
+        return with_memory(run)
+
+    @tool()
+    def memory_status() -> dict:
+        """Read-only (no rev): counts, status/kind distribution, schema version and file paths for the memories database and the separate events database. If the events DB is not configured or missing the events section degrades to configured=false with a reason instead of failing."""
+        def run(store):
+            return {"ok": True, "memories": store.status(),
+                    "events": store.events_status()}
+
+        return with_memory(run)
 
     @tool()
     def get_legal_actions() -> dict:
@@ -929,9 +1173,9 @@ def main():
         choices=TOOL_SET_CHOICES,
         default=TOOL_SET_FULL,
         help=(
-            "tool surface to register: full (all 100 tools, default) or "
-            "recording (94 player-equivalent tools; act/press/debug shortcuts "
-            "and the hardcoded new_game are left out)"
+            "tool surface to register: full (all 114 tools, default) or "
+            "recording (104 player-equivalent tools; act/press/debug shortcuts, "
+            "save_game and the hardcoded new_game are left out)"
         ),
     )
     parser.add_argument("--probe", action="store_true", help="check the bridge and exit")
@@ -946,6 +1190,12 @@ def main():
         default=os.environ.get("PAWNMIND_MEMORY_DB", None),
         help="path to memory.db (default: <PawnMind>/play/memory/memory.db)",
     )
+    parser.add_argument(
+        "--memories-db",
+        default=os.environ.get("PAWNMIND_MEMORIES_DB", None),
+        help="path to the separate memories.db (default: "
+             "<PawnMind>/play/memory/memories.db)",
+    )
     args = parser.parse_args()
 
     try:
@@ -959,6 +1209,7 @@ def main():
         return 0
 
     recorder = None
+    memory_events_db = args.memory_db
     if args.memory == "on":
         # Works both as `python -m agent.mcp_server` (package form) and as
         # `python agent/mcp_server.py` (script form, where relative imports fail).
@@ -970,6 +1221,7 @@ def main():
             from memory.store import EventStore, MemoryUnavailable
 
         db_path = args.memory_db or _default_memory_db()
+        memory_events_db = db_path
         try:
             store = EventStore(db_path)
             version = "unknown"
@@ -991,9 +1243,14 @@ def main():
                   file=sys.stderr)
             return 4
 
+    memory_provider = _MemoryStoreProvider(
+        args.memories_db or _default_memories_db(),
+        events_db=memory_events_db)
     try:
-        build_server(client, args.tools).run()
+        build_server(client, args.tools,
+                     memory_provider=memory_provider).run()
     finally:
+        memory_provider.close()
         if recorder is not None:
             recorder.store.close()
     return 0
@@ -1002,6 +1259,11 @@ def main():
 def _default_memory_db():
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     return os.path.join(root, "play", "memory", "memory.db")
+
+
+def _default_memories_db():
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(root, "play", "memory", "memories.db")
 
 
 if __name__ == "__main__":

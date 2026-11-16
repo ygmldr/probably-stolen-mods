@@ -105,6 +105,10 @@ EXPECTED_RECORDING_TOOLS = frozenset({
     "machine_grow_status",
     "machine_insert",
     "machine_status",
+    "memory_bootstrap",
+    "memory_get",
+    "memory_retrieve",
+    "memory_status",
     "move_item",
     "new_game_continue",
     "new_game_next_page",
@@ -183,7 +187,7 @@ class ToolsModeTests(unittest.TestCase):
         default_names = self._list_tool_names()
         explicit_names = self._list_tool_names("--tools", "full")
 
-        self.assertEqual(110, len(default_names))
+        self.assertEqual(114, len(default_names))
         self.assertEqual(default_names, explicit_names,
                          "omitting --tools must behave exactly like --tools full")
         for expected in ("act", "press", "get_ui_snapshot", "new_game", "save_game"):
@@ -192,10 +196,43 @@ class ToolsModeTests(unittest.TestCase):
     def test_recording_mode_registers_only_the_recording_surface(self):
         names = self._list_tool_names("--tools", "recording")
 
+        self.assertEqual(104, len(EXPECTED_RECORDING_TOOLS))
         self.assertEqual(set(EXPECTED_RECORDING_TOOLS), names)
         self.assertEqual(EXPECTED_RECORDING_TOOLS, mcp_server.RECORDING_TOOL_NAMES)
         for required in EXPECTED_RECORDING_TOOLS:
             self.assertIn(required, names, "missing recording tool: " + required)
+
+    def test_default_memories_db_lives_beside_the_events_db(self):
+        path = mcp_server._default_memories_db()
+        self.assertTrue(path.endswith(
+            os.path.join("play", "memory", "memories.db")), path)
+        self.assertFalse(path.endswith(
+            os.path.join("play", "memory", "memory.db")), path)
+
+    def test_memory_tools_are_read_only_and_need_no_rev(self):
+        tools = self._list_tools("--tools", "recording")
+
+        expected = {
+            "memory_bootstrap": {"limit", "scope"},
+            "memory_retrieve": {"query", "limit", "scope", "state",
+                                "token_budget"},
+            "memory_get": {"memory_id"},
+            "memory_status": set(),
+        }
+        for name, properties in expected.items():
+            self.assertIn(name, tools)
+            self.assertEqual(
+                properties,
+                set(tools[name].input_schema.get("properties", {})),
+                name + " parameter surface")
+            self.assertNotIn(
+                "rev", tools[name].input_schema.get("properties", {}),
+                name + " is read-only and must not require a rev")
+            self.assertIn("read", (tools[name].description or "").lower())
+        self.assertEqual(
+            {"memory_id"}, set(tools["memory_get"].input_schema["required"]))
+        self.assertEqual(
+            {"query"}, set(tools["memory_retrieve"].input_schema["required"]))
 
     def test_prompt_tools_are_registered_with_closed_choices(self):
         tools = self._list_tools("--tools", "recording")

@@ -140,8 +140,8 @@ class SplitSchemaTests(SplitStoreTestBase):
 
     def test_memories_database_is_independent_and_has_fts(self):
         self.assertNotEqual(self.events_path, self.memories_path)
-        self.assertEqual(MEMORY_SCHEMA_VERSION, 2)
-        self.assertEqual(2, self.memory_store.schema_version())
+        self.assertEqual(MEMORY_SCHEMA_VERSION, 3)
+        self.assertEqual(3, self.memory_store.schema_version())
         names = self.memory_store.table_names()
         for expected in ("memories", "memory_evidence", "memory_revisions",
                          "memories_fts"):
@@ -160,7 +160,7 @@ class SplitSchemaTests(SplitStoreTestBase):
         self.add("mem_reopen", kind="fact", text="survives reopen",
                  target="verified")
         self.reopen_memory_store()
-        self.assertEqual(2, self.memory_store.schema_version())
+        self.assertEqual(3, self.memory_store.schema_version())
         self.assertEqual("survives reopen",
                          self.memory_store.get_memory("mem_reopen")["text"])
         self.assertIn("mem_reopen", self.ids(self.memory_store.search(
@@ -370,23 +370,23 @@ class FtsTests(SplitStoreTestBase):
             "SELECT rowid FROM memories_fts WHERE memories_fts MATCH ?",
             ('"rebuild"*',)).fetchall()))
 
-    def test_chinese_prefix_query_hits_via_fts_prefix(self):
+    def test_chinese_prefix_query_hits_via_fulltext(self):
         self.add("mem_cn", kind="warning", target="verified",
                  text="库存接近上限时不要继续进货，先卖出或整理货架。")
         rows = self.memory_store.search("库存接近上限还进货吗", limit=5,
                                         scope=self.scope())
         self.assertIn("mem_cn", self.ids(rows))
         hit = [row for row in rows if row["memory_id"] == "mem_cn"][0]
-        self.assertEqual("fts_prefix", hit["recall_reason"])
+        self.assertEqual("fulltext", hit["recall_reason"])
 
-    def test_chinese_mid_text_falls_back_to_substring(self):
+    def test_chinese_mid_text_falls_back_to_keyword(self):
         self.add("mem_cn_mid", kind="warning", target="verified",
                  text="库存接近上限时不要继续进货，先卖出或整理货架。")
         rows = self.memory_store.search("要继续进货", limit=5,
                                         scope=self.scope())
         self.assertIn("mem_cn_mid", self.ids(rows))
         hit = [row for row in rows if row["memory_id"] == "mem_cn_mid"][0]
-        self.assertEqual("substring", hit["recall_reason"])
+        self.assertEqual("keyword", hit["recall_reason"])
 
 
 # ------------------------------------------------------------------ candidates
@@ -608,7 +608,7 @@ class ScopeTests(SplitStoreTestBase):
                  target="verified")
         rows = self.memory_store.search("inventory", scope=self.scope())
         self.assertEqual(["mem_hit"], self.ids(rows))
-        self.assertEqual("fts", rows[0]["recall_reason"])
+        self.assertEqual("fulltext", rows[0]["recall_reason"])
         loaded = self.memory_store.get_memory("mem_hit")
         self.assertEqual(1, loaded["hit_count"])
         self.assertIsNotNone(loaded["last_used_at"])
@@ -680,8 +680,13 @@ class StateMachineTests(SplitStoreTestBase):
         self.assertNotEqual(before["dedupe_key"], result["dedupe_key"])
         self.assertEqual([], self.memory_store.search("alpha",
                                                       scope=self.scope()))
-        self.assertIn("mem_revised", self.ids(self.memory_store.search(
-            "bravo", scope=self.scope())))
+        self.assertEqual([], self.memory_store.search("bravo",
+                                                      scope=self.scope()),
+                         "a content edit drops the rule back to candidate,"
+                         " which default retrieval must hide")
+        revised = self.memory_store.get_memory("mem_revised")
+        self.assertEqual("bravo replacement step", revised["text"])
+        self.assertEqual("candidate", revised["status"])
         self.assertEqual(3, len(self.memory_store.revisions("mem_revised")))
 
     def test_revise_rejects_immutable_fields_and_terminal_states(self):
@@ -788,9 +793,13 @@ class ConflictTests(SplitStoreTestBase):
         self.assertEqual("conflict", high["status"])
         self.assertEqual("conflict", low["status"])
         self.assertNotEqual(high["text"], low["text"])
-        found = self.ids(self.memory_store.search("陈酿", scope=self.scope()))
-        self.assertIn("mem_conflict_high", found)
-        self.assertIn("mem_conflict_low", found)
+        self.assertEqual([], self.memory_store.search(
+            "陈酿", scope=self.scope()),
+            "conflict rows must be excluded from default retrieval")
+        conflicts = self.ids(self.memory_store.list_memories(
+            status=STATUS_CONFLICT))
+        self.assertEqual(["mem_conflict_high", "mem_conflict_low"],
+                         sorted(conflicts))
         self.assertEqual([], self.memory_store.bootstrap(
             limit=10, scope=self.scope()))
 
@@ -812,7 +821,7 @@ class SeedTests(unittest.TestCase):
             self.assertGreaterEqual(first["events_added"], 10)
             self.assertEqual(0, first["memories_unverified"])
             self.assertEqual(1, first["events_schema_version"])
-            self.assertEqual(2, first["memory_schema_version"])
+            self.assertEqual(3, first["memory_schema_version"])
 
             second = seed.seed_database(memories_path, events_path)
             self.assertEqual(0, second["memories_added"])
@@ -829,7 +838,7 @@ class SeedTests(unittest.TestCase):
 
             store = MemoryStore(memories_path, events_db=events_path)
             try:
-                self.assertEqual(2, store.schema_version())
+                self.assertEqual(3, store.schema_version())
                 status = store.status()
                 self.assertEqual(first["memories_added"], status["memories"])
                 self.assertGreaterEqual(status["by_status"].get("verified", 0), 7)
@@ -950,7 +959,7 @@ class CliStatusTests(unittest.TestCase):
             self.assertEqual(0, code)
             payload = json.loads(buffer.getvalue())
             self.assertEqual(1, payload["schema_version"])
-            self.assertEqual(2, payload["memory_schema_version"])
+            self.assertEqual(3, payload["memory_schema_version"])
             self.assertEqual(memories_path, payload["memories_db"])
             self.assertGreaterEqual(payload["memories"], 10)
             self.assertGreaterEqual(

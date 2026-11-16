@@ -30,7 +30,7 @@ from urllib.request import pathname2url
 
 from .store import MemoryUnavailable
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 MEMORY_SCHEMA_VERSION = SCHEMA_VERSION
 
 #: Default location (relative to ``PawnMind/``).  Tests always pass a temp path.
@@ -46,6 +46,11 @@ KINDS = frozenset({
 # P3 design D4: derived from the event, not a copy of P1's capture_quality.
 EVIDENCE_GRADES = frozenset({"observed", "reported", "unknown"})
 
+#: P3 §9.1: what a piece of evidence does for the claim.
+EVIDENCE_ROLES = frozenset({"support", "contradict", "context"})
+DEFAULT_EVIDENCE_ROLE = "support"
+
+STATUS_PROPOSED = "proposed"
 STATUS_CANDIDATE = "candidate"
 STATUS_VERIFIED = "verified"
 STATUS_CONFLICT = "conflict"
@@ -53,7 +58,25 @@ STATUS_DEPRECATED = "deprecated"
 STATUS_SUPERSEDED = "superseded"
 
 TERMINAL_STATUSES = frozenset({STATUS_DEPRECATED, STATUS_SUPERSEDED})
-DEFAULT_RETRIEVAL_EXCLUDES = (STATUS_DEPRECATED, STATUS_SUPERSEDED)
+
+#: P2 retrieval is precision-first: only manually verified rules are usable.
+#: ``proposed`` is P3's vocabulary; it is accepted here so a P3 row can never
+#: leak through default retrieval before it is verified.
+RETRIEVABLE_STATUSES = frozenset({STATUS_VERIFIED})
+DEFAULT_RETRIEVAL_EXCLUDES = (
+    STATUS_PROPOSED, STATUS_CANDIDATE, STATUS_CONFLICT,
+    STATUS_DEPRECATED, STATUS_SUPERSEDED,
+)
+
+#: A memory must explain at least this share of the query's matched concepts
+#: (``scope_extra.conditions.requires_any``).  A rule that shares one peripheral
+#: term with a three-concept query is not a confident match; returning it would
+#: trade precision for noise.
+MIN_QUERY_COVERAGE = 0.5
+
+#: Rough token budget for one retrieval.  P2.6 suggests 300-900 for a normal
+#: decision; the MCP tool exposes the value so a caller can tighten it.
+DEFAULT_TOKEN_BUDGET = 900
 
 _CONTENT_FIELDS = frozenset({
     "kind", "text", "game_version", "save_id", "run_id", "scope_extra",
@@ -108,6 +131,9 @@ CREATE TABLE IF NOT EXISTS memory_evidence (
   weight REAL NOT NULL DEFAULT 1.0,
   evidence_grade TEXT NOT NULL
     CHECK (evidence_grade IN ('observed', 'reported', 'unknown')),
+  evidence_role TEXT NOT NULL DEFAULT 'support'
+    CHECK (evidence_role IN ('support', 'contradict', 'context')),
+  added_at TEXT NOT NULL DEFAULT '',
   PRIMARY KEY(memory_id, event_id)
 );
 CREATE INDEX IF NOT EXISTS idx_evidence_event ON memory_evidence(event_id);
@@ -151,6 +177,10 @@ INSERT OR IGNORE INTO meta(key, value) VALUES('schema_version', '%d');
 
 class MemoryValidationError(ValueError):
     """Raised when a memory write is malformed (bad kind, illegal transition)."""
+
+
+class MemoryNotFound(MemoryUnavailable):
+    """Raised when a memory id does not exist (distinct from a closed store)."""
 
 
 # --------------------------------------------------------------- helpers
@@ -246,10 +276,6 @@ def _derive_grade(event_row):
     return "reported"
 
 
-def _escape_like(text):
-    return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-
-
 def _query_tokens(query):
     return _TOKEN_RE.findall(unicodedata.normalize("NFKC", query or ""))
 
@@ -273,23 +299,229 @@ def _build_fts_expression(query):
     return " OR ".join(terms), used_cjk
 
 
-def _like_patterns(query):
-    """Substring patterns for mid-token CJK recall (no external tokenizer)."""
-    patterns = []
-    seen = set()
-    for token in _query_tokens(query):
-        candidates = [token]
-        if token and not token[0].isascii() and len(token) > 2:
-            candidates.extend(token[index:index + 2]
-                              for index in range(len(token) - 1))
-        for candidate in candidates:
-            if len(candidate) < 1 or candidate in seen:
-                continue
-            seen.add(candidate)
-            patterns.append("%" + _escape_like(candidate) + "%")
-            if len(patterns) >= 12:
-                return patterns
-    return patterns
+# --------------------------------------------------------- retrieval helpers
+
+
+def _load_scope_extra(raw):
+    try:
+        value = json.loads(raw or "{}")
+    except (TypeError, ValueError):
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def _normalise_term(term):
+    return unicodedata.normalize("NFKC", term or "").strip().lower()
+
+
+def _term_in_query(term, query_norm):
+    term = _normalise_term(term)
+    if not term:
+        return False
+    return term in query_norm
+
+
+def _applicability_terms(scope_extra):
+    """The terms that declare when a memory applies (P2's tag vocabulary).
+
+    ``scope_extra.conditions.requires_any`` is the authoritative applicability
+    list; ``scope_extra.entities`` is a broader description used for entity
+    recall.  A memory that only shares a descriptive entity (for example a
+    run-private fact mentioning "现金") must not be treated as an applicable
+    rule for a rent warning.
+    """
+    conditions = (scope_extra or {}).get("conditions") or {}
+    terms = conditions.get("requires_any") or []
+    if not isinstance(terms, (list, tuple)):
+        return []
+    return [term for term in terms
+            if isinstance(term, str) and term.strip()]
+
+
+def _entity_terms(scope_extra):
+    terms = (scope_extra or {}).get("entities") or []
+    if not isinstance(terms, (list, tuple)):
+        return []
+    return [term for term in terms
+            if isinstance(term, str) and term.strip()]
+
+
+def _fulltext_specific(query_tokens, text_norm):
+    """True when an FTS hit is anchored by a meaningful query token.
+
+    The FTS expression is an OR of prefixes.  A bare digit prefix ("9" for
+    "BETA-9") also matches unrelated values like 90%/0.92, so weak hits alone
+    must not make a memory eligible.
+    """
+    for token in query_tokens:
+        if token[0].isascii():
+            if (len(token) >= 2 and not token.isdigit()
+                    and token.lower() in text_norm):
+                return True
+        else:
+            prefix = token[:2] if len(token) > 2 else token
+            if prefix and prefix in text_norm:
+                return True
+    return False
+
+
+def _text_hit_count(query_tokens, text_norm):
+    """Whole-token substring matches used only as a last-resort fallback."""
+    count = 0
+    for token in query_tokens:
+        if token[0].isascii():
+            if (len(token) >= 2 and not token.isdigit()
+                    and token.lower() in text_norm):
+                count += 1
+        elif len(token) >= 2 and token in text_norm:
+            count += 1
+    return count
+
+
+def _estimate_tokens(text):
+    """Cheap token heuristic: CJK ~2 chars/token, ASCII ~1 word/token."""
+    text = text or ""
+    cjk = sum(1 for char in text if "\u3400" <= char <= "\u9fff")
+    words = len(re.findall(r"[0-9A-Za-z_]+", text))
+    return max(1, (cjk + 1) // 2 + words)
+
+
+_MISSING = object()
+
+
+def _lookup_state(state, path):
+    if not isinstance(state, dict):
+        return _MISSING
+    current = state
+    for part in path.split("."):
+        if isinstance(current, dict) and part in current:
+            current = current[part]
+        else:
+            break
+    else:
+        return current
+    # P3's vocabulary has both ``rent.days_left`` and flat ``rent_days_left``.
+    flat = path.replace(".", "_")
+    if flat in state:
+        return state[flat]
+    # Try each underscore as the nesting point (rent_days_left ->
+    # rent.days_left), without mangling multi-word segments.
+    parts = path.split("_")
+    for index in range(1, len(parts)):
+        dotted = "_".join(parts[:index]) + "." + "_".join(parts[index:])
+        current = state
+        for part in dotted.split("."):
+            if isinstance(current, dict) and part in current:
+                current = current[part]
+            else:
+                break
+        else:
+            return current
+    return _MISSING
+
+
+_STATE_KEY_SUFFIXES = (
+    ("_contains", "contains"),
+    ("_lte", "lte"),
+    ("_gte", "gte"),
+    ("_min", "min"),
+    ("_max", "max"),
+    ("_eq", "eq"),
+    ("_ne", "ne"),
+    ("_lt", "lt"),
+    ("_gt", "gt"),
+    ("_in", "in"),
+)
+
+_STATE_OPERATORS = frozenset(operator for _, operator in _STATE_KEY_SUFFIXES)
+
+
+def _split_state_key(key):
+    for suffix, operator in _STATE_KEY_SUFFIXES:
+        if key.endswith(suffix) and len(key) > len(suffix):
+            return key[:-len(suffix)], operator
+    return key, None
+
+
+def _compare_state(actual, operator, expected):
+    if actual is _MISSING:
+        return False
+    if operator in ("min", "max", "lt", "lte", "gt", "gte"):
+        if isinstance(actual, bool) or isinstance(expected, bool):
+            return False
+        if not isinstance(actual, (int, float)):
+            return False
+        if not isinstance(expected, (int, float)):
+            return False
+        if operator == "min":
+            return actual >= expected
+        if operator == "max":
+            return actual <= expected
+        if operator == "lt":
+            return actual < expected
+        if operator == "lte":
+            return actual <= expected
+        if operator == "gt":
+            return actual > expected
+        return actual >= expected
+    if operator in ("eq", "ne"):
+        # Keep True from matching 1 and vice versa.
+        if isinstance(actual, bool) != isinstance(expected, bool):
+            return False
+        return (actual == expected) if operator == "eq" else (actual != expected)
+    if operator == "in":
+        if not isinstance(expected, (list, tuple, set, frozenset)):
+            return False
+        return actual in expected
+    if operator == "contains":
+        try:
+            return expected in actual
+        except TypeError:
+            return False
+    return False
+
+
+def _state_matches(scope_extra, state):
+    """Evaluate ``scope_extra.conditions.state`` against caller state.
+
+    Fail closed: a condition with no matching value, an unknown operator or a
+    type mismatch means the memory is *not* applicable.  A conditional rule
+    with no state supplied is therefore never returned.
+    """
+    conditions = (scope_extra or {}).get("conditions") or {}
+    spec = conditions.get("state") or {}
+    if not isinstance(spec, dict) or not spec:
+        return True
+    if not isinstance(state, dict):
+        return False
+    for raw_key, expected in spec.items():
+        key = str(raw_key)
+        path, operator = _split_state_key(key)
+        if operator is None and isinstance(expected, dict):
+            if not expected:
+                return False
+            for name, operand in expected.items():
+                if name not in _STATE_OPERATORS:
+                    return False
+                if not _compare_state(_lookup_state(state, path), name, operand):
+                    return False
+            continue
+        if not _compare_state(_lookup_state(state, path),
+                              operator or "eq", expected):
+            return False
+    return True
+
+
+def _rank_key(item):
+    """Deterministic ranking: relevance, confidence, usage, then identity."""
+    return (
+        item.get("_score", 0.0),
+        item.get("confidence", 0.0),
+        int(item.get("hit_count") or 0),
+        item.get("last_used_at") or "",
+        item.get("created_at") or "",
+        item.get("memory_id") or "",
+    )
 
 
 # --------------------------------------------------------------- domain
@@ -349,11 +581,35 @@ class MemoryStore(object):
                     raise MemoryUnavailable(
                         "unsupported memory schema version %r"
                         % (row["value"],))
-            if found is not None and found not in (1, SCHEMA_VERSION):
+            if found is not None and found not in (1, 2, SCHEMA_VERSION):
                 raise MemoryUnavailable(
                     "unsupported memory schema version %d (expected %d)"
                     % (found, SCHEMA_VERSION))
             conn.executescript(_MEMORY_SCHEMA)
+            # v2 -> v3: additive only.  SQLite has no "ADD COLUMN IF NOT
+            # EXISTS", so probe the table first; reopening is a no-op.
+            columns = {row["name"] for row in conn.execute(
+                "PRAGMA table_info(memory_evidence)")}
+            if "evidence_role" not in columns:
+                conn.execute(
+                    "ALTER TABLE memory_evidence ADD COLUMN evidence_role"
+                    " TEXT NOT NULL DEFAULT 'support'"
+                    " CHECK (evidence_role IN"
+                    " ('support', 'contradict', 'context'))")
+            if "added_at" not in columns:
+                conn.execute(
+                    "ALTER TABLE memory_evidence ADD COLUMN added_at"
+                    " TEXT NOT NULL DEFAULT ''")
+            # Backfill only the rows the migration just created empty.  The
+            # memory's creation time is the least surprising timestamp.
+            conn.execute(
+                "UPDATE memory_evidence SET added_at = COALESCE("
+                "(SELECT m.created_at FROM memories m"
+                " WHERE m.memory_id = memory_evidence.memory_id), '')"
+                " WHERE added_at IS NULL OR added_at = ''")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_evidence_role"
+                " ON memory_evidence(memory_id, evidence_role)")
             if found != SCHEMA_VERSION:
                 conn.execute(
                     "INSERT INTO memories_fts(memories_fts) VALUES('rebuild')")
@@ -468,11 +724,13 @@ class MemoryStore(object):
 
     def _evidence(self, memory_id):
         rows = self._require().execute(
-            "SELECT event_id, weight, evidence_grade FROM memory_evidence"
-            " WHERE memory_id=? ORDER BY rowid ASC", (memory_id,)).fetchall()
+            "SELECT event_id, weight, evidence_grade, evidence_role, added_at"
+            " FROM memory_evidence WHERE memory_id=? ORDER BY rowid ASC",
+            (memory_id,)).fetchall()
         return [dict(row) for row in rows]
 
-    def _row_to_memory(self, row, include_evidence=True, evidence_count=None):
+    def _row_to_memory(self, row, include_evidence=True, evidence_count=None,
+                       role_counts=None):
         item = dict(row)
         raw_extra = item.pop("scope_extra_json", "{}")
         try:
@@ -485,9 +743,22 @@ class MemoryStore(object):
             evidence = self._evidence(item["memory_id"])
             item["evidence"] = evidence
             item["evidence_count"] = len(evidence)
+            counts = {role: 0 for role in EVIDENCE_ROLES}
+            for row in evidence:
+                role = row.get("evidence_role") or DEFAULT_EVIDENCE_ROLE
+                counts[role] = counts.get(role, 0) + 1
         else:
             item["evidence"] = []
             item["evidence_count"] = int(evidence_count or 0)
+            counts = {
+                "support": int((role_counts or {}).get("support", 0) or 0),
+                "contradict": int((role_counts or {}).get("contradict", 0)
+                                  or 0),
+                "context": int((role_counts or {}).get("context", 0) or 0),
+            }
+        item["support_count"] = counts.get("support", 0)
+        item["contradict_count"] = counts.get("contradict", 0)
+        item["context_count"] = counts.get("context", 0)
         return item
 
     def _normalise_evidence(self, evidence):
@@ -502,10 +773,13 @@ class MemoryStore(object):
                 event_id = item
                 weight = 1.0
                 grade = None
+                role = DEFAULT_EVIDENCE_ROLE
             elif isinstance(item, dict):
                 event_id = item.get("event_id")
                 weight = item.get("weight", 1.0)
                 grade = item.get("evidence_grade")
+                role = item.get("role", item.get("evidence_role",
+                                                  DEFAULT_EVIDENCE_ROLE))
             else:
                 raise MemoryValidationError(
                     "evidence must contain event ids or mappings")
@@ -513,6 +787,11 @@ class MemoryStore(object):
             if grade is not None and grade not in EVIDENCE_GRADES:
                 raise MemoryValidationError(
                     "unknown evidence grade %r" % (grade,))
+            role = _clean_str(role, "evidence.role")
+            if role not in EVIDENCE_ROLES:
+                raise MemoryValidationError(
+                    "unknown evidence role %r (expected one of %s)"
+                    % (role, ", ".join(sorted(EVIDENCE_ROLES))))
             if event_id in seen:
                 continue
             seen.add(event_id)
@@ -520,6 +799,7 @@ class MemoryStore(object):
                 "event_id": event_id,
                 "weight": _weight(weight),
                 "evidence_grade": grade,
+                "role": role,
             })
         return normalised
 
@@ -552,6 +832,7 @@ class MemoryStore(object):
                 "event_id": event_id,
                 "weight": item["weight"],
                 "evidence_grade": grade,
+                "evidence_role": item["role"],
                 "timeline_id": timeline_id,
             })
         return resolved, missing
@@ -569,8 +850,11 @@ class MemoryStore(object):
              _clean_str(reason, "reason"), _clean_str(actor, "actor"), _now()))
 
     def _scope_clause(self, scope):
+        # No caller identity means "pre-binding": only version/global rows are
+        # safe.  Returning every save/run would leak another run's private
+        # inventory or cash facts.
         if not scope:
-            return "", []
+            return " AND m.run_id IS NULL AND m.save_id IS NULL", []
         if not isinstance(scope, dict):
             raise MemoryValidationError("scope must be a mapping")
         clauses = []
@@ -721,9 +1005,11 @@ class MemoryStore(object):
                          evidence_unverified))
                     conn.executemany(
                         "INSERT INTO memory_evidence(memory_id, event_id,"
-                        " weight, evidence_grade) VALUES(?,?,?,?)",
+                        " weight, evidence_grade, evidence_role, added_at)"
+                        " VALUES(?,?,?,?,?,?)",
                         [(memory_id, row["event_id"], row["weight"],
-                          row["evidence_grade"]) for row in resolved])
+                          row["evidence_grade"], row["evidence_role"], now)
+                         for row in resolved])
                     self._write_revision(conn, memory_id, ["created"], reason,
                                          actor)
                     conn.execute("COMMIT")
@@ -742,6 +1028,88 @@ class MemoryStore(object):
         item["deduped"] = False
         return item
 
+    def add_evidence(self, memory_id, evidence, *, actor="system",
+                     reason="add_evidence"):
+        """Append evidence rows to an existing memory.
+
+        Evidence is additive: an event already linked to the memory is a
+        no-op, never a silent re-classification.  The one-role-per-event limit
+        comes from the ``(memory_id, event_id)`` primary key inherited from
+        schema v2; P3's ``(memory_id, event_id, evidence_role)`` key is a
+        documented difference, so a role change is rejected explicitly instead
+        of overwriting history.
+        """
+        self.get_memory(memory_id)  # raises MemoryNotFound for a bad id
+        normalised = self._normalise_evidence(evidence)
+        if not normalised:
+            return {"ok": False, "reason": "no_evidence",
+                    "memory_id": memory_id, "event_ids": []}
+        actor = _clean_str(actor, "actor")
+        reason = _clean_str(reason, "reason")
+        requested = [item["event_id"] for item in normalised]
+        with self._lock:
+            with self._attached_events() as attached:
+                resolved, missing = self._resolve_evidence(
+                    normalised, attached)
+                if missing:
+                    return {"ok": False, "reason": "no_evidence",
+                            "memory_id": memory_id, "event_ids": requested,
+                            "missing_event_ids": missing}
+                if not resolved:
+                    return {"ok": False, "reason": "no_evidence",
+                            "memory_id": memory_id, "event_ids": requested,
+                            "missing_event_ids": []}
+                existing = {row["event_id"]: row
+                            for row in self._evidence(memory_id)}
+                conflicts = [
+                    row["event_id"] for row in resolved
+                    if row["event_id"] in existing
+                    and existing[row["event_id"]]["evidence_role"]
+                    != row["evidence_role"]]
+                if conflicts:
+                    return {
+                        "ok": False, "reason": "evidence_role_conflict",
+                        "memory_id": memory_id, "event_ids": conflicts,
+                        "existing_roles": {
+                            event_id: existing[event_id]["evidence_role"]
+                            for event_id in conflicts},
+                    }
+                inserted = []
+                now = _now()
+                conn = self._require()
+                try:
+                    conn.execute("BEGIN IMMEDIATE")
+                    for row in resolved:
+                        if row["event_id"] in existing:
+                            continue
+                        conn.execute(
+                            "INSERT INTO memory_evidence(memory_id, event_id,"
+                            " weight, evidence_grade, evidence_role, added_at)"
+                            " VALUES(?,?,?,?,?,?)",
+                            (memory_id, row["event_id"], row["weight"],
+                             row["evidence_grade"], row["evidence_role"], now))
+                        inserted.append(row["event_id"])
+                    if inserted:
+                        conn.execute(
+                            "UPDATE memories SET updated_at=? WHERE memory_id=?",
+                            (now, memory_id))
+                        self._write_revision(conn, memory_id, ["evidence"],
+                                             reason, actor)
+                    conn.execute("COMMIT")
+                except sqlite3.IntegrityError as exc:
+                    self._rollback()
+                    raise MemoryValidationError(
+                        "cannot add evidence: %s" % exc)
+                except Exception as exc:
+                    self._rollback()
+                    raise MemoryUnavailable(
+                        "cannot add evidence: %s" % exc)
+        item = self.get_memory(memory_id)
+        item["ok"] = True
+        item["deduped"] = not inserted
+        item["added_event_ids"] = inserted
+        return item
+
     def verify(self, memory_id, actor="user"):
         """Candidate -> verified, or ``{'ok': False, 'reason': 'unverifiable'}``.
 
@@ -749,6 +1117,7 @@ class MemoryStore(object):
         * the memory was written with the events DB available
           (``evidence_unverified=0``);
         * every evidence row has ``evidence_grade != 'unknown'``;
+        * no evidence row is marked ``evidence_role='contradict'``;
         * the events DB can still be attached and the evidence still matches
           the memory's version/save/run identity;
         * scope is complete (game id, real game version, timeline; run scope
@@ -810,6 +1179,10 @@ class MemoryStore(object):
                    if row["evidence_grade"] == "unknown"]
         if unknown:
             return "evidence_grade_unknown: %s" % ",".join(unknown)
+        contradictory = [row["event_id"] for row in evidence
+                         if row.get("evidence_role") == "contradict"]
+        if contradictory:
+            return "contradictory_evidence: %s" % ",".join(contradictory)
         rows = self._conn.execute(
             "SELECT e.event_id, e.evidence_grade, ev.timeline_id,"
             " t.game_version AS event_version, t.save_id AS event_save_id,"
@@ -1087,90 +1460,210 @@ class MemoryStore(object):
 
     # ------------------------------------------------------------- retrieval
 
-    def search(self, query, limit=5, scope=None):
-        """FTS5 + CJK prefix + substring fallback, always scope-filtered.
+    def retrieve(self, query, limit=5, scope=None, state=None,
+                 token_budget=None):
+        """Recall verified, applicable memories for one situation.
 
-        Deprecated/superseded/expired memories are never returned.  Each result
-        carries ``recall_reason ∈ {fts, fts_prefix, substring}``.  Returned
-        rows are marked as used (``hit_count``/``last_used_at``).
+        Three recall channels feed a deterministic score:
+
+        * ``fulltext`` -- FTS5 (with the CJK two-character prefix fallback);
+        * ``entity``   -- a declared ``scope_extra.entities`` term is in the
+          query (this is also what lets an English query find a Chinese rule);
+        * ``keyword``  -- a whole-token substring fallback when neither of the
+          above can match (for example a mid-token CJK phrase).
+
+        Hard filters run before scoring: only ``verified`` rows that are inside
+        their validity window, match the caller's scope, and whose
+        ``conditions.state`` is satisfied by the caller-supplied ``state`` are
+        eligible.  ``proposed``/``candidate``/``conflict``/``deprecated``/
+        ``superseded`` rows are never returned.
+
+        ``token_budget`` truncates the ranked list (the highest-priority item
+        is always kept).  Returned rows are marked as used unless the result is
+        empty.  The dict shape is::
+
+            {items, candidates, state_filtered, token_estimate,
+             token_budget, truncated, dropped, concepts}
         """
-        limit = int(limit)
-        if limit <= 0:
-            return []
-        query = (query or "").strip()
-        if not query:
-            return []
-        now = _now()
-        scope_sql, scope_params = self._scope_clause(scope)
-        base = ("m.status NOT IN (?, ?)"
-                " AND (m.valid_until IS NULL OR m.valid_until > ?)")
-        base_params = [STATUS_DEPRECATED, STATUS_SUPERSEDED, now] + scope_params
-
-        fts_expression, used_cjk = _build_fts_expression(query)
-        reason = "fts_prefix" if used_cjk else "fts"
-        rows = []
-        if fts_expression:
-            sql = (
-                "SELECT m.*, bm25(memories_fts) AS rank,"
-                " (SELECT COUNT(*) FROM memory_evidence e"
-                "  WHERE e.memory_id=m.memory_id) AS evidence_count"
-                " FROM memories_fts JOIN memories m"
-                " ON m.rowid = memories_fts.rowid"
-                " WHERE memories_fts MATCH ? AND " + base + scope_sql +
-                " ORDER BY rank ASC, m.confidence DESC, m.updated_at DESC"
-                " LIMIT ?")
-            params = [fts_expression] + base_params + [limit]
+        try:
+            limit = int(limit)
+        except (TypeError, ValueError):
+            raise MemoryValidationError("limit must be an integer")
+        if token_budget is not None:
             try:
-                rows = self._require().execute(sql, params).fetchall()
+                token_budget = int(token_budget)
+            except (TypeError, ValueError):
+                raise MemoryValidationError("token_budget must be an integer")
+            if token_budget <= 0:
+                raise MemoryValidationError("token_budget must be positive")
+        query = (query or "").strip()
+        if limit <= 0 or not query:
+            return {"items": [], "candidates": 0, "state_filtered": 0,
+                    "token_estimate": 0, "token_budget": token_budget,
+                    "truncated": False, "dropped": 0, "concepts": []}
+        if state is not None and not isinstance(state, dict):
+            raise MemoryValidationError("state must be a mapping")
+
+        now = _now()
+        conn = self._require()
+        scope_sql, scope_params = self._scope_clause(scope)
+        query_norm = unicodedata.normalize("NFKC", query).lower()
+        query_tokens = _query_tokens(query)
+
+        # Concepts are collected from *all* rows, including hidden statuses and
+        # other scopes: they describe what the query is about, not what is
+        # currently usable.  That is what lets a conflict/deprecated row act as
+        # a precision guard instead of being silently replaced by a weaker
+        # verified row.
+        concepts = set()
+        per_memory = {}
+        for row in conn.execute(
+                "SELECT memory_id, scope_extra_json FROM memories").fetchall():
+            extra = _load_scope_extra(row["scope_extra_json"])
+            matched = {_normalise_term(term)
+                       for term in _applicability_terms(extra)
+                       if _term_in_query(term, query_norm)}
+            per_memory[row["memory_id"]] = matched
+            concepts |= matched
+        concept_count = len(concepts)
+
+        base = ("m.status = ?"
+                " AND (m.valid_from IS NULL OR m.valid_from <= ?)"
+                " AND (m.valid_until IS NULL OR m.valid_until > ?)")
+        sql = (
+            "SELECT m.*, m.rowid AS _fts_rowid,"
+            " (SELECT COUNT(*) FROM memory_evidence e"
+            "  WHERE e.memory_id=m.memory_id) AS evidence_count,"
+            " (SELECT COUNT(*) FROM memory_evidence e"
+            "  WHERE e.memory_id=m.memory_id"
+            "  AND e.evidence_role='support') AS support_count,"
+            " (SELECT COUNT(*) FROM memory_evidence e"
+            "  WHERE e.memory_id=m.memory_id"
+            "  AND e.evidence_role='contradict') AS contradict_count,"
+            " (SELECT COUNT(*) FROM memory_evidence e"
+            "  WHERE e.memory_id=m.memory_id"
+            "  AND e.evidence_role='context') AS context_count"
+            " FROM memories m WHERE " + base + scope_sql)
+        params = [STATUS_VERIFIED, now, now] + scope_params
+        rows = conn.execute(sql, params).fetchall()
+
+        fts_rowids = set()
+        fts_expression, _used_cjk = _build_fts_expression(query)
+        if fts_expression:
+            try:
+                fts_rowids = {
+                    row["rowid"] for row in conn.execute(
+                        "SELECT rowid FROM memories_fts"
+                        " WHERE memories_fts MATCH ?", (fts_expression,))}
             except sqlite3.OperationalError:
-                rows = []
+                fts_rowids = set()
 
         items = []
+        state_filtered = 0
         for row in rows:
+            extra = _load_scope_extra(row["scope_extra_json"])
+            if not _state_matches(extra, state):
+                state_filtered += 1
+                continue
+            text_norm = unicodedata.normalize("NFKC", row["text"]).lower()
+            fts_hit = row["_fts_rowid"] in fts_rowids
+            fts_strong = fts_hit and _fulltext_specific(
+                query_tokens, text_norm)
+            matched = per_memory.get(row["memory_id"], set())
+            keyword_hits = len(matched)
+            entity_hits = len({
+                _normalise_term(term) for term in _entity_terms(extra)
+                if _term_in_query(term, query_norm)})
+            coverage = (float(keyword_hits) / concept_count
+                        if concept_count else 1.0)
+            text_hits = _text_hit_count(query_tokens, text_norm)
+            declared = bool(_applicability_terms(extra))
+            if declared:
+                # A memory that declares its applicability must actually match
+                # one of those terms.  A strong FTS hit alone is not enough: a
+                # run-private fact that happens to contain "库存" is not an
+                # inventory rule.
+                eligible = (keyword_hits > 0
+                            and coverage >= MIN_QUERY_COVERAGE)
+            else:
+                eligible = fts_strong or text_hits > 0
+            if not eligible:
+                continue
+            score = (3.0 * keyword_hits
+                     + 1.0 * entity_hits
+                     + (2.0 if fts_strong else 0.0)
+                     + (1.0 if text_hits else 0.0)
+                     + coverage)
+            if fts_strong:
+                reason = "fulltext"
+            elif entity_hits:
+                reason = "entity"
+            else:
+                reason = "keyword"
             item = self._row_to_memory(
                 row, include_evidence=False,
-                evidence_count=row["evidence_count"])
+                evidence_count=row["evidence_count"],
+                role_counts={
+                    "support": row["support_count"],
+                    "contradict": row["contradict_count"],
+                    "context": row["context_count"],
+                })
+            item.pop("_fts_rowid", None)
             item["recall_reason"] = reason
+            item["matched_terms"] = sorted(matched)
+            item["coverage"] = round(coverage, 3)
+            item["token_estimate"] = _estimate_tokens(row["text"])
+            item["_score"] = score
             items.append(item)
 
-        if len(items) < limit:
-            remaining = limit - len(items)
-            patterns = _like_patterns(query)
-            if patterns:
-                conn = self._require()
-                sql = (
-                    "SELECT m.*,"
-                    " (SELECT COUNT(*) FROM memory_evidence e"
-                    "  WHERE e.memory_id=m.memory_id) AS evidence_count"
-                    " FROM memories m WHERE " + base + scope_sql)
-                params = list(base_params)
-                if items:
-                    placeholders = ",".join("?" for _ in items)
-                    sql += " AND m.memory_id NOT IN (%s)" % placeholders
-                    params.extend(item["memory_id"] for item in items)
-                sql += (" AND (" + " OR ".join(
-                    "m.text LIKE ? ESCAPE '\\'" for _ in patterns) + ")")
-                params.extend(patterns)
-                sql += (" ORDER BY m.confidence DESC,"
-                        " COALESCE(m.last_used_at, m.created_at) DESC,"
-                        " m.updated_at DESC LIMIT ?")
-                params.append(remaining)
-                for row in conn.execute(sql, params).fetchall():
-                    item = self._row_to_memory(
-                        row, include_evidence=False,
-                        evidence_count=row["evidence_count"])
-                    item["recall_reason"] = "substring"
-                    items.append(item)
+        items.sort(key=_rank_key, reverse=True)
+        candidates = len(items)
+        ranked = items[:limit]
+        selected = []
+        token_estimate = 0
+        if token_budget is None:
+            selected = ranked
+            token_estimate = sum(item["token_estimate"] for item in ranked)
+        else:
+            for item in ranked:
+                if not selected:
+                    # Keep the highest-priority rule even when it alone
+                    # exceeds the budget (P2.6: retain the top warning).
+                    selected.append(item)
+                    token_estimate += item["token_estimate"]
+                elif token_estimate + item["token_estimate"] <= token_budget:
+                    selected.append(item)
+                    token_estimate += item["token_estimate"]
+        for item in selected:
+            item.pop("_score", None)
 
-        if items:
-            self._touch([item["memory_id"] for item in items], now)
-            for item in items:
+        if selected:
+            self._touch([item["memory_id"] for item in selected], now)
+            for item in selected:
                 item["hit_count"] = int(item.get("hit_count") or 0) + 1
                 item["last_used_at"] = now
-        return items
+
+        omitted = candidates - len(selected)
+        return {
+            "items": selected,
+            "candidates": candidates,
+            "state_filtered": state_filtered,
+            "token_estimate": token_estimate,
+            "token_budget": token_budget,
+            "truncated": omitted > 0,
+            "dropped": omitted,
+            "concepts": sorted(concepts),
+        }
+
+    def search(self, query, limit=5, scope=None, state=None,
+               token_budget=None):
+        """Backward-compatible list view of :meth:`retrieve`."""
+        return self.retrieve(
+            query, limit=limit, scope=scope, state=state,
+            token_budget=token_budget)["items"]
 
     def bootstrap(self, limit=8, scope=None):
-        """Verified, unexpired memories ordered by confidence then recency."""
+        """Verified, unexpired memories ordered by confidence, use and recency."""
         limit = int(limit)
         if limit <= 0:
             return []
@@ -1179,24 +1672,40 @@ class MemoryStore(object):
         sql = (
             "SELECT m.*,"
             " (SELECT COUNT(*) FROM memory_evidence e"
-            "  WHERE e.memory_id=m.memory_id) AS evidence_count"
+            "  WHERE e.memory_id=m.memory_id) AS evidence_count,"
+            " (SELECT COUNT(*) FROM memory_evidence e"
+            "  WHERE e.memory_id=m.memory_id"
+            "  AND e.evidence_role='support') AS support_count,"
+            " (SELECT COUNT(*) FROM memory_evidence e"
+            "  WHERE e.memory_id=m.memory_id"
+            "  AND e.evidence_role='contradict') AS contradict_count,"
+            " (SELECT COUNT(*) FROM memory_evidence e"
+            "  WHERE e.memory_id=m.memory_id"
+            "  AND e.evidence_role='context') AS context_count"
             " FROM memories m"
             " WHERE m.status = ?"
             " AND (m.valid_until IS NULL OR m.valid_until > ?)"
             " AND (m.valid_from IS NULL OR m.valid_from <= ?)"
             + scope_sql +
-            " ORDER BY m.confidence DESC,"
-            " COALESCE(m.last_used_at, '') DESC, m.hit_count DESC,"
-            " m.created_at DESC LIMIT ?")
+            " ORDER BY m.confidence DESC, m.hit_count DESC,"
+            " COALESCE(m.last_used_at, '') DESC, m.created_at DESC,"
+            " m.memory_id ASC LIMIT ?")
         params = ([STATUS_VERIFIED, now, now] + scope_params + [limit])
         items = []
         for row in self._require().execute(sql, params).fetchall():
             item = self._row_to_memory(
                 row, include_evidence=False,
-                evidence_count=row["evidence_count"])
+                evidence_count=row["evidence_count"],
+                role_counts={
+                    "support": row["support_count"],
+                    "contradict": row["contradict_count"],
+                    "context": row["context_count"],
+                })
             item["recall_reason"] = "bootstrap"
-            item["why"] = ("verified confidence=%.2f hits=%d"
-                           % (item["confidence"], item["hit_count"]))
+            item["why"] = (
+                "verified confidence=%.2f hits=%d evidence=%d contradict=%d"
+                % (item["confidence"], item["hit_count"],
+                   item["evidence_count"], item["contradict_count"]))
             items.append(item)
         if items:
             self._touch([item["memory_id"] for item in items], now)
@@ -1212,8 +1721,78 @@ class MemoryStore(object):
             "SELECT * FROM memories WHERE memory_id=?",
             (memory_id,)).fetchone()
         if row is None:
-            raise MemoryUnavailable("unknown memory %s" % memory_id)
+            raise MemoryNotFound("unknown memory %s" % memory_id)
         return self._row_to_memory(row)
+
+    def event_details(self, event_ids):
+        """Read-only event metadata for evidence, when the events DB is present."""
+        ids = [str(event_id) for event_id in (event_ids or []) if event_id]
+        if not ids:
+            return {}
+        with self._lock:
+            with self._attached_events() as attached:
+                if not attached:
+                    return {}
+                placeholders = ",".join("?" for _ in ids)
+                rows = self._conn.execute(
+                    "SELECT event_id, timeline_id, event_type, tool_name,"
+                    " result_status, capture_quality, game_day, rev,"
+                    " occurred_at FROM events.events"
+                    " WHERE event_id IN (%s)" % placeholders,
+                    ids).fetchall()
+                return {row["event_id"]: dict(row) for row in rows}
+
+    def events_status(self):
+        """Counts and schema of the separate events DB, read-only.
+
+        Missing/unconfigured/unrelated files degrade to a data payload so a
+        memory-only MCP server can still serve ``memory_status``.
+        """
+        info = {"configured": bool(self.events_db), "path": self.events_db,
+                "available": False}
+        if not self.events_db:
+            info["reason"] = "not_configured"
+            return info
+        if not os.path.isfile(self.events_db):
+            info["reason"] = "missing"
+            return info
+        with self._lock:
+            with self._attached_events() as attached:
+                if not attached:
+                    info["reason"] = "unavailable"
+                    return info
+                try:
+                    conn = self._conn
+                    version_row = conn.execute(
+                        "SELECT value FROM events.meta"
+                        " WHERE key='schema_version'").fetchone()
+                    info["schema_version"] = (
+                        int(version_row["value"]) if version_row else None)
+                    info["timelines"] = conn.execute(
+                        "SELECT COUNT(*) AS n FROM events.timelines"
+                    ).fetchone()["n"]
+                    info["events"] = conn.execute(
+                        "SELECT COUNT(*) AS n FROM events.events"
+                    ).fetchone()["n"]
+                    info["by_result_status"] = {
+                        row["result_status"]: row["n"]
+                        for row in conn.execute(
+                            "SELECT result_status, COUNT(*) AS n"
+                            " FROM events.events GROUP BY result_status")}
+                    info["by_event_type"] = {
+                        row["event_type"]: row["n"]
+                        for row in conn.execute(
+                            "SELECT event_type, COUNT(*) AS n"
+                            " FROM events.events GROUP BY event_type")}
+                    last = conn.execute(
+                        "SELECT occurred_at FROM events.events"
+                        " ORDER BY occurred_at DESC LIMIT 1").fetchone()
+                    info["last_event_at"] = last["occurred_at"] if last else None
+                    info["available"] = True
+                except sqlite3.Error as exc:
+                    info["reason"] = "unavailable"
+                    info["detail"] = str(exc)
+        return info
 
     def list_memories(self, status=None, limit=200):
         sql = "SELECT * FROM memories"
@@ -1243,6 +1822,12 @@ class MemoryStore(object):
             "SELECT status, COUNT(*) AS n FROM memories GROUP BY status"
         ).fetchall()
         by_status = {row["status"]: row["n"] for row in rows}
+        kind_rows = self._require().execute(
+            "SELECT kind, COUNT(*) AS n FROM memories GROUP BY kind").fetchall()
+        role_rows = self._require().execute(
+            "SELECT evidence_role, COUNT(*) AS n FROM memory_evidence"
+            " GROUP BY evidence_role").fetchall()
+        by_role = {row["evidence_role"]: row["n"] for row in role_rows}
         return {
             "db": self.path,
             "events_db": self.events_db,
@@ -1250,6 +1835,10 @@ class MemoryStore(object):
             "schema_version": self.schema_version(),
             "memories": sum(by_status.values()),
             "by_status": by_status,
+            "by_kind": {row["kind"]: row["n"] for row in kind_rows},
+            "evidence": sum(by_role.values()),
+            "evidence_by_role": by_role,
+            "contradict": by_role.get("contradict", 0),
         }
 
     def rebuild_fts(self):

@@ -66,6 +66,12 @@ MCP_STATE_READS = frozenset({
     "wait_for_events",
     "wait_for_change",
     "wait_until",
+    # Local read-only tools over play/memory/memories.db.  They take no rev and
+    # must stay usable while the game write gate is locked.
+    "memory_bootstrap",
+    "memory_retrieve",
+    "memory_get",
+    "memory_status",
 })
 
 READ_ONLY_OPS = READ_ONLY_ACTION_OPS | MCP_STATE_READS

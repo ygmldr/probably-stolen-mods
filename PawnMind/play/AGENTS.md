@@ -23,15 +23,16 @@
 
 ---
 
-## 2. 工具面：100 个工具（95 个玩家等价 + 2 个取证 + 2 个弹窗 + 1 个关窗）
+## 2. 工具面：104 个工具（95 个玩家等价 + 2 个取证 + 2 个弹窗 + 1 个关窗 + 4 个记忆检索）
 
 工具名统一带前缀：模型侧叫 **`mcp__pawnmind__<短名>`**。下面用短名。
 
-服务端刻意**不**提供 6 个旁路/作弊入口（`act`、`press`、`get_ui_snapshot`、`wait_until`、`wine_add_water`、`new_game`），**其余 98 个全部可用**，包括机器、酿酒、彩票、电话、夜间搜刮、市场委托、派系、鉴定、搬运等整块玩法；另有 `capture_screenshot` / `list_screenshots` 两个取证工具。
+服务端刻意**不**提供 6 个旁路/作弊入口（`act`、`press`、`get_ui_snapshot`、`wait_until`、`wine_add_water`、`new_game`），`--tools recording` 提供上表 **104 个**工具，包括机器、酿酒、彩票、电话、夜间搜刮、市场委托、派系、鉴定、搬运以及 4 个只读记忆检索工具。`--tools full` 另有 10 个（上面 6 个 + `save_game` / `save_recording_game` + 2 个远征调试入口），录制时不要用。
 
 | 系统 | 工具 | 用途 |
 |---|---|---|
 | 观察 | `ping` `get_state` `get_legal_actions` `get_run_summary` `get_action_history` `wait_for_events` `wait_for_change` | 只读；`rev` 从这里取 |
+| 记忆检索 | `memory_bootstrap` `memory_retrieve` `memory_get` `memory_status` | 只读、无 `rev`；开局先 `bootstrap`，重大决策前 `retrieve`（带当前 `state`） |
 | 情报 | `get_day_report` `get_calendar` `get_clientele` | 只读：早间报告、本周事件与租金日、展示柜会吸引哪些顾客 |
 | 新局菜单 | `get_new_game_options` `open_new_game_menu` `select_new_game_option` `new_game_next_page` `new_game_continue` `focus_new_game_selected_perk` `blur_new_game_option` `confirm_new_game` | 原生 UI 单步 |
 | 专用槽 | `get_recording_save_status` `load_game` `load_recording_game` | **没有手动存档**：游戏只在睡觉时自动存档；这两个读档只用于核对 |
@@ -55,7 +56,7 @@
 
 **等待用 `wait_for_events` / `wait_for_change`，不要用连续 `get_state` 空转。** 超时不是失败，只是“这段时间内没变化”。
 
-> **很重要**：这 94 个里有一批**从没在真机上验证过成功路径**（彩票兑奖、委托交货、陈酿多日、Barter 成交、部分升级）。所以第一次用某个系统时，按第 5 节的“探路”方式：先只读看清楚，再单步试一次，失败就记下来换路，**不要反复硬试**。
+> **很重要**：这些工具里有一批**从没在真机上验证过成功路径**（彩票兑奖、委托交货、陈酿多日、Barter 成交、部分升级）。所以第一次用某个系统时，按第 5 节的“探路”方式：先只读看清楚，再单步试一次，失败就记下来换路，**不要反复硬试**。
 
 ---
 
