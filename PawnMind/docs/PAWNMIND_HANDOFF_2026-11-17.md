@@ -272,6 +272,7 @@ PAWNMIND_BUILD_ONLY=1 ./build.sh            # 只编译 Mod（含 Unity 目标�
 | `docs/audit/NIGHTLY_BASELINE.md` | 冻结基线 |
 | `docs/audit/NIGHTLY_TEST_MATRIX.md` | 每个 `PP-*` 的真实状态 |
 | `docs/reports/NIGHTLY_BATCH_A_REPORT.md` | 批次阶段报告（含 12 问回答） |
+| `docs/plans/SERVER_AGENT_BOOTSTRAP_AND_CONTINUE.md` | **服务器侧 agent 专用**：从零搭环境 + 继续开发 |
 | `docs/plans/SERVER_MIGRATION_2026-11-17.md` | 服务器细节与同步命令 |
 | `docs/plans/NEXT_LIVE_SESSION.md` | 实机验收步骤与记录模板 |
 | `docs/reviews/NIGHTLY_A_MODE_POLICY_REVIEW.md` | A 模块独立审阅（**尚未产出**） |
