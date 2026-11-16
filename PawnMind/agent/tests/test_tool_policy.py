@@ -6,7 +6,7 @@ import sys
 import unittest
 
 AGENT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-REPO_ROOT = os.path.dirname(os.path.dirname(AGENT_DIR))
+MOD_DIR = os.path.dirname(AGENT_DIR)
 sys.path.insert(0, AGENT_DIR)
 
 from tool_policy import (  # noqa: E402
@@ -16,7 +16,7 @@ import mcp_server  # noqa: E402
 
 
 def _inventory():
-    path = os.path.join(REPO_ROOT, "docs", "audit", "tools-inventory.json")
+    path = os.path.join(MOD_DIR, "docs", "audit", "tools-inventory.json")
     with open(path, encoding="utf-8") as handle:
         return json.load(handle)
 

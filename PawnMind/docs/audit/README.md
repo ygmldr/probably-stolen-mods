@@ -1,6 +1,6 @@
 # 玩家入口矩阵（PLAYER_ENTRY_MATRIX.csv）导读
 
-- 数据源：`PawnMind/src/Bridge/*.cs`、`PawnMind/src/PawnMindMod.cs:249-773` 的 dispatch switch、`RecordingDispatchGuard.cs:82-118`、`docs/GUARD_AUDIT.md`（B1–B43 / C1–C15）、`_decomp/`（只核对类型名与方法名）。
+- 数据源：`PawnMind/src/Bridge/*.cs`、`PawnMind/src/PawnMindMod.cs:249-773` 的 dispatch switch、`RecordingDispatchGuard.cs:82-118`、`../GUARD_AUDIT.md`（B1–B43 / C1–C15）、`_decomp/`（只核对类型名与方法名）。
 - 快照：源码 `d0440ab`（HEAD `ab70004` 只加 docs）。GUARD_AUDIT 之后还有 `3d85963`（P0 修复）等提交，正文按**当前源码**写，冲突以源码为准。
 - 读法：`guard_checks` 是**我们代码现在真的查的谓词**（`|` 分隔），不是审计建议；`implicit_deps` 写 `C<id>:<token>`；`defect_ids` 只放 B 编号（`read_impure` 行放 S 编号）。`status` 由 B 缺口与"桥缺一条显式门禁"的 C 规则共同决定；C10（笔窗口不同步）、C12（兑奖不可撤销）按审计判为可接受，不扣 status。
 
@@ -51,7 +51,7 @@ fixed 的 10 条 B 缺口全部落在提交 `3d85963 fix(pawnmind): close the P0
 | OP-042 `set_label`（open） | 标签机窗口"应用"没有公开调用点（`fakeCondition` 只在 `LabelerUIManager.Repeat` 里赋值） | 真机贴一次标签，记录实际回调链与 labeler 持有判定 |
 | OP-062 `barter_status`（unverified） | S5：3 个 `getBarterResult` delegate 现在纯读，但不保证将来不掷骰 | 读 `StoreClientListBarter` 里全部 delegate，确认无 RNG/写状态 |
 
-## 4. 与 `docs/GUARD_AUDIT.md` 的差异（审计过时/说错的地方）
+## 4. 与 `../GUARD_AUDIT.md` 的差异（审计过时/说错的地方）
 
 1. **§0/§2.1–§2.2/§9 的"当前行为"已过时**：文档把 `open_shop` 写成手拼 `OnShutterOpened()+OpenShutter()`、`end_day` 写成直调 `PlayerStore.EndDay()`、`sleep` 没有 outside 判定、`dismiss_current_client` 不查 `IsClientDimissable()` —— 这四条在同一次提交 `3d85963` 里已改，正文没回写，§9.1 前 10 名仍把它们当未修。另外 §2 全表的行号是修复前快照（`open_shop` 15-39 → 现 22-71，`move_item` 152-224 → 现 192-264，`confirm_trade` 416-461 → 现 456-501）；本表用当前行号。
 2. **§2.6 `machine_collect` 的玩家路径写错**：0.46D 没有通用"机器收取按钮"；收取是机器仓储窗口拖出（`ItemMouseDragHandler.EndDrag`），个别机器另带按钮（如 `MachineChemFinisher` 的 output）。§2.3 的 `B33` 仍成立。

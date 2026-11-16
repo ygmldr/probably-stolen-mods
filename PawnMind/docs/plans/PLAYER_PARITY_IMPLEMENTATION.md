@@ -1,7 +1,7 @@
 # 玩家等价实施计划（D0–D6）
 
 - **状态**：Proposed
-- **前置**：`docs/ADR-PLAYER-PARITY.md`、`docs/reviews/PLAYER_PARITY_RFC_REVIEW.md`、`docs/audit/PLAYER_ENTRY_MATRIX.csv`
+- **前置**：`../ADR-PLAYER-PARITY.md`、`../reviews/PLAYER_PARITY_RFC_REVIEW.md`、`../audit/PLAYER_ENTRY_MATRIX.csv`
 - **基线**：commit `d0440ab`；C# 651 / 契约 490 / Python 234
 - **总原则**：每一阶段有可证伪的退出门槛；**没有通过的阶段不得开始录像**。
 
@@ -28,7 +28,7 @@
 1. `./build.sh` → 覆盖安装 → 重启游戏 → 记录 `/health` 的 `game_version` 与 MVID；
    确认 `dist` 与已安装 DLL 的 sha256 一致（当前不一致：`0a991b99` vs `e9e1bd07`）。
 2. 跑基线：`./test.sh`、`python -m unittest discover -s agent/tests`、`tools/list` 两模式；
-   把 commit / MVID / 计数写进 `docs/audit/README.md`。
+   把 commit / MVID / 计数写进 `../audit/README.md`。
 3. 复核 `PLAYER_ENTRY_MATRIX.csv` 中 `unverified=yes` 的行，能静态确认的降级为 verified。
 4. 确认 `bargain_preview` 不在 `strict_player` 的 allowlist；`get_state` 副作用登记为 D3 阻塞。
 

@@ -12,7 +12,7 @@
 
 你正在为一个**现有的、通过 MCP 操作《深空当铺》的 Agent 项目**增量开发长期记忆与自主决策能力。请遵守以下规则：
 
-1. **先审计、后改造。** 读取 README、项目树、MCP 工具注册、输入输出 schema、游戏适配层、测试、配置、数据目录、运行日志。实际调用 `tools/list` 或项目现有能力发现入口；输出 `docs/CAPABILITY_AUDIT.md`，列出可读取、可执行、只读、危险、需要前置条件及尚缺的能力。不猜测现有 API。
+1. **先审计、后改造。** 读取 README、项目树、MCP 工具注册、输入输出 schema、游戏适配层、测试、配置、数据目录、运行日志。实际调用 `tools/list` 或项目现有能力发现入口；输出 `CAPABILITY_AUDIT.md`，列出可读取、可执行、只读、危险、需要前置条件及尚缺的能力。不猜测现有 API。
 2. **不破坏现有 MCP。** 优先采用旁路事件记录、包装器、中间件或独立 Memory Service；保留原有工具签名和兼容行为。任何改动需有回归测试。
 3. **明确区分事实与推断。** 游戏 MCP 的真实观察属于事实；LLM 的归因属于待证假设；经证据验证的规律才能提升为可执行的策略建议。
 4. **先完成可靠记录再做 AI 反思。** 原始事件日志必须由程序写入，不得依赖 LLM 自觉调用记忆写工具。
@@ -1169,4 +1169,4 @@ python -m pytest tests/unit tests/contract tests/integration -q
 
 ## 附录 C：交给下一位 Coding Agent 的启动提示词
 
-> 请打开 `Probably_Stolen_Agent_Memory_Architecture_v1.md`，按照第 0 节和第 12 节进行实施。**先只做 Phase 0**：审计现有 Game MCP、枚举真实工具 schema、确认 Game MCP 服务端是否能自动包裹写操作、确认存档身份和版本字段、建立测试 fixture；输出 `docs/CAPABILITY_AUDIT.md` 与 `docs/ADR-001-memory-architecture.md`。不要直接实现完整系统，不要假定文档中的工具和目录在现有仓库已存在。审计完成后再执行 Phase 1 的可靠事件记录，并通过全部 C-EVT-* 测试。每阶段提交修改文件、运行命令、实际结果、未解决问题和下一阶段计划。
+> 请打开 `Probably_Stolen_Agent_Memory_Architecture_v1.md`，按照第 0 节和第 12 节进行实施。**先只做 Phase 0**：审计现有 Game MCP、枚举真实工具 schema、确认 Game MCP 服务端是否能自动包裹写操作、确认存档身份和版本字段、建立测试 fixture；输出 `CAPABILITY_AUDIT.md` 与 `ADR-001-memory-architecture.md`。不要直接实现完整系统，不要假定文档中的工具和目录在现有仓库已存在。审计完成后再执行 Phase 1 的可靠事件记录，并通过全部 C-EVT-* 测试。每阶段提交修改文件、运行命令、实际结果、未解决问题和下一阶段计划。

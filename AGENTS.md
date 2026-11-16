@@ -92,16 +92,16 @@ cd PawnMind && ./build.sh
 
 - 不提交、不随 `dist/` 或工坊包分发；
 - 只用于本地互操作、排查、自用分析；
-- 长期结论写进 `CompactSort/analysis/` 或 `docs/`；
+- 长期结论写进 `CompactSort/analysis/` 或 `PawnMind/docs/`；
 - 引用只写类型名/方法名/结论，不复制大段反编译代码；
 - `CompactSort/analysis/sia_decompiled/` 是历史遗留已跟踪内容，新增产物不要再放进去。
 
 ## 6. 文档与审查
 
 - 仓库总览：[`README.md`](README.md)
-- PawnMind 能力矩阵：[`docs/pawnmind-capability-matrix.zh-CN.md`](docs/pawnmind-capability-matrix.zh-CN.md)
-- 已知限制：[`docs/pawnmind-known-limitations.zh-CN.md`](docs/pawnmind-known-limitations.zh-CN.md)
-- 迭代问题：[`docs/pawnmind-iteration-issues.md`](docs/pawnmind-iteration-issues.md)
+- PawnMind 能力矩阵：[`PawnMind/docs/pawnmind-capability-matrix.zh-CN.md`](PawnMind/docs/pawnmind-capability-matrix.zh-CN.md)
+- 已知限制：[`PawnMind/docs/pawnmind-known-limitations.zh-CN.md`](PawnMind/docs/pawnmind-known-limitations.zh-CN.md)
+- 迭代问题：[`PawnMind/docs/pawnmind-iteration-issues.md`](PawnMind/docs/pawnmind-iteration-issues.md)
 
 审查时优先验证：
 

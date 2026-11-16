@@ -1,6 +1,6 @@
 # RFC-002《玩家语义等价》审阅报告
 
-> 审阅对象：`docs/rfc/PawnMind_Player_Parity_RFC_v1.md`（v1.0，2026-11-17，外部评审稿）
+> 审阅对象：`../rfc/PawnMind_Player_Parity_RFC_v1.md`（v1.0，2026-11-17，外部评审稿）
 > 审阅基线：commit `d0440ab`，工作区干净；游戏 *Probably Stolen* 0.46D
 > 审阅立场：**默认不采信**。本文每条结论都给了当前源码/测试/命令作为证据，未取证的写 `UNKNOWN` 或 `not_run`。
 > 结论：**修改后接受**。方向正确，但有 3 条需要改写、1 条在当前实现下不可满足、2 条成本明显高于收益（详见 §7）。
@@ -36,8 +36,8 @@
 
 | 模式 | 工具数 | 快照 |
 |---|---|---|
-| `--tools recording` | **104** | `docs/audit/mcp-tools-recording.json` |
-| `--tools full` | **114** | `docs/audit/mcp-tools-full.json` |
+| `--tools recording` | **104** | `../audit/mcp-tools-recording.json` |
+| `--tools full` | **114** | `../audit/mcp-tools-full.json` |
 
 与 RFC §0.2 引用的"100 / 94"不同：这是加入了 4 个只读记忆工具后的现况。**RFC 的旧计数不能再用**。
 

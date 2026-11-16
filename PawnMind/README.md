@@ -40,11 +40,11 @@ PawnMind.dll ── HTTP 127.0.0.1:15528 ── Python MCP stdio ── DSH / �
 ## 文档导航
 
 - [仓库总览](../README.md)
-- [能力矩阵](../docs/pawnmind-capability-matrix.zh-CN.md)
-- [已知限制](../docs/pawnmind-known-limitations.zh-CN.md)
-- [迭代问题](../docs/pawnmind-iteration-issues.md)
-- [系统扩展计划](../docs/pawnmind-systems-expansion-plan.zh-CN.md)
-- [测试档说明](../docs/pawnmind-test-save.md)
+- [能力矩阵](docs/pawnmind-capability-matrix.zh-CN.md)
+- [已知限制](docs/pawnmind-known-limitations.zh-CN.md)
+- [迭代问题](docs/pawnmind-iteration-issues.md)
+- [系统扩展计划](docs/pawnmind-systems-expansion-plan.zh-CN.md)
+- [测试档说明](docs/pawnmind-test-save.md)
 
 ## 当前能力（按系统）
 
@@ -564,5 +564,5 @@ machine_collect(slot4) -> 回背包
 
 ## 扩展能力矩阵
 
-- [P6–P10 能力矩阵](../docs/pawnmind-capability-matrix.zh-CN.md)
+- [P6–P10 能力矩阵](docs/pawnmind-capability-matrix.zh-CN.md)
 - 测试：C# 141 + 适配器契约 + Python 8

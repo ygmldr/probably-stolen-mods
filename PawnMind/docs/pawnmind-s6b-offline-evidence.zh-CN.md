@@ -19,7 +19,7 @@
 | [`agent/tests/test_fake_game_contract.py`](../PawnMind/agent/tests/test_fake_game_contract.py) | 736 | 假桥契约测试（21 项） |
 | [`agent/tests/test_demo_agent_e2e.py`](../PawnMind/agent/tests/test_demo_agent_e2e.py) | 277 | 端到端 + 停机条件测试（7 项） |
 | [`agent/tests/test_mcp_entrypoint.py`](../PawnMind/agent/tests/test_mcp_entrypoint.py) | 89 | 宿主入口 `python -m agent.mcp_server` 测试（2 项） |
-| [`docs/pawnmind-ai-host-setup.zh-CN.md`](pawnmind-ai-host-setup.zh-CN.md) | 280 | 宿主接入说明（OpenCode 模板、模型、权限、自检、停止条件） |
+| [`pawnmind-ai-host-setup.zh-CN.md`](pawnmind-ai-host-setup.zh-CN.md) | 280 | 宿主接入说明（OpenCode 模板、模型、权限、自检、停止条件） |
 | `agent/mcp_server.py` | +9 | 仅为 `python -m agent.mcp_server` 增加模块目录 bootstrap；工具面仍是 100 个，未改任何工具语义 |
 
 **这是测试替身，不是游戏模拟器。** `fake_game.py` 头部与 `/health` 都写明 `fake: true`、`not the real game`；它不加载 Unity/程序集/存档，经济是罐头数据，**不得用于真机录制**。
@@ -184,4 +184,4 @@ cd /mnt/d/code/game_mods/PawnMind
 
 未启动游戏、未打开菜单、未调用真实 `/action`、未安装/运行 OpenCode、未联网、未写 `dist/`、未改 C#/`build.sh`/`manifest.xml`/`test.sh`/Steam/云同步、未读写任何真实存档、未生成 `_decomp/` 产物。
 
-本轮改动文件：新增 `PawnMind/agent/fake_game.py`、`PawnMind/agent/demo_agent.py`、`PawnMind/agent/tests/test_fake_game_contract.py`、`PawnMind/agent/tests/test_demo_agent_e2e.py`、`PawnMind/agent/tests/test_mcp_entrypoint.py`、`docs/pawnmind-ai-host-setup.zh-CN.md`、本文件；修改 `PawnMind/agent/mcp_server.py`（仅 9 行 import bootstrap）。
+本轮改动文件：新增 `PawnMind/agent/fake_game.py`、`PawnMind/agent/demo_agent.py`、`PawnMind/agent/tests/test_fake_game_contract.py`、`PawnMind/agent/tests/test_demo_agent_e2e.py`、`PawnMind/agent/tests/test_mcp_entrypoint.py`、`pawnmind-ai-host-setup.zh-CN.md`、本文件；修改 `PawnMind/agent/mcp_server.py`（仅 9 行 import bootstrap）。

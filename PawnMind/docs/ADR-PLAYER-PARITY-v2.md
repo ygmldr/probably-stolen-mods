@@ -2,8 +2,8 @@
 
 - **状态**：Proposed（取代 v1 中被本文覆盖的条款；未提及的条款继续有效）
 - **日期**：2026-11-17
-- **输入**：`PLAYER_PARITY_ROUND2_EXTERNAL_REVIEW.md`、`docs/ROUND2_DISPOSITION.md`
-- **基线**：commit `3fed61c` + 本轮登记表（`agent/tool_policy.py`、`docs/audit/tools-inventory.json`）
+- **输入**：`PLAYER_PARITY_ROUND2_EXTERNAL_REVIEW.md`、`ROUND2_DISPOSITION.md`
+- **基线**：commit `3fed61c` + 本轮登记表（`agent/tool_policy.py`、`audit/tools-inventory.json`）
 
 ---
 

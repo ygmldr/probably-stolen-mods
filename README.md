@@ -17,7 +17,7 @@
 - 测试：C# **462**（含脚本门禁 53）+ 适配器契约 **392** + Python **81**，均 0 skip
 - 构建产物：`PawnMind/dist/PawnMind/{manifest.xml, PawnMind.dll}`
 - 已离线完成：新局菜单语义、专用录制槽授权、首周付租回执、传输加固与隐藏字段清理
-- **尚未真机验证**：以上全部只经过假 UI/假桥与已安装程序集契约；真机步骤见 [`docs/pawnmind-s8-runbook.zh-CN.md`](docs/pawnmind-s8-runbook.zh-CN.md)
+- **尚未真机验证**：以上全部只经过假 UI/假桥与已安装程序集契约；真机步骤见 [`PawnMind/docs/pawnmind-s8-runbook.zh-CN.md`](PawnMind/docs/pawnmind-s8-runbook.zh-CN.md)
 - **还没有**接入真实 LLM 宿主；`agent/orchestrator.py` 只有 `RulePolicy`，`agent/demo_agent.py` 是脚本化演示
 
 ## PawnMind 架构
@@ -122,16 +122,16 @@ python -m venv .venv
 ## 文档
 
 - [PawnMind README](PawnMind/README.md)
-- [能力矩阵](docs/pawnmind-capability-matrix.zh-CN.md)
-- [已知限制](docs/pawnmind-known-limitations.zh-CN.md)
-- [迭代问题记录](docs/pawnmind-iteration-issues.md)
-- [系统扩展计划](docs/pawnmind-systems-expansion-plan.zh-CN.md)
-- [测试档说明](docs/pawnmind-test-save.md)
+- [能力矩阵](PawnMind/docs/pawnmind-capability-matrix.zh-CN.md)
+- [已知限制](PawnMind/docs/pawnmind-known-limitations.zh-CN.md)
+- [迭代问题记录](PawnMind/docs/pawnmind-iteration-issues.md)
+- [系统扩展计划](PawnMind/docs/pawnmind-systems-expansion-plan.zh-CN.md)
+- [测试档说明](PawnMind/docs/pawnmind-test-save.md)
 
 ## 给审查模型的建议
 
 1. 先读本文件 + `AGENTS.md`，再看 `PawnMind/README.md` 顶部状态。
-2. 对照 `docs/pawnmind-capability-matrix.zh-CN.md` 核验“真机/代码/未接”是否与代码一致。
+2. 对照 `PawnMind/docs/pawnmind-capability-matrix.zh-CN.md` 核验“真机/代码/未接”是否与代码一致。
 3. 重点看：
    - `src/Bridge/` 的 rev/token/主线程/回滚
    - `src/Game/` 是否读了隐藏字段

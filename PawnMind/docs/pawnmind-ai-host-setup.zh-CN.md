@@ -9,7 +9,7 @@
 | 交付物 | 作用 |
 |---|---|
 | [`PawnMind/agent/dsh/pawnmind.patch.yml`](../PawnMind/agent/dsh/pawnmind.patch.yml) | DSH patch 覆盖层：MCP 客户端条目 + 默认模型条目 |
-| [`PawnMind/play/AGENTS.md`](../PawnMind/play/AGENTS.md) | “AI 当铺老板”试玩剧本，DSH 作为 project instructions 自动加载 |
+| [`PawnMind/play/AGENTS.md`](../play/AGENTS.md) | “AI 当铺老板”试玩剧本，DSH 作为 project instructions 自动加载 |
 | 本文件 | 接入步骤、离线验证记录、未验证清单 |
 
 没有改动任何 C# / Python 服务端 / 构建脚本 / `manifest.xml` / `dist/` / 真实游戏 / 存档 / Steam。
@@ -33,7 +33,7 @@ cd /mnt/d/code/game_mods/PawnMind/play
 dsh --profile web --patch ../agent/dsh/pawnmind.patch.yml --port 3090 --no-open
 ```
 
-第 2 步的工作目录是 `PawnMind/play`，这样 [`AGENTS.md`](../PawnMind/play/AGENTS.md) 才会作为 project instructions 自动加载。两种启动形态的差别见 §6.2。
+第 2 步的工作目录是 `PawnMind/play`，这样 [`AGENTS.md`](../play/AGENTS.md) 才会作为 project instructions 自动加载。两种启动形态的差别见 §6.2。
 
 ---
 
@@ -481,7 +481,7 @@ dsh --profile headless --patch /tmp/pm-mcp.yml --json \
 
 1. **服务端硬白名单**（`--tools recording`）：那 6 个旁路工具在协议里根本不存在；
 2. **宿主工具收紧**（[`play-headless.patch.yml`](../PawnMind/agent/dsh/play-headless.patch.yml)）：用 `--dump-config` 验证过，组合后模型侧启用的 tool 行只剩执行器，shell/文件/网页/子代理/工作流全部 `disabled: true`；
-3. **剧本软约束**（[`PawnMind/play/AGENTS.md`](../PawnMind/play/AGENTS.md)）：只允许 `mcp__pawnmind__*`，单步、回读、`rev`、错误处置。
+3. **剧本软约束**（[`PawnMind/play/AGENTS.md`](../play/AGENTS.md)）：只允许 `mcp__pawnmind__*`，单步、回读、`rev`、错误处置。
 
 [`demo_agent.py`](../PawnMind/agent/demo_agent.py) 的 `REQUIRED_TOOLS`（19 个）只是“脚本策略最小集”，不再是宿主 allowlist；`test_mcp_tools_mode.py` 仍断言它 ⊆ 服务端录制集，防止两处清单漂移。
 
@@ -633,5 +633,5 @@ S8 现场按 [runbook](pawnmind-s8-runbook.zh-CN.md) 走；本文件覆盖其中
 - S8 现场步骤：[`pawnmind-s8-runbook.zh-CN.md`](pawnmind-s8-runbook.zh-CN.md)
 - 阶段证据：[S1](pawnmind-s1-offline-evidence.zh-CN.md)、[S3B](pawnmind-s3b-offline-evidence.zh-CN.md)、[S4](pawnmind-s4-offline-evidence.zh-CN.md)、[S5](pawnmind-s5-offline-evidence.zh-CN.md)、[S6A](pawnmind-s6a-offline-evidence.zh-CN.md)、[S6B](pawnmind-s6b-offline-evidence.zh-CN.md)
 - 代码：[`mcp_server.py`](../PawnMind/agent/mcp_server.py)、[`pawnmind_client.py`](../PawnMind/agent/pawnmind_client.py)、[`demo_agent.py`](../PawnMind/agent/demo_agent.py)、[`fake_game.py`](../PawnMind/agent/fake_game.py)
-- 宿主：[`PawnMind/agent/dsh/pawnmind.patch.yml`](../PawnMind/agent/dsh/pawnmind.patch.yml)、[`PawnMind/play/AGENTS.md`](../PawnMind/play/AGENTS.md)
+- 宿主：[`PawnMind/agent/dsh/pawnmind.patch.yml`](../PawnMind/agent/dsh/pawnmind.patch.yml)、[`PawnMind/play/AGENTS.md`](../play/AGENTS.md)
 - DSH 包文档（本机安装）：`@deepseek-ai/dsh`（`README.md`）、`@deepseek-ai/dsh-mcp-client`、`@deepseek-ai/dsh-agent-default-model`、`@deepseek-ai/dsh-agent-instructions`

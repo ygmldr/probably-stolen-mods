@@ -251,10 +251,10 @@ commit 8f64166  feat(pawnmind): screenshot evidence capture and debug bundle
 
 | 我想… | 去看 |
 |---|---|
-| 知道有哪些工具 | `docs/audit/tool-matrix.md` |
-| 知道为什么这么设计 | `docs/ADR-001-memory-architecture.md` |
-| 知道 P0 发现了什么漏洞 | `docs/P0_REMEDIATION.md` §1 |
-| 知道 P1 做了什么、限制是什么 | `docs/P1_REPORT.md` §3 / §5 |
+| 知道有哪些工具 | `audit/tool-matrix.md` |
+| 知道为什么这么设计 | `ADR-001-memory-architecture.md` |
+| 知道 P0 发现了什么漏洞 | `P0_REMEDIATION.md` §1 |
+| 知道 P1 做了什么、限制是什么 | `P1_REPORT.md` §3 / §5 |
 | 改 recorder 前 | `PawnMind/agent/tests/test_memory_recorder.py`（15 条不变量） |
 | 改 store 前 | `PawnMind/agent/tests/test_memory_store.py`（19 条） |
 | 加 MCP 工具前 | `PawnMind/agent/tests/test_write_rev_required.py`（写工具必须带 rev） |

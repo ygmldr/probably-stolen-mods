@@ -3,7 +3,7 @@
 > **状态提示（2026-11-17 追加）**：本文是**修复前**的快照。其中 B1–B8、B20、B22 已在提交
 > `3d85963` 修掉（`open_shop` 走 `OnClick()`、`end_day` 走 `ShutterButton`、`sleep` 查 `outside`、
 > `dismiss` 查 `IsClientDimissable()`），B 表现状与行号请以
-> `docs/audit/PLAYER_ENTRY_MATRIX.csv` 与 `docs/audit/README.md` 为准。
+> `audit/PLAYER_ENTRY_MATRIX.csv` 与 `audit/README.md` 为准。
 > 另有三处审计结论已在矩阵复核中更正：`call_next_customer` 的真实入口是 `StoreBell.RingBell`
 > （有 `lockNextBellFlag` 与 `storeState` 门禁）、`machine_collect` 在 0.46D 没有通用收取按钮、
 > `dismiss_tutorial_hints` 在玩家侧没有对等入口（属特权 op）。

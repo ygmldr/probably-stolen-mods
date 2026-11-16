@@ -1,7 +1,7 @@
 # PawnMind 迭代问题记录
 
 > 规则：每轮把新发现的问题写在这里；未解决的保留到下一轮，解决后移到“已解决”。
-> 当前目标：完成 P1–P5（见 `docs/pawnmind-normal-gameplay-plan.zh-CN.md`）。
+> 当前目标：完成 P1–P5（见 `pawnmind-normal-gameplay-plan.zh-CN.md`）。
 
 ## 当前阶段：P1 收尾
 

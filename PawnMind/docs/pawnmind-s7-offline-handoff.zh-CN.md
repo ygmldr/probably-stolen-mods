@@ -57,7 +57,7 @@
 
 ## 6. 工作树与提交建议
 
-- 本轮所有改动**未提交**。工作树包含：C# 生产代码与测试、`agent/` 新工具与 fake/demo、大量 `docs/pawnmind-*.md` 证据、`AGENTS.md`/`README.md` 计数更新。
+- 本轮所有改动**未提交**。工作树包含：C# 生产代码与测试、`agent/` 新工具与 fake/demo、大量 `pawnmind-*.md` 证据、`AGENTS.md`/`README.md` 计数更新。
 - 建议在 S8 前先做一次本地提交（不推送），提交信息示例：
   `feat(pawnmind): offline S0-S7 — new-game semantics, recording slot gate, rent receipts, transport hardening`
 - 提交前确认：`git diff --check`、`REQUIRE_GAME=1 ./test.sh`、Python 全量三项全绿；不要把 `_decomp/`、`dist/`、`bin/`、`obj/`、`.venv/` 加入提交。

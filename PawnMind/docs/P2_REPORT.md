@@ -20,7 +20,7 @@
 | `PawnMind/agent/memory/retrieval_eval.py` | 30 条情景的可复现评测 CLI（Recall@k / Precision@k / 高风险警告漏召回 / 逐条 PASS） |
 | `PawnMind/agent/tests/test_memory_store_v3.py` | schema v2→v3 就地迁移、证据角色、`add_evidence`、contradict 计数、events 只读检查 |
 | `PawnMind/agent/tests/test_memory_retrieval.py` | 30 条情景断言、state 条件过滤、评测口径、四个 MCP 工具端到端、只读分类 |
-| `docs/P2_REPORT.md` | 本报告 |
+| `P2_REPORT.md` | 本报告 |
 
 修改：
 

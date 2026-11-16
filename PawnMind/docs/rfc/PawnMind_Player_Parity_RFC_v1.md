@@ -40,10 +40,10 @@
 
 请维护 Agent 在阅读 RFC 后**先审阅，后编码**：
 
-1. `docs/reviews/PLAYER_PARITY_RFC_REVIEW.md`：按“接受 / 修改后接受 / 拒绝 / 待证实”逐章评估，所有反对意见给出具体证据。
-2. `docs/audit/PLAYER_ENTRY_MATRIX.csv` 或 `.yaml`：当前**真实** op/原生入口/守卫/可观察效果/异步类别/测试场景矩阵。
-3. `docs/ADR-PLAYER-PARITY.md`：架构取舍，尤其是 operation 所有权、journal 所有权、主线程执行规则、Hook 准入和运行模式。
-4. `docs/plans/PLAYER_PARITY_IMPLEMENTATION.md`：分阶段任务与退出门槛，明确哪些工作阻塞下一次真实录像。
+1. `../reviews/PLAYER_PARITY_RFC_REVIEW.md`：按“接受 / 修改后接受 / 拒绝 / 待证实”逐章评估，所有反对意见给出具体证据。
+2. `../audit/PLAYER_ENTRY_MATRIX.csv` 或 `.yaml`：当前**真实** op/原生入口/守卫/可观察效果/异步类别/测试场景矩阵。
+3. `../ADR-PLAYER-PARITY.md`：架构取舍，尤其是 operation 所有权、journal 所有权、主线程执行规则、Hook 准入和运行模式。
+4. `../plans/PLAYER_PARITY_IMPLEMENTATION.md`：分阶段任务与退出门槛，明确哪些工作阻塞下一次真实录像。
 5. 对所有尚未验证的游戏函数，不编造结果；列 `UNKNOWN` 并说明需要的取证手段。
 
 > **重要**：不要把本 RFC 误读为“立即重写 100 个工具”或“给所有游戏函数加 Hook”。它提供增量迁移的目标模型，而非推倒重来的强制重构计划。
@@ -637,7 +637,7 @@ Action Contract 是**行为边界和证据计划**，不是替代游戏的业务
 
 ### 10.2 每个写动作的一页契约
 
-推荐 `docs/contracts/actions/*.yaml`，并由注册表生成风险矩阵与测试清单。示意：
+推荐 `../contracts/actions/*.yaml`，并由注册表生成风险矩阵与测试清单。示意：
 
 ```yaml
 schema_version: 1
@@ -761,7 +761,7 @@ IL/方法体 Hash **只能提醒已审计的原生入口或守卫在版本升级
 
 ### 11.1 先清楚定义缺陷，而不是先估计工时
 
-建议在 `docs/audit/PLAYER_PARITY_GAPS.yaml` 统一记录：
+建议在 `../audit/PLAYER_PARITY_GAPS.yaml` 统一记录：
 
 ```yaml
 - defect_id: PARITY-001

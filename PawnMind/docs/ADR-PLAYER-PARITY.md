@@ -2,7 +2,7 @@
 
 - **状态**：Proposed（评审通过前不实施）
 - **日期**：2026-11-17
-- **关联**：`docs/rfc/PawnMind_Player_Parity_RFC_v1.md`（输入）、`docs/reviews/PLAYER_PARITY_RFC_REVIEW.md`（审阅结论）
+- **关联**：`rfc/PawnMind_Player_Parity_RFC_v1.md`（输入）、`reviews/PLAYER_PARITY_RFC_REVIEW.md`（审阅结论）
 - **基线**：commit `d0440ab`，*Probably Stolen* 0.46D，C# 651 / 契约 490 / Python 234
 
 ---

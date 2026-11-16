@@ -76,7 +76,7 @@ ActionRouter.HandleWrite                      src/Bridge/ActionRouter.cs:198
 
 | 项 | 实测 | 证据 |
 |---|---|---|
-| full | **114** | `docs/audit/tools-inventory.json` |
+| full | **114** | `audit/tools-inventory.json` |
 | recording | **104** | 同上 |
 | 差集 | 10 | 同上 |
 | recording ⊂ full | 是 | `agent/tests/test_tool_policy.py::test_recording_is_a_subset_of_full` |
@@ -155,7 +155,7 @@ ActionRouter.HandleWrite                      src/Bridge/ActionRouter.cs:198
 |---|---|---|
 | full 114 / recording 104，差集 10 | **agree** | 与 `tools-inventory.json` 一致 |
 | "相对上一轮 100 个，实际新增 14" | **reject（口径）** | 本地记录：加 `dismiss_current_client` 前 full=109，加上后 110；再加 4 个记忆工具 = 114。**没有 100 这个基线**，请以 git 历史为准。结论"新增不止 4 个"本身成立（110→114 是 4 个，但 109→114 是 5 个；取决于起点） |
-| `tool-matrix(2).md` 只有 102 个具名工具 | **agree** | 该文件是旧产物，已由 `docs/audit/PLAYER_ENTRY_MATRIX.csv`（62 行，逐写 op）与 `tools-inventory.json`（114 工具）取代 |
+| `tool-matrix(2).md` 只有 102 个具名工具 | **agree** | 该文件是旧产物，已由 `audit/PLAYER_ENTRY_MATRIX.csv`（62 行，逐写 op）与 `tools-inventory.json`（114 工具）取代 |
 | recording 仍含 `bargain_preview` | **agree** | 本轮在策略层排除；注册表仍导出，待 D0 决定是否从 recording 工具集移除 |
 | `get_operation`/`wait_operation` 不存在 | **agree** | 计划新增，不计入现况 |
 | tools JSON 缺完整 schema | **agree，已修** | 已重新生成 `tools-inventory.json`，含 `description`/`required`/`properties`/`readOnlyHint` |
@@ -174,12 +174,12 @@ ActionRouter.HandleWrite                      src/Bridge/ActionRouter.cs:198
 
 | 文件 | 类型 | 内容 |
 |---|---|---|
-| `docs/ROUND2_DISPOSITION.md` | 新增 | 本文 |
-| `docs/ADR-PLAYER-PARITY-v2.md` | 新增 | 在 v1 基础上：D0a、两轴状态、workflow vs operation、allowlist 生成 |
-| `docs/plans/PLAYER_PARITY_IMPLEMENTATION-v2.md` | 新增 | D0–D6 修订版（含 D0a、C6 收紧） |
+| `ROUND2_DISPOSITION.md` | 新增 | 本文 |
+| `ADR-PLAYER-PARITY-v2.md` | 新增 | 在 v1 基础上：D0a、两轴状态、workflow vs operation、allowlist 生成 |
+| `plans/PLAYER_PARITY_IMPLEMENTATION-v2.md` | 新增 | D0–D6 修订版（含 D0a、C6 收紧） |
 | `agent/tool_policy.py` | 新增 | 纯度/特权/严格名单的**唯一**注册表 |
 | `agent/tests/test_tool_policy.py` | 新增 | 6 条一致性测试（recording ⊂ full、strict 排除、deny 优先） |
-| `docs/audit/tools-inventory.json` | 新增 | 真实 `tools/list` 全量快照（含 schema 字段） |
+| `audit/tools-inventory.json` | 新增 | 真实 `tools/list` 全量快照（含 schema 字段） |
 
 **未做（明确记录）**：C# `ModePolicy`、D0a 代码修复、`get_operation`/`wait_operation`、真机测试。
 这些都需要下一轮，且 D0a 需要真机仪表验证。

@@ -1,7 +1,7 @@
 # 玩家等价实施计划 v2（取代 v1）
 
 - **状态**：Proposed
-- **前提**：`docs/ADR-PLAYER-PARITY-v2.md`、`docs/ROUND2_DISPOSITION.md`
+- **前提**：`../ADR-PLAYER-PARITY-v2.md`、`../ROUND2_DISPOSITION.md`
 - **基线**：commit `3fed61c`；C# 656 / 契约 491 / 脚本门禁 53 / Python 240（含新增 6 条工具策略测试）
 - **与 v1 的差异**：新增 **D0a**（快照纯度，排在 D1 前）；D2/D6 的验收不再接受 `not_run`；
   白名单改为**由证据生成**；`get_clientele` 与 `bargain_preview` 移出 strict。
@@ -29,7 +29,7 @@
    当前 `dist` = `ad335987…`，已安装 = `e9e1bd07…`，**不一致**。
 2. 部署 `ModePolicy`：普通 op 也做模式校验，`act` 展开后再次校验（ADR-PP-11）。
 3. 录制面改为 strict 名单：MCP `--tools recording` 与 `strict_allowlist()` 同源生成。
-4. 用真实 `tools/list` 重新生成 `docs/audit/tools-inventory.json`，并跑 `test_tool_policy.py`。
+4. 用真实 `tools/list` 重新生成 `../audit/tools-inventory.json`，并跑 `test_tool_policy.py`。
 5. 复核矩阵里 `unverified=yes` 的 5 行，主路径上的必须降级或禁用。
 
 **证据**：`/health` 输出、`sha256sum` 对比、`tools-inventory.json` 的生成命令与 diff。
