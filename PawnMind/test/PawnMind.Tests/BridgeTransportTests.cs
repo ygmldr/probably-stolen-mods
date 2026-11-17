@@ -790,7 +790,12 @@ namespace PawnMind.Tests
             BridgeLimits limits = Limits();
             limits.MaxWriteBytesPerTickPerClient = 1024;
             limits.MaxWriteBytesPerTickTotal = 1024;
-            limits.WriteTimeoutMs = 100;
+            // The client is aborted mid-flush; the timeout only bounds how long a
+            // stalled write may occupy the server. Windows/WSL sleep granularity is
+            // ~15 ms, so a 100 ms budget can expire before the 4 KiB body is sent
+            // and the server would drop the *retry* as undelivered for the wrong
+            // reason. Keep it generous enough to be timing-independent.
+            limits.WriteTimeoutMs = 3000;
 
             Harness harness = Start(delegate { return "{\"rev\":3}"; }, router.Handle, limits,
                 delegate { return revision; }, router.MarkResponseUndelivered);
