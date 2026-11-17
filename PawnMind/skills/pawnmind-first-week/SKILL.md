@@ -53,6 +53,9 @@
 6. `confirm_new_game()`：**整局只调一次**。触发原生 `InitialSave()`（真实写盘），调用后回读
    `get_recording_save_status()` 与 `get_new_game_options()`，不要重试。
 7. 若要读回一个已绑定的专用档：`load_recording_game()`（必须先由人把游戏退回主菜单；只读绑定槽）。
+   响应里的 `run_change_status` 通常先是 `"requested"`（`load_pending:true`）：
+   **不要**再发第二个 `action_id`；用同一个 `action_id` 轮 `get_operation()` 直到
+   `run_change_status:"confirmed"`（顶层会出现 `completion_evidence`）。
 8. `get_state()` 确认 `in_game:true`、`day`、`run_summary`，然后进入 §2。
 
 **不要**调用通用 `act()` / `press()`，不要调用 `new_game()` / `load_game()` / `save_game()`：
@@ -121,7 +124,8 @@
 | `operation_id` | 本次操作 id（即 `action_id`），用于 `get_operation()` / `wait_operation()` 回查 |
 | `execution_status` | `prepared \| running \| completed \| rejected \| failed \| uncertain` |
 | `delivery_status` | `pending_delivery \| delivered \| undelivered`（只描述“调用方有没有拿到响应”） |
-| `dispatched` | 是否真的派发了原生调用；`false` = 派发前被拒（含 `execution_status:"rejected"`） |
+| `dispatch_status` | `not_dispatched \| dispatched \| unknown`：是否真的调用了原生。`unknown` **不是**"没调用" |
+| `dispatched` | 与上一行同源的兼容布尔：`true` / `false` / **`null`**（`null` 即 unknown） |
 
 规则：
 
@@ -147,6 +151,9 @@
    `action_history` 都不是证据。
 7. `uncertain` 操作**不得用新的 `action_id` 重试**：同 op+args 必须复用原 `action_id`，
    或先用 `get_operation()` / `wait_operation()` 查清状态。**盲重试 = 允许双扣款/双成交，是硬违规。**
+   `dispatch_status:"unknown"`（`dispatched:null`）就是这一类：原生可能已经执行，
+   即使 `ok:false` 也**不能**当成"安全拒绝"重试；响应会带 `next` 说明。
+   只有 `dispatch_status:"not_dispatched"` + `execution_status:"rejected"` 才是"世界无变化"。
 8. `pending` 操作存在时，不允许发出冲突写动作（不同 op 或不同 `rev`）；
    读（`get_state()` 等）与同一 `action_id` 的幂等重放允许。
 9. `delivery_status:"undelivered"`：响应丢失但执行事实可能已成立——用原 `action_id` 重查/重放拿回原证据
@@ -423,19 +430,21 @@
 
 ---
 
-## 13. schema 已核对（最终，2026-11-17 D+C 合入后）
+## 13. schema 已核对（最终，2026-11-18 Round 4 合入后）
 
 以下字段已与 `mcp_server.py` / `src/Bridge/` / `src/Core/` 实际实现核对
-（HEAD `f09314e` 的 D+C，policy sha `e0da5a24…`，工具 full=116 / recording=106）：
+（Round 4 / `docs/reviews/ROUND4_DISPOSITION.md`，policy sha `e0da5a24…`，
+工具 full=116 / recording=106）：
 
 | 主题 | 已核对 schema |
 |---|---|
-| 写响应 | `operation_id`、`execution_status`、`delivery_status`、`dispatched`；`ok:true` 仅 completed；重复 ID → 原证据 + `delivery_status:"undelivered"` + `redelivered:true` |
-| 操作查询 | `get_operation` 返回 `known/ok/operation_id/op/execution_status/delivery_status/dispatched/error/rev/result_rev/next`；未知 id `known:false` + `unknown_operation`（run 变化后带 `process_restarted:true`）；`wait_operation` 超时 `ok:false + status:"pending" + operation_id + execution_status + next` |
+| 写响应 | `operation_id`、`execution_status`、`delivery_status`、`dispatch_status`、`dispatched`（true/false/**null**）、跨局时 `run_change_status`/`run_change_confirmed`、晋升后 `completion_evidence`/`initial_result`；`ok:true` 仅 completed；重复 ID → 原证据 + `delivery_status:"undelivered"` + `redelivered:true` |
+| 操作查询 | `get_operation` 返回 `known/ok/operation_id/op/execution_status/delivery_status/dispatch_status/dispatched/run_change_status/run_change_confirmed/completion_evidence/error/rev/result_rev/next`；未知 id `known:false` + `unknown_operation`（run 变化后带 `process_restarted:true`）；`wait_operation` 超时 `ok:false + status:"pending" + operation_id + execution_status + next` |
 | 交易证据 | `business_complete`、`client_unchanged`、`items_transferred`、`cash_before`、`cash_after`（整数）、`cash_changed`、`staged_item_id`、`client_intent`、`evidence.{called,error,business_complete,client_unchanged,items_transferred,cash_before,cash_after,staged_item_id_after}`；拒绝时 `dispatched:false`；静默 return → `error:"outcome_unverified"` + `execution_status:"uncertain"` |
 | 关店 | `execution_status:"completed"` ⇔ `shop_closed_after:true`；仍 OPEN → `ok:false + pending:true + execution_status:"running" + error:"shop_still_open"` |
 | 睡觉 | `day_changed`、`save_evidence`（`save_completed`/`save_unknown`）、`save_completed`、`save_unknown`；`last_save_time` 不算落盘证据；`day_changed:false` = running/pending |
 | 快照 | `legal_actions`（`availability="available"`）与 `candidate_actions`（`availability="unknown"`、`requires="native_guard"`）；举报用纯字段 `reported`/`is_wanted` |
 | 工具面 | full = 116，recording = 106；`get_operation` / `wait_operation` 已注册且均在 recording 面 |
+| MCP 模式 | 注册面 = bridge 报告的 `run_mode`；`auto` 在 bridge 不可达/未知时 **locked**（只留本地 memory 工具），显式 `--mode test` 也必须 bridge 报告 `test`；运行中模式漂移 → `error:"mode_changed"`，需重启 MCP |
 
 若后续再改冻结协议：本表随 Lead 的协议变更同步；**不要再引入“待核对”字段**。
