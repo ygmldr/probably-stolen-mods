@@ -2,7 +2,7 @@
 <ModManifest>
   <ID>pawnmind</ID>
   <Name>PawnMind · AI Bridge</Name>
-  <Author>local</Author>
+  <Author>ygmldr</Author>
   <ModVersion>0.3.0</ModVersion>
   <Description><![CDATA[
 Local AI bridge for Probably Stolen.

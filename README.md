@@ -1,7 +1,8 @@
-# game_mods — Probably Stolen 0.46D 的两个本地 Mod
+# Probably Stolen Mods
 
 
 《深空当铺：可能是偷的》(*Probably Stolen* 0.46D) 的非官方 Mod 集合。
+仓库 `ygmldr/probably-stolen-mods`。
 
 > **免责声明**：本项目与 Questing Goose Studio 无关，不是官方内容。使用 Mod 可能影响存档，
 > 请自行备份。所有能力都只在本机生效：不联网、不上传、不改游戏资产。

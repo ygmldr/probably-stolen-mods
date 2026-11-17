@@ -2,7 +2,7 @@
 
 ## 与游戏的关系
 
-本项目是《深空当铺：可能是偷的》(*Probably Stolen*) 的非官方 Mod，与 Questing Goose Studio
+Probably Stolen Mods 是《深空当铺：可能是偷的》(*Probably Stolen*) 的非官方 Mod，与 Questing Goose Studio
 没有隶属关系，也未获得其背书。游戏本体、游戏资产、商标与相关内容的版权归其权利人所有。
 
 本仓库**不包含**：
