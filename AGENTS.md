@@ -94,7 +94,8 @@ cd PawnMind && ./build.sh
 - 只用于本地互操作、排查、自用分析；
 - 长期结论写进 `CompactSort/analysis/` 或 `PawnMind/docs/`；
 - 引用只写类型名/方法名/结论，不复制大段反编译代码；
-- `CompactSort/analysis/sia_decompiled/` 是历史遗留已跟踪内容，新增产物不要再放进去。
+- 第三方反编译源码**不得进入仓库**：`sia_decompiled` 已从历史移除，本地放在 `_decomp/sia/`（已 gitignore）；
+  `CompactSort/analysis/competitor_bench/` 通过 `$(SiaSourceRoot)` 引用它，缺源码时该项目不参与构建。
 
 ## 6. 文档与审查
 

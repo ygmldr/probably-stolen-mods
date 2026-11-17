@@ -9,6 +9,12 @@
     <AssemblyName>CompetitorBench</AssemblyName>
     <RootNamespace>CompactSort.CompetitorBench</RootNamespace>
   </PropertyGroup>
+  <PropertyGroup>
+    <!-- The competitor sources are third-party decompiled code and are NOT in this
+         repository. Place them under _decomp/sia (gitignored) or pass
+         -p:SiaSourceRoot=<path> when running the analysis benchmark. -->
+    <SiaSourceRoot Condition="'$(SiaSourceRoot)' == ''">$(MSBuildThisFileDirectory)../../../_decomp/sia</SiaSourceRoot>
+  </PropertyGroup>
   <ItemGroup>
     <Compile Include="Program.cs" />
     <Compile Include="../global_bench/BenchModel.cs" />
@@ -18,14 +24,14 @@
     <Compile Include="../../src/Packing/BeamPacker.cs" />
     <Compile Include="../../src/Packing/AdvancedPacker.cs" />
     <Compile Include="../../src/Packing/VisualPacker.cs" />
-    <Compile Include="../sia_decompiled/SmartInventoryArrange.Core/Cell.cs" />
-    <Compile Include="../sia_decompiled/SmartInventoryArrange.Core/ShapeMask.cs" />
-    <Compile Include="../sia_decompiled/SmartInventoryArrange.Core/Orientation.cs" />
-    <Compile Include="../sia_decompiled/SmartInventoryArrange.Core/Placement.cs" />
-    <Compile Include="../sia_decompiled/SmartInventoryArrange.Core/LayoutItem.cs" />
-    <Compile Include="../sia_decompiled/SmartInventoryArrange.Core/LayoutProblem.cs" />
-    <Compile Include="../sia_decompiled/SmartInventoryArrange.Core/LayoutScore.cs" />
-    <Compile Include="../sia_decompiled/SmartInventoryArrange.Core/LayoutResult.cs" />
-    <Compile Include="../sia_decompiled/SmartInventoryArrange.Core/DeterministicSolver.cs" />
+    <Compile Include="$(SiaSourceRoot)/SmartInventoryArrange.Core/Cell.cs" />
+    <Compile Include="$(SiaSourceRoot)/SmartInventoryArrange.Core/ShapeMask.cs" />
+    <Compile Include="$(SiaSourceRoot)/SmartInventoryArrange.Core/Orientation.cs" />
+    <Compile Include="$(SiaSourceRoot)/SmartInventoryArrange.Core/Placement.cs" />
+    <Compile Include="$(SiaSourceRoot)/SmartInventoryArrange.Core/LayoutItem.cs" />
+    <Compile Include="$(SiaSourceRoot)/SmartInventoryArrange.Core/LayoutProblem.cs" />
+    <Compile Include="$(SiaSourceRoot)/SmartInventoryArrange.Core/LayoutScore.cs" />
+    <Compile Include="$(SiaSourceRoot)/SmartInventoryArrange.Core/LayoutResult.cs" />
+    <Compile Include="$(SiaSourceRoot)/SmartInventoryArrange.Core/DeterministicSolver.cs" />
   </ItemGroup>
 </Project>
