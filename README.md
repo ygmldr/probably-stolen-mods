@@ -1,5 +1,7 @@
 # Probably Stolen Mods
 
+[![python-tests](https://github.com/ygmldr/probably-stolen-mods/actions/workflows/python-tests.yml/badge.svg)](https://github.com/ygmldr/probably-stolen-mods/actions/workflows/python-tests.yml) [![secret-scan](https://github.com/ygmldr/probably-stolen-mods/actions/workflows/secret-scan.yml/badge.svg)](https://github.com/ygmldr/probably-stolen-mods/actions/workflows/secret-scan.yml)
+
 
 《深空当铺：可能是偷的》(*Probably Stolen* 0.46D) 的非官方 Mod 集合。
 仓库 `ygmldr/probably-stolen-mods`。
