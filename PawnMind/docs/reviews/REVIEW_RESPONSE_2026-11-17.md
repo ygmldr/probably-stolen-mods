@@ -131,6 +131,17 @@ test 仍 116、`allowed_tools_for_mode` 与策略一致）。
 - `dist` 与已安装 DLL 仍不一致；`play_allowlist` 仍为 0；L3 实机项全部 `NOT_RUN`。
 - 结论：F7 保持 `OPEN`，需要在实机会话中跑一次官方扫描器并记录输出。
 
+## Red 证据（先失败再修）
+
+| 项 | 修复前的失败形态 | 证据 |
+|---|---|---|
+| F1 | 编译失败：`ActionResult` 无 `WithRunChanged` | `./test.sh F1_Run_Change` → CS1061 |
+| F2 | 编译失败：`DayEndPolicy` 无 `ReadbackProvesEndDay` | `./test.sh Readback_Needs` → CS0117 |
+| F3 | 断言失败：重试仍带 `pending` | `AssertionException: stale pending flag removed` |
+| F4 | 断言失败：记录 `dispatched=true` 但服务声明 false | `AssertionException: the record keeps the service claim…` |
+| F5 | 修复前的服务端直接拒绝参数：`mcp_server.py: error: unrecognized arguments: --mode play`；全量 116 个工具无过滤 | 临时 worktree `509bfd1^` 复跑 |
+| F6 | 旧测试对"完全缺 rev"直接 `continue`；新检查器单测（缺 rev / 可选 / 合法 / 未注册）先红后绿 | `test_rev_checker_flags_a_tool_that_omits_rev` |
+
 ## 未处理 / 需要决策
 
 1. `C-2`（B12 原生方向语义）、`C-3`（顾客实例切换）仍依赖真机，安全侧拒绝。
