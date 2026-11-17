@@ -5,11 +5,15 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      # Pinned actions/checkout v4.2.2; no third-party services or secrets.
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -24,5 +28,5 @@ jobs:
         working-directory: PawnMind
         run: python tools/gen_policy_catalog.py --check
 
-  # The C# suites compile against the game's Assembly-CSharp.dll and are not
-  # runnable on hosted runners; they are documented in PawnMind/AGENTS.md.
+  # The C# suites compile against the game's Assembly-CSharp.dll and cannot run
+  # on hosted runners; see PawnMind/AGENTS.md for the local command.
