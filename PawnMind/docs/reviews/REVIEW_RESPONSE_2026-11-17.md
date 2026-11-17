@@ -15,7 +15,7 @@
 | F4 | P1 | `dispatched` 由执行状态推断 | **成立** | 已修，显式传递；JSON 与记录同源 |
 | F5 | P2 | `tools/list` 不随模式过滤 | **成立** | 已实现 `--mode` 过滤（C# 仍是最终边界） |
 | F6 | P2 | rev 契约测试漏检 | **成立** | 已重写为策略驱动 + 纯函数自测 |
-| F7 | 发布 | 兼容性与 L3 | **部分新增证据** | `files` 能力：本仓库不需要；扫描器仍 `NOT_RUN` |
+| F7 | 发布 | 兼容性与 L3 | **部分新增证据** | `files` 运行时不需要、扫描器预测仍需；官方扫描器 `NOT_RUN` |
 
 ## F0 — GitHub Python CI 失败（已过时）
 
@@ -116,10 +116,17 @@ test 仍 116、`allowed_tools_for_mode` 与策略一致）。
 
 ## F7 — 发布兼容与 L3（部分新增证据）
 
-- `manifest.xml` 的 `files` 能力：本仓库**不需要**。所有文件 IO 都走
-  `ModHelper.GetModDataFolder` / `ReadModDataFileText` / `WriteModDataFileText`，即限定在
-  Mod 自己的数据目录内；`_decomp/ModHelper.cs` 的这三个 API 没有能力门禁，任意路径访问才需要 `files`。
-  `src/` 里没有 `File.`/`Directory.` 越界调用（`ScreenshotService` 也用 `GetModDataFolder`）。
+- `manifest.xml` 的 `files` 能力：需要区分两层，结论**不是**"肯定不需要"。
+  - 运行时层：`ReadModDataFileText` / `WriteModDataFileText` / `ListModDataFiles` 等
+    （`_decomp/ModHelper.cs:1489-1556`）都限制在 Mod 自己的数据目录内，**没有能力门禁**；
+    只有任意路径访问才需要 `files`。
+  - 扫描器层：`_decomp/ModScanner.cs` 的 FileTypes 规则按**程序集引用**判定，
+    `System.IO.Directory` / `FileInfo` 出现在 `src/Game/ScreenshotService.cs:196-207`
+    （统计截图目录占用），因此"声明缺 `files` 会被拒绝启用"的预测（矩阵 C1）**仍然成立**，
+    与本仓库的文件访问是否越界无关。
+  - 可行的消除方式（待扫描器证实后再做，避免为未验证规则改生产代码）：
+    用 `ModHelper.ListModDataFiles` + `ReadModDataFileBytes` 替换那 3 处 `System.IO` 调用，
+    使程序集不再引用 `Directory`/`FileInfo`。
 - 官方 ModScanner 仍未运行（`NOT_RUN`），因此"扫描器是否静态误报 `System.IO`"无法证明。
 - `dist` 与已安装 DLL 仍不一致；`play_allowlist` 仍为 0；L3 实机项全部 `NOT_RUN`。
 - 结论：F7 保持 `OPEN`，需要在实机会话中跑一次官方扫描器并记录输出。
