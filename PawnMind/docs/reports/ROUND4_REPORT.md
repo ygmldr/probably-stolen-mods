@@ -96,11 +96,36 @@ python3 -B scripts/security/scan_git_secrets.py
 Red 的采集方式与完整失败文本见 `ROUND4_DISPOSITION.md` §7 与各条目的 Red 表；
 两处临时还原均已撤回，仓库内没有测试专用旁路。
 
-## 5. CI
+## 5. CI 与第二台机器
 
-- `python-tests` 与 `secret-scan` 在本轮提交后重跑；结果链接见 GitHub Actions 页面
-  （`https://github.com/ygmldr/probably-stolen-mods/actions`）。
-- 本地等价命令已全绿（§4），CI 只是同一命令的干净环境复跑。
+`b98c05b` 上的两个工作流均通过：
+
+| 工作流 | 结果 | 链接 |
+|---|---|---|
+| `python-tests` | success | https://github.com/ygmldr/probably-stolen-mods/actions/runs/44142867622 |
+| `secret-scan` | success | https://github.com/ygmldr/probably-stolen-mods/actions/runs/44142867619 |
+
+构建机 `CT101`（192.168.1.101，Linux + .NET 9.0.321 + 真实 `Assembly-CSharp.dll`，
+`REQUIRE_GAME=1` 严格模式）在 `b98c05b` 上独立复跑：
+
+```text
+passed=775 failed=0
+contract gate tests: passed=53 failed=0
+contract checks: 503
+adapter contract OK
+```
+
+命令（该机没有 Windows 路径，必须显式给出三处路径）：
+
+```bash
+cd /root/work/game_mods/PawnMind
+DOTNET=/root/.dotnet/dotnet \
+PAWNMIND_NEWTONSOFT_DLL=/root/work/game_managed/Newtonsoft.Json.dll \
+GAME_ASSEMBLY=/root/work/game_managed/Assembly-CSharp.dll \
+REQUIRE_GAME=1 ./test.sh
+```
+
+> 该机的仓库通过 `git bundle` 同步（它没有 GitHub 私钥），工作树干净，HEAD = `b98c05b`。
 
 ## 6. 风险与剩余工作
 
