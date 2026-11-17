@@ -66,6 +66,18 @@ namespace PawnMind.Core
         }
 
         /// <summary>
+        /// F2: the async verifier may only finish an end_day when the readback is a
+        /// readable, in-game CLOSED state. "Not OPEN" is not proof: MORNING is the
+        /// next day, an unknown/null state is a failed read and an out-of-game
+        /// snapshot has no shop at all.
+        /// </summary>
+        public static bool ReadbackProvesEndDay(ShopDaySnapshot after)
+        {
+            if (after == null || !after.Readable || !after.InGame) return false;
+            return IsClosed(after.ShopState);
+        }
+
+        /// <summary>
         /// Only the game's own CLOSED state allows sleeping. A missing or unknown
         /// state string is treated as not closed: the bridge must not advance the
         /// day on a guess.

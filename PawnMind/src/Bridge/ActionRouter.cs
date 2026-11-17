@@ -248,10 +248,12 @@ namespace PawnMind.Bridge
                 // so a retry with the same id returns the same answer without a
                 // second dispatch.
                 string unknown = OutcomeUnknown(op, currentRevision);
+                bool unknownDispatched = DispatchedClaim(result);
                 string envelope = DecorateResponse(actionId, unknown,
-                    ExecutionStatus.Uncertain, DeliveryStatus.Delivered, false);
+                    ExecutionStatus.Uncertain, DeliveryStatus.Delivered, false, unknownDispatched);
                 _gate.Complete(actionId, envelope, ExecutionStatus.Uncertain,
-                    DeliveryStatus.Delivered, currentRevision, "outcome_unknown");
+                    DeliveryStatus.Delivered, currentRevision, "outcome_unknown", unknownDispatched);
+                if (result.RunChanged) _gate.ClearOperationsExcept(actionId);
                 _history.Add(
                     HistoryText(Scrub(op)),
                     Scrub(JsonForAudit(request)),
@@ -262,11 +264,12 @@ namespace PawnMind.Bridge
             }
 
             string response = result.ToJson(responseRevision);
-            string execution = Classify(result, response, out string error);
+            string execution = Classify(result, response, out string error, out bool dispatched);
             string decorated = DecorateResponse(actionId, response, execution,
-                DeliveryStatus.Delivered, false);
+                DeliveryStatus.Delivered, false, dispatched);
             _gate.Complete(actionId, decorated, execution, DeliveryStatus.Delivered,
-                responseRevision, error);
+                responseRevision, error, dispatched);
+            if (result.RunChanged) _gate.ClearOperationsExcept(actionId);
             _history.Add(
                 HistoryText(Scrub(op)),
                 Scrub(JsonForAudit(request)),
@@ -429,11 +432,11 @@ namespace PawnMind.Bridge
 
             bool redelivered = record.Delivery == DeliveryStatus.Undelivered;
             return DecorateResponse(actionId, cached, record.Execution, record.Delivery,
-                redelivered);
+                redelivered, record.Dispatched);
         }
 
         private string DecorateResponse(string actionId, string response,
-            string execution, string delivery, bool redelivered)
+            string execution, string delivery, bool redelivered, bool dispatched)
         {
             JObject json;
             try
@@ -447,21 +450,47 @@ namespace PawnMind.Bridge
             }
 
             bool completed = ExecutionStatus.IsSuccess(execution);
+
+            // F3: a promoted operation must not keep the facts of the state it was
+            // promoted from (pending:true + ok:true is unreadable for a model). The
+            // original body is preserved once, under initial_result, as evidence.
+            JObject initial = null;
+            if (completed
+                && (JsonBool(json, "pending") || JsonBool(json, "uncertain") || JsonBool(json, "unknown")))
+            {
+                initial = (JObject)json.DeepClone();
+                json.Remove("pending");
+                json.Remove("uncertain");
+                json.Remove("unknown");
+                json.Remove("error");
+                if (json["shop_closed_after"] != null) json["shop_closed_after"] = true;
+            }
+
             json["ok"] = completed;
             json["operation_id"] = actionId;
             json["execution_status"] = execution;
             json["delivery_status"] = delivery;
-            if (execution == ExecutionStatus.Rejected)
-            {
-                json["dispatched"] = false;
-            }
-            else if (json["dispatched"] == null)
-            {
-                json["dispatched"] = true;
-            }
+            json["dispatched"] = dispatched;
+            if (initial != null) json["initial_result"] = initial;
 
             if (redelivered) json["redelivered"] = true;
             return json.ToString(Formatting.None);
+        }
+
+        /// <summary>The service's own dispatched claim; a bare refusal dispatched nothing.</summary>
+        private static bool DispatchedClaim(ActionResult result)
+        {
+            if (result == null) return false;
+            if (result.RawJson == null) return result.Ok;
+            try
+            {
+                JObject raw = JObject.Parse(result.RawJson);
+                return raw["dispatched"] == null || JsonBool(raw, "dispatched");
+            }
+            catch (Exception)
+            {
+                return true;
+            }
         }
 
         private string OperationPending(string op, OperationRecord pending)
@@ -479,7 +508,8 @@ namespace PawnMind.Bridge
             return payload.ToString(Formatting.None);
         }
 
-        private static string Classify(ActionResult result, string response, out string error)
+        private static string Classify(ActionResult result, string response, out string error,
+            out bool dispatched)
         {
             error = result == null ? null : result.Error;
             JObject json = null;
@@ -497,16 +527,16 @@ namespace PawnMind.Bridge
                 || JsonBool(json, "unknown")
                 || string.Equals(error, "outcome_unknown", StringComparison.Ordinal);
 
-            bool dispatched;
             if (json != null && json["dispatched"] != null)
             {
                 dispatched = JsonBool(json, "dispatched");
             }
             else
             {
-                // Raw services spell out dispatched; a bare ActionResult.Failure is a
-                // pre-dispatch guard refusal, which is the conservative reading.
-                dispatched = result != null && result.RawJson != null;
+                // Raw services spell out dispatched. A bare Success ran the action;
+                // a bare Failure is a pre-dispatch guard refusal, which is the
+                // conservative reading.
+                dispatched = result != null && (result.RawJson != null || result.Ok);
             }
 
             if (!ok && string.IsNullOrEmpty(error) && json != null)

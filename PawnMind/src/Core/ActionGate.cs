@@ -184,7 +184,7 @@ namespace PawnMind.Core
 
         /// <summary>Completes a prepared operation; only the router calls this.</summary>
         public void Complete(string actionId, string response, string execution,
-            string delivery, long resultRevision, string error)
+            string delivery, long resultRevision, string error, bool dispatched)
         {
             Entry entry;
             if (!TryFind(actionId, out entry)) return;
@@ -198,9 +198,10 @@ namespace PawnMind.Core
                 : DeliveryStatus.Delivered;
             entry.Operation.ResultRevision = resultRevision;
             entry.Operation.Error = error;
-            // A pre-dispatch guard refusal never reached the game; only a real
-            // dispatch sets the flag (reviewer D finding).
-            entry.Operation.Dispatched = entry.Operation.Execution != ExecutionStatus.Rejected;
+            // F4: dispatched is the service's own claim, never inferred from the
+            // execution axis. A pending/failed result that says nothing reached the
+            // game must stay dispatched=false.
+            entry.Operation.Dispatched = dispatched;
         }
 
         /// <summary>
@@ -272,6 +273,35 @@ namespace PawnMind.Core
             _order.Clear();
             _cleared++;
             return count;
+        }
+
+        /// <summary>
+        /// Evicts the previous run's records but keeps the operation that triggered
+        /// the switch, so its response, evidence and idempotency survive (F1).
+        /// </summary>
+        public int ClearOperationsExcept(string keepActionId)
+        {
+            if (string.IsNullOrEmpty(keepActionId)) return ClearOperations();
+
+            var drop = new System.Collections.Generic.List<string>();
+            foreach (string id in _results.Keys)
+            {
+                if (!string.Equals(id, keepActionId, System.StringComparison.Ordinal))
+                    drop.Add(id);
+            }
+
+            for (int i = 0; i < drop.Count; i++) _results.Remove(drop[i]);
+
+            var kept = new System.Collections.Generic.Queue<string>();
+            while (_order.Count > 0)
+            {
+                string id = _order.Dequeue();
+                if (_results.ContainsKey(id)) kept.Enqueue(id);
+            }
+            while (kept.Count > 0) _order.Enqueue(kept.Dequeue());
+
+            if (drop.Count > 0) _cleared++;
+            return drop.Count;
         }
 
         private bool TryFind(string actionId, out Entry entry)

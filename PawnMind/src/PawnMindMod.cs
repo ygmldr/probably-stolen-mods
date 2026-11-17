@@ -253,20 +253,27 @@ public sealed class PawnMindMod : IMod
 
     private static ActionResult DispatchAction(string op, JObject request)
     {
+        ActionResult result = DispatchActionCore(op, request);
+        if (result != null && result.Ok && IsRunChangeOp(op))
+        {
+            // D2/PP-RECOVERY-01 + F1: a new game or a loaded save starts a new run.
+            // Mark the result; the router evicts the old run's evidence *after*
+            // completing this operation, so the caller's own action id keeps its
+            // response and stays idempotent. Rent receipts belong to the old run
+            // and are dropped immediately.
+            FirstWeekService service = FirstWeekService.Current;
+            if (service != null) service.ResetRentReceipts();
+            result = result.WithRunChanged();
+        }
+        return result;
+    }
+
+    private static ActionResult DispatchActionCore(string op, JObject request)
+    {
         ActionResult recordingResult;
         if (_recordingGuard != null
             && _recordingGuard.TryHandle(op, request, out recordingResult))
         {
-            if (recordingResult.Ok && IsRunChangeOp(op))
-            {
-                FirstWeekService service = FirstWeekService.Current;
-                if (service != null) service.ResetRentReceipts();
-                // D2/PP-RECOVERY-01: a new game or a loaded save starts a new run;
-                // operation evidence from the previous run must not be attributed
-                // to this one, and unknown ids must not be replayed blindly.
-                ActionRouter router = _router;
-                if (router != null) router.ResetOperations();
-            }
             return recordingResult;
         }
 
@@ -875,9 +882,10 @@ public sealed class PawnMindMod : IMod
         ShopDaySnapshot after = GameState.ReadShopDaySnapshot();
         if (after == null || !after.Readable) return record;
 
-        // CLOSED (or a new day) proves the shutter request finished; OPEN means
-        // the native animation is still running.
-        if (DayEndPolicy.IsOpenState(after.ShopState)) return record;
+        // Only a readable, in-game CLOSED readback proves the shutter request
+        // finished. "Not OPEN" is not proof: MORNING and unknown states used to
+        // mark end_day completed while the shop had simply not opened yet.
+        if (!DayEndPolicy.ReadbackProvesEndDay(after)) return record;
 
         record.Execution = ExecutionStatus.Completed;
         record.Error = null;

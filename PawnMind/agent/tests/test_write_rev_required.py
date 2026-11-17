@@ -40,6 +40,29 @@ READ_ONLY = {
 }
 
 
+def _policy():
+    sys.path.insert(0, os.path.join(ROOT, "agent"))
+    import tool_policy
+    return tool_policy.load_policy()
+
+
+def _rev_offenders(schemas, write_tools):
+    """Pure check so the contract itself is testable without the MCP server."""
+    offenders = []
+    for name in sorted(write_tools):
+        schema = schemas.get(name)
+        if schema is None:
+            offenders.append({"tool": name, "reason": "missing from tools/list"})
+            continue
+        props = schema.get("properties") or {}
+        required = schema.get("required") or []
+        if "rev" not in props:
+            offenders.append({"tool": name, "reason": "no rev property"})
+        elif "rev" not in required:
+            offenders.append({"tool": name, "reason": "rev is optional"})
+    return offenders
+
+
 def _write_tool_schemas(config_path):
     params = StdioServerParameters(
         command=sys.executable,
@@ -70,21 +93,39 @@ class WriteToolsRequireRevTests(unittest.TestCase):
             os.unlink(cls.config_path)
 
     def test_every_write_tool_requires_rev(self):
-        offenders = []
-        for name, schema in sorted(self.schemas.items()):
-            if name in READ_ONLY:
-                continue
-            props = schema.get("properties") or {}
-            if "rev" not in props:
-                continue
-            if "rev" not in (schema.get("required") or []):
-                offenders.append({
-                    "tool": name,
-                    "rev_schema": props.get("rev"),
-                })
-        self.assertEqual([], offenders,
-                         "write tools must declare rev as required: %s" % json.dumps(offenders))
+        """F6: a write tool that omits rev entirely must fail, not be skipped.
 
+        The target list comes from the policy (purity=write), so adding a write
+        tool cannot silently bypass this contract by forgetting the field.
+        """
+        policy = _policy()
+        write_tools = sorted(
+            name for name, entry in policy["tools"].items() if entry["purity"] == "write")
+        self.assertTrue(write_tools, "the policy lists write tools")
+
+        self.assertEqual([], _rev_offenders(self.schemas, write_tools),
+                         "write tools must require rev")
+
+    def test_rev_checker_flags_a_tool_that_omits_rev(self):
+        """The checker must fail on a missing rev, not skip it (F6)."""
+        empty = {"properties": {"item_id": {}}, "required": ["item_id"]}
+        optional = {"properties": {"rev": {}, "item_id": {}}, "required": ["item_id"]}
+        good = {"properties": {"rev": {}, "item_id": {}}, "required": ["rev", "item_id"]}
+
+        self.assertEqual([{"tool": "x", "reason": "no rev property"}],
+                         _rev_offenders({"x": empty}, ["x"]))
+        self.assertEqual([{"tool": "x", "reason": "rev is optional"}],
+                         _rev_offenders({"x": optional}, ["x"]))
+        self.assertEqual([], _rev_offenders({"x": good}, ["x"]))
+        self.assertEqual([{"tool": "ghost", "reason": "missing from tools/list"}],
+                         _rev_offenders({}, ["ghost"]))
+
+    def test_policy_and_tool_list_agree_on_write_tools(self):
+        policy = _policy()
+        write_tools = {name for name, entry in policy["tools"].items()
+                       if entry["purity"] == "write"}
+        self.assertEqual(set(), write_tools - set(self.schemas),
+                         "every policy write tool is registered")
     def test_wine_add_water_is_not_advertised_with_optional_rev(self):
         schema = self.schemas["wine_add_water"]
         self.assertIn("rev", schema.get("required") or [],

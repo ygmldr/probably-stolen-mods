@@ -11,6 +11,18 @@ namespace PawnMind.Bridge
         public string Error { get; private set; }
         public string RawJson { get; private set; }
 
+        /// <summary>
+        /// A successful new_game/load_game switches the run: the router must evict
+        /// the previous run's operation evidence *after* completing this one.
+        /// </summary>
+        public bool RunChanged { get; private set; }
+
+        public ActionResult WithRunChanged()
+        {
+            RunChanged = true;
+            return this;
+        }
+
         public static ActionResult Success(string op)
         {
             return new ActionResult { Ok = true, Op = op };

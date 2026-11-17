@@ -414,7 +414,14 @@ def _retrieve_payload(item):
     }
 
 
-def build_server(client, tool_set=TOOL_SET_FULL, memory_provider=None):
+#: Tools served locally (memory) never depend on the game bridge, so a mode
+#: filter must not hide them.
+LOCAL_TOOL_NAMES = frozenset({"memory_bootstrap", "memory_get", "memory_retrieve",
+                              "memory_status"})
+
+
+def build_server(client, tool_set=TOOL_SET_FULL, memory_provider=None,
+                 allowed_tools=None):
     if tool_set not in TOOL_SET_CHOICES:
         raise ValueError("unknown tool set: %r" % (tool_set,))
 
@@ -432,7 +439,14 @@ def build_server(client, tool_set=TOOL_SET_FULL, memory_provider=None):
         """Register a tool only when the selected surface allows it."""
 
         def decorator(function):
-            if tool_set == TOOL_SET_RECORDING and function.__name__ not in RECORDING_TOOL_NAMES:
+            name = function.__name__
+            if tool_set == TOOL_SET_RECORDING and name not in RECORDING_TOOL_NAMES:
+                return function
+            # F5: expose only what the current run mode can actually execute. The
+            # C# gate stays the final authority; this only stops a model from
+            # seeing tools the bridge would refuse anyway.
+            if (allowed_tools is not None and name not in LOCAL_TOOL_NAMES
+                    and name not in allowed_tools):
                 return function
             return server.tool(*args, **kwargs)(function)
 
@@ -1227,6 +1241,16 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default=None, help="path to bridge.conf")
     parser.add_argument(
+        "--mode",
+        choices=("auto", "bootstrap", "play", "test"),
+        default=os.environ.get("PAWNMIND_MODE", "auto"),
+        help=(
+            "register only the tools the bridge run mode can execute: bootstrap, "
+            "play (live-evidenced only), test (no filtering). auto asks /health and "
+            "falls back to test when the bridge is not running"
+        ),
+    )
+    parser.add_argument(
         "--tools",
         choices=TOOL_SET_CHOICES,
         default=TOOL_SET_FULL,
@@ -1314,13 +1338,41 @@ def main():
         args.memories_db or _default_memories_db(),
         events_db=memory_events_db)
     try:
+        mode = _detect_mode(client, args.mode)
+        allowed = allowed_tools_for_mode(mode)
         build_server(client, args.tools,
-                     memory_provider=memory_provider).run()
+                     memory_provider=memory_provider,
+                     allowed_tools=allowed).run()
     finally:
         memory_provider.close()
         if recorder is not None:
             recorder.store.close()
     return 0
+
+
+def allowed_tools_for_mode(mode, policy=None):
+    """Tools a run mode may expose. ``None`` means "no filtering" (test)."""
+    import tool_policy
+
+    policy = policy or tool_policy.load_policy()
+    if mode == "play":
+        # Only reviewed live evidence counts: never the candidate allowlist.
+        return set(tool_policy.play_allowlist(policy))
+    if mode in ("bootstrap", "test"):
+        return None if mode == "test" else set(tool_policy.allowlist(policy, mode))
+    raise ValueError("unknown mode: %r" % (mode,))
+
+
+def _detect_mode(client, requested):
+    """Resolve ``auto`` by asking the bridge; an unreachable bridge keeps full."""
+    if requested != "auto":
+        return requested
+    try:
+        health = client.health()
+    except Exception:
+        return "test"
+    mode = (health or {}).get("run_mode")
+    return mode if mode in ("bootstrap", "play", "test") else "test"
 
 
 def _default_memory_db():

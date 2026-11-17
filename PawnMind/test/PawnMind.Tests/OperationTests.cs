@@ -60,7 +60,7 @@ namespace PawnMind.Tests
             var gate = new ActionGate();
             gate.Begin("op-1", "end_day", 4);
             gate.Complete("op-1", "{\"ok\":true}", ExecutionStatus.Completed,
-                DeliveryStatus.Delivered, 5, null);
+                DeliveryStatus.Delivered, 5, null, true);
 
             OperationRecord record = gate.Find("op-1");
             Assert.NotNull(record, "operation recorded");
@@ -76,7 +76,7 @@ namespace PawnMind.Tests
             var gate = new ActionGate();
             gate.Begin("op-2", "confirm_trade", 7);
             gate.Complete("op-2", "{\"ok\":true}", ExecutionStatus.Completed,
-                DeliveryStatus.Delivered, 8, null);
+                DeliveryStatus.Delivered, 8, null, true);
 
             Assert.True(gate.MarkUndelivered("op-2"), "delivery axis updated");
             OperationRecord record = gate.Find("op-2");
@@ -93,7 +93,7 @@ namespace PawnMind.Tests
             var gate = new ActionGate();
             gate.Begin("old", "confirm_trade", 3);
             gate.Complete("old", "{\"ok\":true}", ExecutionStatus.Completed,
-                DeliveryStatus.Delivered, 4, null);
+                DeliveryStatus.Delivered, 4, null, true);
 
             Assert.Equal(1, gate.ClearOperations(), "one operation cleared");
             Assert.Null(gate.Find("old"), "a cleared operation cannot be replayed");
@@ -189,6 +189,83 @@ namespace PawnMind.Tests
             Assert.True((bool)second["ok"], "completed is ok");
         }
 
+        /// <summary>
+        /// F3: once the verifier promotes a pending operation, a cached retry must
+        /// not keep the old pending/error facts next to ok:true.
+        /// </summary>
+        /// <summary>
+        /// F1: switching save/new game must not erase the operation that is still
+        /// being completed. The old run's ids are evicted, the current one survives
+        /// with its evidence and stays idempotent.
+        /// </summary>
+        [Test]
+        public static void F1_Run_Change_Evicts_Old_Operations_But_Keeps_Current()
+        {
+            int dispatches = 0;
+            ActionRouter router = Router(3, delegate(string op, JObject request)
+            {
+                dispatches++;
+                if (op == "load_game") return ActionResult.Success(op).WithRunChanged();
+                return ActionResult.Success(op);
+            });
+
+            router.Handle("{\"op\":\"open_shop\",\"action_id\":\"old-run\",\"rev\":3}");
+            Assert.NotNull(router.GetOperationJson("old-run")["execution_status"], "old op recorded");
+
+            const string body = "{\"op\":\"load_game\",\"action_id\":\"f1-1\",\"rev\":3}";
+            string first = router.Handle(body);
+            Assert.Contains(first, "\"ok\":true", "the run switch completed");
+
+            JObject current = router.GetOperationJson("f1-1");
+            Assert.Equal(ExecutionStatus.Completed, (string)current["execution_status"],
+                "the in-flight operation is not erased by its own run change");
+            Assert.False((bool)current["known"] == false, "the current id is known");
+            Assert.False((bool)router.GetOperationJson("old-run")["ok"], "old run id is gone");
+
+            string retry = router.Handle(body);
+            Assert.Contains(retry, "\"ok\":true", "the retry returns the cached result");
+            Assert.Equal(2, dispatches, "no second dispatch for the same action id");
+        }
+
+        [Test]
+        public static void F3_Promoted_Retry_Drops_Stale_Pending_Facts()
+        {
+            int dispatches = 0;
+            int verifications = 0;
+            ActionRouter router = Router(3,
+                delegate(string op, JObject request)
+                {
+                    dispatches++;
+                    return ActionResult.SuccessRaw(op, PendingResponse(op));
+                },
+                null,
+                delegate(OperationRecord record)
+                {
+                    verifications++;
+                    if (verifications < 2) return record;
+                    record.Execution = ExecutionStatus.Completed;
+                    record.ResultRevision = 4;
+                    record.Error = null;
+                    return record;
+                });
+
+            const string body = "{\"op\":\"end_day\",\"action_id\":\"f3-1\",\"rev\":3}";
+            router.Handle(body);
+            router.GetOperationJson("f3-1");
+            router.GetOperationJson("f3-1");
+
+            string retry = router.Handle(body);
+            JObject json = JObject.Parse(retry);
+            Assert.True((bool)json["ok"], "the retry reports the completed fact");
+            Assert.Equal(ExecutionStatus.Completed, (string)json["execution_status"], "completed");
+            Assert.Null(json["pending"], "stale pending flag removed");
+            Assert.Null(json["error"], "stale error removed");
+            Assert.Null(json["uncertain"], "stale uncertain flag removed");
+            Assert.True((bool)json["dispatched"], "the operation was dispatched");
+            Assert.Equal(1, dispatches, "the retry never re-dispatches");
+            Assert.NotNull(json["initial_result"], "the original readback stays as evidence");
+        }
+
         [Test]
         public static void PP_ASYNC_02_Undelivered_Response_Keeps_Completed_Evidence()
         {
@@ -231,6 +308,37 @@ namespace PawnMind.Tests
                 "a guard refusal is rejected");
             Assert.False((bool)operation["dispatched"],
                 "a guard refusal dispatched nothing (reviewer D finding)");
+        }
+
+        /// <summary>
+        /// F4: dispatched must be the service's own claim, not a second guess made
+        /// from the execution axis. A pending operation that explicitly reports
+        /// dispatched=false used to be recorded as dispatched=true.
+        /// </summary>
+        [Test]
+        public static void F4_Dispatched_Follows_The_Service_Claim()
+        {
+            ActionRouter router = Router(3, delegate(string op, JObject request)
+            {
+                return ActionResult.SuccessRaw(op,
+                    "{\"ok\":false,\"pending\":true,\"dispatched\":false,"
+                    + "\"error\":\"shop_still_open\"}");
+            });
+
+            const string body = "{\"op\":\"end_day\",\"action_id\":\"f4-1\",\"rev\":3}";
+            string first = router.Handle(body);
+            JObject firstJson = JObject.Parse(first);
+            Assert.Equal(ExecutionStatus.Running, (string)firstJson["execution_status"], "still running");
+            Assert.False((bool)firstJson["dispatched"], "the service says nothing was dispatched");
+
+            JObject operation = router.GetOperationJson("f4-1");
+            Assert.Equal(ExecutionStatus.Running, (string)operation["execution_status"], "record running");
+            Assert.False((bool)operation["dispatched"],
+                "the record keeps the service claim instead of inferring from the status");
+
+            string retry = router.Handle(body);
+            JObject retryJson = JObject.Parse(retry);
+            Assert.False((bool)retryJson["dispatched"], "cached retry agrees with the record");
         }
 
         [Test]

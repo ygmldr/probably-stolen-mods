@@ -340,6 +340,32 @@ class ToolsModeTests(unittest.TestCase):
             "recording mode must never register debug_* tools",
         )
 
+    def test_allowed_tools_for_mode_matches_the_policy(self):
+        self.assertEqual(set(), mcp_server.allowed_tools_for_mode("play"),
+                         "play exposes only live-evidenced tools, and there are none")
+        bootstrap = mcp_server.allowed_tools_for_mode("bootstrap")
+        self.assertNotIn("get_state", bootstrap, "bootstrap never reads the snapshot")
+        self.assertIn("get_new_game_options", bootstrap)
+        self.assertIsNone(mcp_server.allowed_tools_for_mode("test"), "test is unfiltered")
+
+    def test_play_mode_exposes_only_local_tools(self):
+        names = self._list_tool_names("--mode", "play")
+        self.assertNotIn("get_state", names)
+        self.assertNotIn("open_shop", names)
+        self.assertNotIn("confirm_trade", names)
+        self.assertTrue(names <= set(mcp_server.LOCAL_TOOL_NAMES),
+                        "only local tools survive a play-mode filter: %r" % (sorted(names),))
+
+    def test_bootstrap_mode_hides_snapshot_reads(self):
+        names = self._list_tool_names("--mode", "bootstrap")
+        for hidden in ("get_state", "get_run_summary", "get_legal_actions",
+                       "wait_for_change", "wait_for_events", "wait_until"):
+            self.assertNotIn(hidden, names, "bootstrap must not expose " + hidden)
+        self.assertIn("get_new_game_options", names)
+
+    def test_explicit_test_mode_keeps_the_full_surface(self):
+        self.assertEqual(116, len(self._list_tool_names("--mode", "test")))
+
     def test_demo_allowlist_is_a_subset_of_the_recording_surface(self):
         demo_tools = demo_agent.ALLOWED_OPS
 
