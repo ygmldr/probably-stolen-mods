@@ -45,7 +45,7 @@ $ sed -n '52,60p'  _decomp/ModSecurityDebug.cs  -> "refused by the game update o
 # 5) 自跑全量/编译 gate（用于交叉核对矩阵 C8/NR-06 的“可编译”结论）
 $ ./test.sh                                   -> passed=750 failed=0（最终提交；矩阵 §10.1/§12 记录其快照时点 749，见 G-2）
 $ .venv/bin/python -B -m unittest discover -s agent/tests -> Ran 365 tests OK（与最终 report/test matrix 一致）
-$ $DOTNET build src/PawnMind.csproj -c Release -p:GameManaged=/root/work/game_managed
+$ $DOTNET build src/PawnMind.csproj -c Release -p:GameManaged=<game-managed>
 Build succeeded. 0 Warning(s) 0 Error(s)      -> 与矩阵 §10.1 的编译 gate 结论一致
 ```
 
@@ -108,7 +108,7 @@ Build succeeded. 0 Warning(s) 0 Error(s)      -> 与矩阵 §10.1 的编译 gate
   `dist` 安装一致性、启用/拒绝/能力提示的真实行为、Workshop 上传/验证。需要：游戏进程/Windows 构建机/
   用户在场授权；本批次未启动游戏、未安装、未上传。
 - **NOT_RUN**：`APIChanges.md` / `ModdingGuide.md` 本地不存在（仓库内 0 命中），内容未核实。
-- **UNKNOWN**：`_decomp` 规则副本（`ModScanner.VERSION=4`）与 `/root/work/game_managed` 的 MVID 是否同一构建；
+- **UNKNOWN**：`_decomp` 规则副本（`ModScanner.VERSION=4`）与 `<game-managed>` 的 MVID 是否同一构建；
   规则随游戏更新会变，实机 `mod-scan` 永远优先。
 - **UNKNOWN（记录）**：`dist` DLL 的 IL 级引用/`unlisted-reference`/`native` 二进制证据未检查
   （无 ilspycmd；矩阵 `NR-10` 已登记）。

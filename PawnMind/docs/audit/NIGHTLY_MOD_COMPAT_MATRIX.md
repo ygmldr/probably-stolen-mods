@@ -14,7 +14,7 @@
 | 快照时间（UTC） | 首扫 `2026-11-16T20:12:17Z` @ `4846189` → 复扫 `20:21:06Z` @ `6ab3333` → **C/D/E 合并后复核 + 编译 gate `20:40–20:41Z` @ `f789a92`** | `date -u` / `git log -1` |
 | HEAD（最终） | `f789a92f7b347ab605ab3230f08512684629b25e`（`git describe` = `v1.0.1-45-gf789a92`）；审计期间新增 C/D `f09314e`、E `299ecd4`、G 文档 `f789a92` | `git rev-parse HEAD` / `git describe --tags --always` |
 | 工作树 | 审计开始时 clean；复核/写文档期间其他模块在更新 `AGENTS.md`、`README.md`、`PawnMind/AGENTS.md`、`PawnMind/README.md`、`docs/audit/NIGHTLY_BASELINE.md`、`docs/audit/NIGHTLY_TEST_MATRIX.md`、`docs/reports/NIGHTLY_BATCH_A_REPORT.md`、`agent/tests/test_skill_tool_refs.py`（均为文档/测试元数据，非本模块修改） | `git status --porcelain` |
-| 扫描范围 | `PawnMind/src/**`（含 C/D 新增 `TradeService`/`GameTradePort`/`Operation*`/`TradeGuard`）、`PawnMind/agent/**`、`PawnMind/tools/**`、`PawnMind/build.sh`、`PawnMind/manifest.xml`、`PawnMind/dist/**`、`PawnMind/test.sh`（只读）、`/root/work/game_managed`（只读）、`/root/work/game_mods/_decomp`（只读） | — |
+| 扫描范围 | `PawnMind/src/**`（含 C/D 新增 `TradeService`/`GameTradePort`/`Operation*`/`TradeGuard`）、`PawnMind/agent/**`、`PawnMind/tools/**`、`PawnMind/build.sh`、`PawnMind/manifest.xml`、`PawnMind/dist/**`、`PawnMind/test.sh`（只读）、`<game-managed>`（只读）、`<repo>/_decomp`（只读） | — |
 | 本文件统计口径 | 见 §12；全部计数可用 §14 命令重跑 | — |
 
 > ⚠️ 本矩阵是**时间点快照**：批次合并后必须用 §14 命令重跑；数字漂移不代表本文件当时造假。
@@ -50,15 +50,15 @@
 | 对象 | 本地状态 | 位置/证据 | 能否作为运行结果 |
 |---|---|---|---|
 | 官方可执行 ModScanner | **仍不可运行**（本机无游戏进程；离线 harness 需游戏程序集且会写构建产物，本任务未授权运行） | 见 §10.2 `NR-01`/`NR-02` | `NOT_RUN` |
-| 编译链路（供"能否构建"判断） | **可用且已实测**：.NET 9 SDK；`.env.server` 提供 `DOTNET` / `GAME_MANAGED` / `PAWNMIND_NEWTONSOFT_DLL`；`PAWNMIND_BUILD_ONLY=1 ./build.sh` 通过 | `/root/.dotnet/dotnet`（9.0.321）；`/root/work/game_managed`；证据 §10.1 `NR-06` | PASS（编译 gate） |
+| 编译链路（供"能否构建"判断） | **可用且已实测**：.NET 9 SDK；`.env.server` 提供 `DOTNET` / `GAME_MANAGED` / `PAWNMIND_NEWTONSOFT_DLL`；`PAWNMIND_BUILD_ONLY=1 ./build.sh` 通过 | `<dotnet>/dotnet`（9.0.321）；`<game-managed>`；证据 §10.1 `NR-06` | PASS（编译 gate） |
 | 官方规则源码（反编译副本） | **存在**（本机从已安装游戏程序集反编译，`ModScanner.VERSION = 4`） | `_decomp/ModScanner.cs:1994`；`_decomp/ModCapability.cs`；`_decomp/ModScanResult.cs`；`_decomp/ModScanFinding.cs`；`_decomp/ModSecurityDebug.cs`；`_decomp/ModLoader.cs`（启用链） | 只作**规则推导**，不是扫描结果 |
 | 游戏内官方命令 `mod-scan` | 源码存在（`[Command("mod-scan", …)]`，需游戏进程内执行） | `_decomp/ModSecurityDebug.cs:11-101` | `NOT_RUN` |
 | 离线扫描 harness | 存在（CompactSort 的历史工具，硬编码 Windows 游戏安装路径，会写 `bin/obj`） | `CompactSort/test/ScannerCheck/Program.cs:8-10`、`ScannerCheck.csproj` | `NOT_RUN` |
 | `APIChanges.md` / `ModdingGuide.md` | **仓库内不存在**（`find` 0 命中） | §10.2 `NR-03` | `NOT_RUN` |
-| 游戏程序集参考副本 | 存在（`/root/work/game_managed`，仅 Managed 目录，非安装目录） | `Assembly-CSharp.dll` SHA256 `725cb999d019dff1ff31bed353c7f9bb8d81a7605a15de1f80f5a3a6cf7b1d05`，4,820,224 B，mtime 2026-11-09 | 参考用，MVID `NOT_RUN` |
+| 游戏程序集参考副本 | 存在（`<game-managed>`，仅 Managed 目录，非安装目录） | `Assembly-CSharp.dll` SHA256 `725cb999d019dff1ff31bed353c7f9bb8d81a7605a15de1f80f5a3a6cf7b1d05`，4,820,224 B，mtime 2026-11-09 | 参考用，MVID `NOT_RUN` |
 
 > **来源声明**：本矩阵的"扫描器预测"全部由 `_decomp/` 本地反编译副本的规则逐条推导，**没有引用任何网传兼容性口径**；外部 URL 只作为"获取方式"记录（§10.2 `NR-03`），其内容未在本机核实，不作为规则依据。
-> **局限**：反编译副本对应 0.46D 的某个安装构建，但**未能证明**它与我方编译所用 `/root/work/game_managed` 是同一 MVID；规则会随更新变化，实机 `mod-scan` 结果永远优先于本矩阵。
+> **局限**：反编译副本对应 0.46D 的某个安装构建，但**未能证明**它与我方编译所用 `<game-managed>` 是同一 MVID；规则会随更新变化，实机 `mod-scan` 结果永远优先于本矩阵。
 
 ### 1.2 本地规则要点（用于推导，逐条可查）
 
@@ -195,7 +195,7 @@
 |---|---|---|---|---|---|---|
 | N-01 | — | `DllImport` / `extern` / `Marshal.*` / `unsafe` / `calli` / `NativeLibrary` | **0 命中**（C/D 合并后复核仍为 0） | PASS | `grep -rn "DllImport\|extern \|Marshal\.\|unsafe" src` = 0；`System.Runtime.InteropServices` 也未导入 | 保持禁止 |
 | N-02 | `dist/PawnMind/PawnMind.dll` 与 `src/bin/Release/netstandard2.1/PawnMind.dll` | PE32 Mono/.NET assembly | 无法从源码证明"无原生依赖"，需扫描器/引用清单校验 | 低 | 编译 gate 已 PASS（§10.1），但**编译成功不等于无原生依赖**；二进制引用清单/IL 检查仍 `NOT_RUN` | `NOT_RUN`：`NR-10`（需 `ilspycmd`/`mod-scan` 查看引用） |
-| N-03 | `/root/work/game_managed/*.dll` | 游戏 Managed 参考副本存在（只读） | 不适用 | 低 | 仅用于编译/契约测试，不会进 dist（`<Private>false</Private>`，`src/PawnMind.csproj:24-61`） | 保持 `Private=false` |
+| N-03 | `<game-managed>/*.dll` | 游戏 Managed 参考副本存在（只读） | 不适用 | 低 | 仅用于编译/契约测试，不会进 dist（`<Private>false</Private>`，`src/PawnMind.csproj:24-61`） | 保持 `Private=false` |
 
 ---
 
@@ -266,7 +266,7 @@
 | D-04 | **dist 是否对应当前源码** | **不对应（STALE）**：dist DLL mtime `2026-11-16 17:58:22Z`；最终复核时 **26 个源码 `.cs` 文件比它新**（排除 `obj/bin`；列表见 §14 命令）。本机编译 gate 产出的新 DLL（`d29209a4…`，338,432 B）与 dist（`ad335987…`，296,960 B）**哈希不同** → dist 确定不是当前代码构建 | **高** | `find src … -newer dist/PawnMind/PawnMind.dll`；`sha256sum src/bin/Release/netstandard2.1/PawnMind.dll dist/PawnMind/PawnMind.dll` |
 | D-05 | dist 是否可被 git 校验 | 不可：`.gitignore:4` `**/dist/` | 中 | `git check-ignore -v PawnMind/dist/PawnMind/PawnMind.dll` → `.gitignore:4:**/dist/` |
 | D-06 | build 产物 / 编译门禁 | **编译 gate 实测 PASS**（§10.1 `NR-06`）；产物 `d29209a4…`/338,432 B；DLL MVID/程序集版本仍未读取 | PASS（编译）/ NOT_RUN（MVID） | `PAWNMIND_BUILD_ONLY=1 ./build.sh` 退出码 0；MVID 读取见 §10.2 `NR-10` |
-| D-07 | 与已安装 DLL 比较 | 已安装目录本机不可访问（无 `/mnt`、无 Probably Stolen 安装；`/root/work/game_managed` 只是 Managed 参考目录，不是 `Mods/PawnMind`） | **NOT_RUN** | §10.2 `NR-04`；历史记录：已安装 `e9e1bd07…`、295,424 B（`docs/audit/BASELINE_CURRENT.md:31`、`docs/plans/PLAYER_PARITY_IMPLEMENTATION-v2.md:29`）→ 与 dist `ad335987…`、296,960 B **不一致** |
+| D-07 | 与已安装 DLL 比较 | 已安装目录本机不可访问（无 `/mnt`、无 Probably Stolen 安装；`<game-managed>` 只是 Managed 参考目录，不是 `Mods/PawnMind`） | **NOT_RUN** | §10.2 `NR-04`；历史记录：已安装 `e9e1bd07…`、295,424 B（`docs/audit/BASELINE_CURRENT.md:31`、`docs/plans/PLAYER_PARITY_IMPLEMENTATION-v2.md:29`）→ 与 dist `ad335987…`、296,960 B **不一致** |
 | D-08 | 是否"只记录不覆盖" | **是**：本批次未复制、未安装、未覆盖任何游戏目录；唯一构建动作是 `PAWNMIND_BUILD_ONLY=1`（打包前退出） | PASS | 日志 `/tmp/pawnmind_build_gate_full.log` 末行：`PAWNMIND_BUILD_ONLY=1: build gate complete; skipping dist packaging.` |
 
 > **验收含义**：`dist` ≠ 当前源码，且 `dist` ≠ 已安装 DLL（历史记录）。编译 gate PASS 只说明"能编译"，**不说明 dist/安装已更新**。因此**任何当前游戏内现象都不能归因于仓库 HEAD 代码**。等级：**高（验收归因）**。
@@ -283,8 +283,8 @@
 |---|---|
 | 结论 | **PASS（实测）**。上一版"Linux 无 Windows dotnet 目标 → NOT_RUN"的表述**错误**，本版已改正 |
 | 时间 / HEAD | `2026-11-16T20:40–20:41Z`（UTC）@ `f789a92`（`v1.0.1-45-gf789a92`） |
-| 命令（精确） | `cd /root/work/game_mods/PawnMind && set -a; . ./.env.server; set +a; PAWNMIND_BUILD_ONLY=1 ./build.sh` |
-| 环境 | `/root/.dotnet/dotnet`（.NET SDK 9.0.321）；`GAME_MANAGED=/root/work/game_managed`；`PAWNMIND_NEWTONSOFT_DLL=/root/work/game_managed/Newtonsoft.Json.dll`（来自 host-local `.env.server`，已 gitignore） |
+| 命令（精确） | `cd <repo>/PawnMind && set -a; . ./.env.server; set +a; PAWNMIND_BUILD_ONLY=1 ./build.sh` |
+| 环境 | `<dotnet>/dotnet`（.NET SDK 9.0.321）；`GAME_MANAGED=<game-managed>`；`PAWNMIND_NEWTONSOFT_DLL=<game-managed>/Newtonsoft.Json.dll`（来自 host-local `.env.server`，已 gitignore） |
 | 退出码 | **0**（`EXIT=0`） |
 | 测试摘要 | C# 纯逻辑 `passed=749 failed=0`（审阅修复后 750/0）；脚本门禁 `passed=53 failed=0`；适配器契约 `contract checks: 503` / `adapter contract OK`；日志内 `PASS` 行 1305、`FAIL` 0、`SKIP` 0 |
 | 编译摘要 | `Build succeeded. 0 Warning(s) 0 Error(s)`；`PawnMind -> src/bin/Release/netstandard2.1/PawnMind.dll` |
@@ -299,7 +299,7 @@
 |---|---|---|---|---|
 | `NR-01` | 官方扫描命令 `mod-scan`（游戏内） | `NOT_RUN`（无游戏进程） | 启动 0.46D → 加载 PawnMind → 打开开发者控制台（F8）→ 执行：`mod-scan pawnmind`；未加载时：`mod-scan "D:\Program Files\steam\steamapps\common\Probably Stolen\Mods\PawnMind"` | 完整输出：`declared` / `detected` / `UNDECLARED (enable would be refused)` / `DEPRECATED` / `VERIFICATION` / `HARD FLAGS` / `findings` / `fingerprint` |
 | `NR-02` | 离线 ScannerCheck harness | `NOT_RUN`（需游戏程序集；构建会写 `CompactSort/test/ScannerCheck` 的 `bin/obj`，本任务未授权） | `cd CompactSort/test/ScannerCheck && dotnet run -c Release -- "D:\Program Files\steam\steamapps\common\Probably Stolen\Mods\PawnMind"`（`Program.cs:8-10` 硬编码 Managed 路径；需要游戏 0.46D 默认安装位置） | `error=`、`refused=`、`caps=`、`methods=`、`hard=`、`findings=`；注意它**不打印** declared/undeclared/verification |
-| `NR-03` | `APIChanges.md` / `ModdingGuide.md` | 仓库内**不存在**（`find` 0 命中）；内容未在本地核实 | `cd /root/work/game_mods && find . -path ./.git -prune -o \( -iname 'APIChanges*' -o -iname 'ModdingGuide*' \) -print`；仓库内文档引用的获取地址（**仅获取方式，未核实内容，禁止当作本地证据**）：`https://github.com/dragonpan2/probably-stolen-modding/blob/main/APIChanges.md`、`.../ModdingGuide.md`（见 `docs/PAWNMIND_AGENT_BRIEF_NEXT_PHASE_2026-11-17.md:329-332`） | 下载后记录 commit/hash 与读取日期；与 `_decomp/ModScanner.cs` 规则对比 |
+| `NR-03` | `APIChanges.md` / `ModdingGuide.md` | 仓库内**不存在**（`find` 0 命中）；内容未在本地核实 | `cd <repo> && find . -path ./.git -prune -o \( -iname 'APIChanges*' -o -iname 'ModdingGuide*' \) -print`；仓库内文档引用的获取地址（**仅获取方式，未核实内容，禁止当作本地证据**）：`https://github.com/dragonpan2/probably-stolen-modding/blob/main/APIChanges.md`、`.../ModdingGuide.md`（见 `docs/PAWNMIND_AGENT_BRIEF_NEXT_PHASE_2026-11-17.md:329-332`） | 下载后记录 commit/hash 与读取日期；与 `_decomp/ModScanner.cs` 规则对比 |
 | `NR-04` | dist vs 已安装 DLL / manifest | 安装目录不可访问 | Windows/WSL 构建机：`sha256sum "/mnt/d/Program Files/steam/steamapps/common/Probably Stolen/Mods/PawnMind/PawnMind.dll"` + `stat -c '%s %y' …`；`sha256sum …/manifest.xml`；`cat …/manifest.xml` | 与 dist `ad335987…`/296,960 B **及**新构建产物 `d29209a4…`/338,432 B 对比；历史安装 `e9e1bd07…`/295,424 B；**只记录，不覆盖** |
 | `NR-05` | 运行中版本/MVID/`/health` | `NOT_RUN`（无游戏） | 游戏运行后：`curl -s http://127.0.0.1:15528/health`（`/health` 免 token）；记录 `ok`、`version`、`game_version`、`game_assembly_mvid`、`expected_*`、`write_gate`、`latest`；或游戏内 `mod-trust` | 与 `bridge.conf` 的 `expected_*` 对比；`latest=UNVERIFIED` 是预期 |
 | `NR-07` | Workshop 上传/验证/预览素材 | `NOT_RUN`（未发布，按边界不执行） | 由 Steam 客户端/游戏内工坊 UI 完成；上传前需 `mod-scan` 0 硬旗 +（若声明 files/network）开发者验证；本仓库未找到离线上传工具 | 记录工坊 item id、版本、验证状态；**本批次不上架** |
@@ -410,7 +410,7 @@
 ## 14. 附录：证据命令（可复现 §12）
 
 ```bash
-cd /root/work/game_mods/PawnMind
+cd <repo>/PawnMind
 
 # 0) 快照
 date -u; git -C .. rev-parse HEAD; git -C .. describe --tags --always; git -C .. status --porcelain
@@ -456,7 +456,7 @@ sha256sum src/bin/Release/netstandard2.1/PawnMind.dll     # d29209a4…（编译
 git -C .. check-ignore -v PawnMind/dist/PawnMind/PawnMind.dll
 
 # 8) 编译 gate（本任务已实测 PASS；会先跑 test.sh，约 1–2 分钟；dist 打包前退出）
-cd /root/work/game_mods/PawnMind
+cd <repo>/PawnMind
 set -a; . ./.env.server; set +a
 PAWNMIND_BUILD_ONLY=1 ./build.sh        # 期望: C# 749/0（审阅修复后 750/0）, 门禁 53/0, 契约 503, Build succeeded 0/0, EXIT=0
 # 日志示例（本机临时）: /tmp/pawnmind_build_gate_full.log
@@ -466,8 +466,8 @@ python3 -c 'import json;d=json.load(open("docs/audit/tools-inventory.json"));pri
 .venv/bin/python tools/gen_policy_catalog.py --check      # sha256 e0da5a24… matches tool_policy.json
 
 # 10) 官方规则副本定位（仅为推导，不是运行结果）
-ls /root/work/game_mods/_decomp/ModScanner.cs /root/work/game_mods/_decomp/ModSecurityDebug.cs
-grep -n "VERSION = 4\|REFUSE_UNSCANNABLE_CAPABILITIES" /root/work/game_mods/_decomp/ModScanner.cs
+ls <repo>/_decomp/ModScanner.cs <repo>/_decomp/ModSecurityDebug.cs
+grep -n "VERSION = 4\|REFUSE_UNSCANNABLE_CAPABILITIES" <repo>/_decomp/ModScanner.cs
 ```
 
 ---
@@ -477,6 +477,6 @@ grep -n "VERSION = 4\|REFUSE_UNSCANNABLE_CAPABILITIES" /root/work/game_mods/_dec
 - 本文件是 **static audit + 编译 gate 实测**：`PASS`/`FAIL` 只用于静态项与编译 gate；所有需要游戏/Scanner/安装的项均为 `NOT_RUN`（§10.2）。
 - 预测来自本地反编译规则副本（`_decomp/ModScanner.cs` VERSION=4），**不是**官方运行结果；其与已安装构建的 MVID 对应关系未核实（`UNKNOWN`）。
 - 未引用任何网传兼容性口径；外部链接仅作获取方式记录。
-- **本版已改正**上一版的错误结论：编译 gate 不是 `NOT_RUN`，而是在本机 Linux/CT101 实测 **PASS**（§10.1）；仅 dist 打包/安装保留 `NOT_RUN`（`NR-11`）。
+- **本版已改正**上一版的错误结论：编译 gate 不是 `NOT_RUN`，而是在本机 Linux/build host 实测 **PASS**（§10.1）；仅 dist 打包/安装保留 `NOT_RUN`（`NR-11`）。
 - **共享树是移动的**：审计跨越 `4846189`（首扫）→ `6ab3333`（Nightly B）→ `f789a92`（C/D/E 合并后最终复核）；C/D 合并后重扫确认计数无新增。合并/提交后仍必须用 §14 重跑并据此复核本矩阵。
 - 与本文件配套阅读：`docs/plans/WORKSHOP_INSTALL_DRAFT.md`（安装/回滚草稿，未上架）。

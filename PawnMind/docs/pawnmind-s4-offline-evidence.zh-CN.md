@@ -11,7 +11,7 @@
 | Core 端口 | 注入 `IRecordingGameStatePort`、`IRecordingSlotInventoryPort`、`IRecordingNativeSavePort`、`IRecordingSaveMetadataPort`。Core 不引用 Unity/游戏类型。 |
 | Bridge 服务 | `RecordingSaveService`：`get_recording_save_status`（只读）、`save_recording_game`、`load_recording_game`、`confirm_new_game`，以及旧入口 `new_game` / `load_game` / `save_game` / `sleep` / `press` 的统一策略。 |
 | Bridge 路由 | `RecordingDispatchGuard`：`act` 包裹受保护 op 直接 `recording_act_wrapper_forbidden`；`press` 始终拒绝；旧写入口在进入原生层前被拦。`get_recording_save_status` 加入 `ActionRouter` 只读白名单。 |
-| Game 适配器 | [RecordingSaveAdapter.cs](<../PawnMind/src/Game/RecordingSaveAdapter.cs>)：只读 `SaveFiles.IndexLoad` 槽索引 / `PlayerStore` 身份；原生 `SaveGame`、`StartNewGameClick`（经难度页原生 Start）、`EndDayUIManager.OnEndDayButtonClick`、`ConfirmPanelUIManager.OnYesClick`。不直接调用 ES3，不设置新局目标槽，不读存档预览内容。 |
+| Game 适配器 | [RecordingSaveAdapter.cs](<../src/Game/RecordingSaveAdapter.cs>)：只读 `SaveFiles.IndexLoad` 槽索引 / `PlayerStore` 身份；原生 `SaveGame`、`StartNewGameClick`（经难度页原生 Start）、`EndDayUIManager.OnEndDayButtonClick`、`ConfirmPanelUIManager.OnYesClick`。不直接调用 ES3，不设置新局目标槽，不读存档预览内容。 |
 | 菜单接线 | S3B 的 7 个菜单写操作改为经同一 `CheckMenuWrite()`；旧固定拒绝 `new_game_slot_policy_unavailable` 已从生产代码移除。 |
 | 适配器契约 | 新增 `PlayerStore.HasInstance`、`ConfirmPanelUIManager.OnYesClick`；既有 `SaveFiles.IndexLoad/Slot/NextFreeSlotId`、`NewGameData.saveSlot`、`PlayerStore.saveSlotId/runID/runNumber/startType/startScenarioId/lastSaveTime`、`SavePreviewData.lastSaveDateTime` 均在 Rev13 程序集上通过。 |
 

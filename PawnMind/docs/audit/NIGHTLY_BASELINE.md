@@ -1,6 +1,6 @@
 # NIGHTLY_BASELINE — Nightly Batch A 基线冻结（服务器侧续跑版）
 
-> 采集/收尾：2026-11-17 03:54–05:0x (Asia/Shanghai)，主机 `CT101`（`/root/work/game_mods`）。
+> 采集/收尾：2026-11-17 03:54–05:0x (Asia/Shanghai)，主机 `build host`（`<repo>`）。
 > 未启动游戏，未读写存档，未覆盖安装，未推送远程。所有实机项 `NOT_RUN`。
 >
 > 上一版基线（WSL + A 模块）提交见 `docs/reports/NIGHTLY_BATCH_A_REPORT.md`；本文件记录本批次
@@ -22,13 +22,13 @@
 | 项 | 值 |
 |---|---|
 | 系统 | Ubuntu 24.04 x86_64，12 核 / 20 GB |
-| .NET SDK | **9.0.321**（`/root/.dotnet`，`/usr/local/bin/dotnet` 软链，本批次新装） |
+| .NET SDK | **9.0.321**（`<dotnet>`，`/usr/local/bin/dotnet` 软链，本批次新装） |
 | Python venv | `PawnMind/.venv`（mcp 2.3.0 / pydantic），`python -V` = 3.12.3 |
 | 环境文件 | `PawnMind/.env.server`（DOTNET/GAME_MANAGED/PAWNMIND_NEWTONSOFT_DLL；已 gitignore） |
-| 游戏 DLL | `/root/work/game_managed`（Assembly-CSharp + Newtonsoft + 161 DLL，只读引用） |
-| 编译 gate | `dotnet build src/PawnMind.csproj -c Release -p:GameManaged=/root/work/game_managed` → **Build succeeded 0 warnings 0 errors**（服务器上可跑，见 G 矩阵 NR-06 更正） |
+| 游戏 DLL | `<game-managed>`（Assembly-CSharp + Newtonsoft + 161 DLL，只读引用） |
+| 编译 gate | `dotnet build src/PawnMind.csproj -c Release -p:GameManaged=<game-managed>` → **Build succeeded 0 warnings 0 errors**（服务器上可跑，见 G 矩阵 NR-06 更正） |
 
-## 3. 测试基线（本批次末，CT101 实测）
+## 3. 测试基线（本批次末，build host 实测）
 
 | 套件 | 起始 | 本批次末 | 命令 |
 |---|---|---|---|

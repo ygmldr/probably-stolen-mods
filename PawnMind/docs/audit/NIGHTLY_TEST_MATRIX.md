@@ -2,7 +2,7 @@
 
 > 规则：**空白 ≠ PASS**。没有真实运行记录的一律 `NOT_RUN`。
 > 层级：`L0-static`（源码扫描/纯逻辑）· `L1-fake`（假实现/假端口）· `L2-integration-no-game`（真 loopback socket，无游戏）· `L3-real-game`（需要游戏进程，本批次一律 `NOT_RUN`）。
-> 采集：2026-11-17 05:0x，CT101；全量命令见 §复现。
+> 采集：2026-11-17 05:0x，build host；全量命令见 §复现。
 > 本表只记录**本批次实际运行过**的结果；fake 证据不计入 live evidence。
 
 ## 全量数字
@@ -96,7 +96,7 @@
 |---|---|---|---|---|
 | `PP-COMPAT-01` | L0-static | `docs/audit/NIGHTLY_MOD_COMPAT_MATRIX.md`（反射/线程/监听器/P-Invoke/打包 Python/Unity-in-Core/manifest/dist） | **PASS（静态）** | 每条 文件:行号 + 风险 + 替代建议 |
 | `PP-MODSCAN-01` | L3 | 官方 `mod-scan` / `ScannerCheck` | **NOT_RUN** | 无游戏进程；命令见矩阵 §10 |
-| `PP-BUILD-01` | L0 | 编译 gate（Linux/CT101） | **PASS** | `dotnet build src/PawnMind.csproj -c Release -p:GameManaged=/root/work/game_managed` → Build succeeded |
+| `PP-BUILD-01` | L0 | 编译 gate（Linux/build host） | **PASS** | `dotnet build src/PawnMind.csproj -c Release -p:GameManaged=<game-managed>` → Build succeeded |
 | `PP-INSTALL-01` | L3 | dist 打包 / 安装一致性 | **NOT_RUN** | 只记录不一致；未安装、未覆盖 |
 
 ## F — 独立审阅与集成
@@ -110,7 +110,7 @@
 ## 复现命令
 
 ```bash
-cd /root/work/game_mods/PawnMind
+cd <repo>/PawnMind
 set -a; . .env.server; set +a
 
 ./test.sh                                                    # 750 + 门禁 53 + 契约 503
@@ -119,5 +119,5 @@ set -a; . .env.server; set +a
 ./test.sh PP_TRADE                                           # C 交易守卫
 .venv/bin/python -B -m unittest discover -s agent/tests      # 365
 .venv/bin/python tools/gen_policy_catalog.py --check         # 策略漂移
-$DOTNET build src/PawnMind.csproj -c Release -p:GameManaged=/root/work/game_managed  # 编译 gate
+$DOTNET build src/PawnMind.csproj -c Release -p:GameManaged=<game-managed>  # 编译 gate
 ```

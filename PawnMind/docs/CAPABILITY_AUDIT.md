@@ -3,7 +3,7 @@
 **审计时间**：2026-11-14
 **基线 commit**：`fd287da9b6bef82e5de56333cf51b38f028f4e0e`（工作树干净）
 **审计性质**：只读。未启动游戏、未执行任何写动作、未读写任何真实存档文件。
-**对应规范**：[Probably_Stolen_Agent_Memory_Architecture_v1.md](<../Probably_Stolen_Agent_Memory_Architecture_v1.md>) 第 12 节 Phase 0（P0.1–P0.7）
+**对应规范**：[Probably_Stolen_Agent_Memory_Architecture_v1.md](Probably_Stolen_Agent_Memory_Architecture_v1.md) 第 12 节 Phase 0（P0.1–P0.7）
 
 ---
 
@@ -59,9 +59,9 @@ PawnMind/
 
 产出（审计附件）：
 
-- [mcp-tools-full.json](<mcp-tools-full.json>) — 102 个工具的完整 `input_schema` 快照（P0 初审时为 100，截图取证特性后增加 2 个）
-- [mcp-tools-recording.json](<mcp-tools-recording.json>) — 96 个（录制集）
-- [tool-matrix.md](<tool-matrix.md>) — 逐工具的可读/写/风险/rev/参数/验证状态表
+- [mcp-tools-full.json](audit/tools-inventory.json) — 102 个工具的完整 `input_schema` 快照（P0 初审时为 100，截图取证特性后增加 2 个）
+- [mcp-tools-recording.json](audit/tools-inventory.json) — 96 个（录制集）
+- [tool-matrix.md](audit/PLAYER_ENTRY_MATRIX.csv) — 逐工具的可读/写/风险/rev/参数/验证状态表
 
 ### 2.1 数量与集合差异
 
@@ -130,7 +130,7 @@ client.wait_events()     1 个工具  →  GET /events
 
 ### 3.3 幂等键已存在
 
-`BridgeClient.action()` 每次调用自动生成 `action_id = uuid4()`（[pawnmind_client.py](<../../PawnMind/agent/pawnmind_client.py>)）。
+`BridgeClient.action()` 每次调用自动生成 `action_id = uuid4()`（[pawnmind_client.py](<../agent/pawnmind_client.py>)）。
 
 - 该值同时是服务端幂等缓存键，可直接作为事件的 `idempotency_key`。
 - `rev` 由模型显式传入，写入事件时一并记录。
@@ -233,9 +233,9 @@ unicode61：不切分 CJK，整段中文成为一个 token
 
 | 资产 | 位置 | 能力 |
 |---|---|---|
-| fake 游戏桥 | [agent/fake_game.py](<../../PawnMind/agent/fake_game.py>) | 127.0.0.1 随机端口，实现 96 工具子集：四阶段新局菜单、录制三态、交易原子性、房东对话、跨日、租金回执、存读档绑定 |
-| 脚本策略端到端 | [agent/demo_agent.py](<../../PawnMind/agent/demo_agent.py>) | 走真实 MCP stdio，19 个 allowlist 工具跑完整首周 |
-| 预检脚本 | [agent/preflight.py](<../../PawnMind/agent/preflight.py>) | 只读健康检查，退出码 0/1/2 |
+| fake 游戏桥 | [agent/fake_game.py](<../agent/fake_game.py>) | 127.0.0.1 随机端口，实现 96 工具子集：四阶段新局菜单、录制三态、交易原子性、房东对话、跨日、租金回执、存读档绑定 |
+| 脚本策略端到端 | [agent/demo_agent.py](<../agent/demo_agent.py>) | 走真实 MCP stdio，19 个 allowlist 工具跑完整首周 |
+| 预检脚本 | [agent/preflight.py](<../agent/preflight.py>) | 只读健康检查，退出码 0/1/2 |
 | 端到端测试 | `agent/tests/test_demo_agent_e2e.py` 等 | 81 项 Python 测试全绿 |
 
 **P1 可直接复用**：fake 游戏作为“可重放的受控模拟”，事件回放无需启动真实游戏。

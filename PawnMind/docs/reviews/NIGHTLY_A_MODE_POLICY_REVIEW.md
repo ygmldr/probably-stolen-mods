@@ -17,7 +17,7 @@ Change scope: `src/Core/ModePolicy.cs`、`src/Core/RunModeBinding.cs`、`src/Cor
 
 ## Real evidence（本 Agent 亲自运行，非照抄实现者报告）
 
-环境：CT101 `/root/work/game_mods/PawnMind`，`set -a; . .env.server; set +a`；时间 2026-11-16 20:39–21:05 UTC。
+环境：build host `<repo>/PawnMind`，`set -a; . .env.server; set +a`；时间 2026-11-16 20:39–21:05 UTC。
 
 ```text
 # 最终提交（f7ae62c）全量：
@@ -36,9 +36,9 @@ $ .venv/bin/python tools/gen_policy_catalog.py --check
 ok: .../src/Core/PolicyCatalog.g.cs matches tool_policy.json (sha256 e0da5a24a0c21014db57ee842413ef4d6d10ac0e1dca3545dea417490f22d1cc)
 EXIT=0
 
-$ $DOTNET build src/PawnMind.csproj -c Release -p:GameManaged=/root/work/game_managed
+$ $DOTNET build src/PawnMind.csproj -c Release -p:GameManaged=<game-managed>
 Build succeeded. 0 Warning(s) 0 Error(s)
-$ $DOTNET build src/PawnMind.csproj -c Release -t:Rebuild -p:GameManaged=/root/work/game_managed
+$ $DOTNET build src/PawnMind.csproj -c Release -t:Rebuild -p:GameManaged=<game-managed>
 Build succeeded. 0 Warning(s) 0 Error(s)
 src/bin/Release/netstandard2.1/PawnMind.dll = d29209a4...87eec (338,432 B)   # 两次构建同哈希（确定性）
 ```

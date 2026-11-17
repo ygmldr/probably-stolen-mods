@@ -14,11 +14,11 @@
 
 | 文件 | 行数 | 作用 |
 |---|---|---|
-| [`agent/fake_game.py`](../PawnMind/agent/fake_game.py) | 1573 | 127.0.0.1 临时端口假游戏桥（测试替身）：`/health`、`/state`、`/action`、菜单、录制槽、首周、存读档 |
-| [`agent/demo_agent.py`](../PawnMind/agent/demo_agent.py) | 805 | 脚本化“AI”策略：真 MCP stdio 客户端 + 只允许 19 个工具 + rev/action_id 纪律 + 停机语义 |
-| [`agent/tests/test_fake_game_contract.py`](../PawnMind/agent/tests/test_fake_game_contract.py) | 736 | 假桥契约测试（21 项） |
-| [`agent/tests/test_demo_agent_e2e.py`](../PawnMind/agent/tests/test_demo_agent_e2e.py) | 277 | 端到端 + 停机条件测试（7 项） |
-| [`agent/tests/test_mcp_entrypoint.py`](../PawnMind/agent/tests/test_mcp_entrypoint.py) | 89 | 宿主入口 `python -m agent.mcp_server` 测试（2 项） |
+| [`agent/fake_game.py`](../agent/fake_game.py) | 1573 | 127.0.0.1 临时端口假游戏桥（测试替身）：`/health`、`/state`、`/action`、菜单、录制槽、首周、存读档 |
+| [`agent/demo_agent.py`](../agent/demo_agent.py) | 805 | 脚本化“AI”策略：真 MCP stdio 客户端 + 只允许 19 个工具 + rev/action_id 纪律 + 停机语义 |
+| [`agent/tests/test_fake_game_contract.py`](../agent/tests/test_fake_game_contract.py) | 736 | 假桥契约测试（21 项） |
+| [`agent/tests/test_demo_agent_e2e.py`](../agent/tests/test_demo_agent_e2e.py) | 277 | 端到端 + 停机条件测试（7 项） |
+| [`agent/tests/test_mcp_entrypoint.py`](../agent/tests/test_mcp_entrypoint.py) | 89 | 宿主入口 `python -m agent.mcp_server` 测试（2 项） |
 | [`pawnmind-ai-host-setup.zh-CN.md`](pawnmind-ai-host-setup.zh-CN.md) | 280 | 宿主接入说明（OpenCode 模板、模型、权限、自检、停止条件） |
 | `agent/mcp_server.py` | +9 | 仅为 `python -m agent.mcp_server` 增加模块目录 bootstrap；工具面仍是 100 个，未改任何工具语义 |
 
@@ -110,7 +110,7 @@ JSON 键名与错误码取自 `src/Bridge/*`（`NewGameMenuService`、`NewGameMe
 ### Green（本机可复跑）
 
 ```bash
-cd /mnt/d/code/game_mods/PawnMind
+cd <repo>/PawnMind
 .venv/bin/python -m unittest discover -s agent/tests -p "test_fake_game_contract.py"   # 21 OK ~1.2s
 .venv/bin/python -m unittest discover -s agent/tests -p "test_demo_agent_e2e.py"       #  7 OK ~7.5s
 .venv/bin/python -m unittest discover -s agent/tests -p "test_mcp_entrypoint.py"       #  2 OK ~6.9s

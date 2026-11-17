@@ -7,9 +7,9 @@
 | 层 | 内容 |
 |---|---|
 | 语义工具（7 个） | `get_new_game_options`（读）、`open_new_game_menu`、`select_new_game_option(kind,id)`、`new_game_next_page(row,±1)`、`new_game_continue`、`focus_new_game_selected_perk(id)`、`blur_new_game_option(id)` |
-| [C# 服务](<../PawnMind/src/Bridge/NewGameMenuService.cs>) | 每次写都先过槽策略函数（当前固定 `new_game_slot_policy_unavailable`）；动作只委托一次原生回调并回读校验；显式白名单 JSON，绝不输出原生 slot 参数、存档预览或候选注册表 |
-| [Core 控制](<../PawnMind/src/Core/NewGameMenuControl.cs>) | 分页行、首局 prompt 的**可见文本**、控制端口与结果 DTO；`prompt_pending` 是终止状态，不当作已开始 |
-| [Game 适配器](<../PawnMind/src/Game/NewGameMenuAdapter.cs>) | 打开=`MainMenuUIController.OnNewGameClick`（游戏内拒绝）；翻页=一次原生 `TurnPage`/`TurnSelectedPage`；继续=仅 scenario/perks 的原生 Continue，难度页直接 `difficulty_start_forbidden`；聚焦/失焦=对目标槽调用真实 `WildNetworkSlot.OnPointerEnter/OnPointerExit`，**不写**私有 `hovered/views` |
+| [C# 服务](<../src/Bridge/NewGameMenuService.cs>) | 每次写都先过槽策略函数（当前固定 `new_game_slot_policy_unavailable`）；动作只委托一次原生回调并回读校验；显式白名单 JSON，绝不输出原生 slot 参数、存档预览或候选注册表 |
+| [Core 控制](<../src/Core/NewGameMenuControl.cs>) | 分页行、首局 prompt 的**可见文本**、控制端口与结果 DTO；`prompt_pending` 是终止状态，不当作已开始 |
+| [Game 适配器](<../src/Game/NewGameMenuAdapter.cs>) | 打开=`MainMenuUIController.OnNewGameClick`（游戏内拒绝）；翻页=一次原生 `TurnPage`/`TurnSelectedPage`；继续=仅 scenario/perks 的原生 Continue，难度页直接 `difficulty_start_forbidden`；聚焦/失焦=对目标槽调用真实 `WildNetworkSlot.OnPointerEnter/OnPointerExit`，**不写**私有 `hovered/views` |
 | 强制入口 | `ActionRouter` 读白名单只加 `get_new_game_options`；7 个写 op 全部要求 `rev` + `action_id`，并受版本门禁与幂等缓存约束；`act` 包裹仍走同一 dispatch |
 
 ## 同 ID 卡片的撤销路径（重点）

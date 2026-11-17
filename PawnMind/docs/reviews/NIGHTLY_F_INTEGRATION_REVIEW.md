@@ -19,7 +19,7 @@ trace_validator/fake_game 与 tests）、`test/PawnMind.Tests/`、`test/PawnMind
 ## Real evidence（本 Agent 亲自运行；全部在最终提交上）
 
 ```text
-$ cd /root/work/game_mods/PawnMind && set -a; . .env.server; set +a
+$ cd <repo>/PawnMind && set -a; . .env.server; set +a
 
 $ ./test.sh                                         # 最终提交 f7ae62c
 passed=750 failed=0
@@ -39,17 +39,17 @@ ok: .../src/Core/PolicyCatalog.g.cs matches tool_policy.json
     (sha256 e0da5a24a0c21014db57ee842413ef4d6d10ac0e1dca3545dea417490f22d1cc)
 EXIT=0
 
-$ $DOTNET build src/PawnMind.csproj -c Release -p:GameManaged=/root/work/game_managed
+$ $DOTNET build src/PawnMind.csproj -c Release -p:GameManaged=<game-managed>
 Build succeeded. 0 Warning(s) 0 Error(s)          # 增量
-$ $DOTNET build src/PawnMind.csproj -c Release -t:Rebuild -p:GameManaged=/root/work/game_managed
+$ $DOTNET build src/PawnMind.csproj -c Release -t:Rebuild -p:GameManaged=<game-managed>
 Build succeeded. 0 Warning(s) 0 Error(s)          # clean rebuild
 src/bin/Release/netstandard2.1/PawnMind.dll = d29209a4...87eec（338,432 B）  # 两次构建同哈希 → 确定性
 
-$ git -C /root/work/game_mods log --oneline -3
+$ git -C <repo> log --oneline -3
 f7ae62c docs(nightly): final reports, baseline, test matrix and schema sync
 7548ddb fix(pawnmind): fail-closed policy fingerprint and review findings
 f789a92 docs(audit): static mod compatibility matrix and workshop install draft (Nightly G)
-$ git -C /root/work/game_mods status --porcelain
+$ git -C <repo> status --porcelain
 ?? PawnMind/docs/reviews/NIGHTLY_A_..._REVIEW.md ... （仅本批 7 份审阅文件；生产代码/文档干净）
 ```
 
@@ -173,7 +173,7 @@ $ git check-ignore -v PawnMind/.env.server PawnMind/dist/... # 均已 ignore（t
 - **NOT_RUN（宿主）**：DSH/OpenCode 真实 MCP E2E（含 `wait_operation` 语义、policy_mismatch 呈现）。
 - **NOT_MEASURED**：首周通关率、Skill 效率、平均成本/回合时长、人工介入、seed 可复现性、竞品对比
   （benchmark spec §9；本审阅确认没有被填数字）。
-- **UNKNOWN**：`_decomp` ModScanner 规则副本（VERSION=4）与 `/root/work/game_managed` 是否同一 MVID；
+- **UNKNOWN**：`_decomp` ModScanner 规则副本（VERSION=4）与 `<game-managed>` 是否同一 MVID；
   规则随游戏更新变化，实机扫描永远优先。
 - **UNKNOWN**：`dist`/安装 DLL 与最终 HEAD 的对应关系；这是“游戏内验收不可归因”的根因，需用户重建并重装后消除。
 

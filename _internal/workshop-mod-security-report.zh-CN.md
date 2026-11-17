@@ -18,11 +18,11 @@
 
 | 工坊 ID | 名称 | 版本 | Manifest 作者 | 所有者 SteamID | DLL 大小 | SHA-256（前 16 位） | 游戏内信任状态 |
 |---|---|---|---|---|---|---|---|
-| 3828921912 | Appraisal Assistant（鉴定助手） | 1.0.10 | kale | 76561198325245745 | 355,840 | `6ff713017859cfc8…` | `Updated` |
-| 3828938065 | 客户需求高亮 | 1.3.6 | hollow | 76561198310244144 | 64,512 | `c7f3974954fcc254…` | `NotChecked`（禁用） |
-| 3829053332 | 声望飘字 Reputation Pop | 1.0.0 | User | 76561199237236549 | 13,824 | `3d55332b88bc2db0…` | `Match` |
-| 3829206666 | Smart Inventory Arrange | 3.17.47-mono.1 | xiepeixuan | 76561198166860494 | 746,496 | `9fa7244ba20de549…` | `NotChecked`（禁用） |
-| 3830661318 | 批量标签 | 1.0.0 | Alikes·Illusions | 76561199021295624 | 14,336 | `2a77b801c0bd849c…` | `Match` |
+| 3828921912 | Appraisal Assistant（鉴定助手） | 1.0.10 | kale | 7656119… | 355,840 | `6ff713017859cfc8…` | `Updated` |
+| 3828938065 | 客户需求高亮 | 1.3.6 | hollow | 7656119… | 64,512 | `c7f3974954fcc254…` | `NotChecked`（禁用） |
+| 3829053332 | 声望飘字 Reputation Pop | 1.0.0 | User | 7656119… | 13,824 | `3d55332b88bc2db0…` | `Match` |
+| 3829206666 | Smart Inventory Arrange | 3.17.47-mono.1 | xiepeixuan | 7656119… | 746,496 | `9fa7244ba20de549…` | `NotChecked`（禁用） |
+| 3830661318 | 批量标签 | 1.0.0 | Alikes·Illusions | 7656119… | 14,336 | `2a77b801c0bd849c…` | `Match` |
 
 说明：`Match` 表示本地文件哈希与该 Mod 上次被用户批准时一致；`Updated` 表示文件已变化、需要重新确认；`NotChecked` 表示 Mod 被禁用，游戏没有计算指纹。
 

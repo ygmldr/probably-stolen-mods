@@ -47,7 +47,7 @@ MCP/HTTP  op="act", request.action="debug_grant"
 
 **Red**：新增 3 个测试后编译失败——`RecordingSaveErrors` 不含 `DebugForbidden`。
 
-**Green**（[RecordingDispatchGuard.cs](<../PawnMind/src/Bridge/RecordingDispatchGuard.cs>)）：
+**Green**（[RecordingDispatchGuard.cs](<../src/Bridge/RecordingDispatchGuard.cs>)）：
 
 ```csharp
 if (viaAct && IsDebugOp(target))          // act 永不可达 debug_*
@@ -157,7 +157,7 @@ passed=14 failed=0
 
 **修复**：改为 `wine_add_water(item_id: int, rev: StrictInt, ml: int = 750)`。
 
-**测试**（[test_write_rev_required.py](<../PawnMind/agent/tests/test_write_rev_required.py>)）：
+**测试**（[test_write_rev_required.py](<../agent/tests/test_write_rev_required.py>)）：
 
 - `test_every_write_tool_requires_rev`：扫描全部 102 工具的 `input_schema`，任何写工具若声明 `rev` 却不在 `required` 中即失败；
 - `test_wine_add_water_is_not_advertised_with_optional_rev`：专项断言。

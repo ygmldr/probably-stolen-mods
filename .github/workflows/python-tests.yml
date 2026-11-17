@@ -1,0 +1,28 @@
+name: python-tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install MCP SDK
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "mcp==2.3.0" pydantic
+      - name: Python suite (MCP + policy + validators)
+        working-directory: PawnMind
+        run: python -B -m unittest discover -s agent/tests
+      - name: Generated policy catalog is current
+        working-directory: PawnMind
+        run: python tools/gen_policy_catalog.py --check
+
+  # The C# suites compile against the game's Assembly-CSharp.dll and are not
+  # runnable on hosted runners; they are documented in PawnMind/AGENTS.md.

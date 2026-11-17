@@ -36,7 +36,7 @@ $ .venv/bin/python -B -m unittest discover -s agent/tests   # 含 test_operation
 Ran 365 tests in 56.446s
 OK                                 # 最终提交；日志 /tmp/nightly_review_pytests_committed.log
 
-$ $DOTNET build src/PawnMind.csproj -c Release -p:GameManaged=/root/work/game_managed
+$ $DOTNET build src/PawnMind.csproj -c Release -p:GameManaged=<game-managed>
 Build succeeded. 0 Warning(s) 0 Error(s)
 ```
 

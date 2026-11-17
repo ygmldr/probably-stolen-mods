@@ -6,14 +6,14 @@
 
 | 文件 | 内容 |
 |---|---|
-| [GameVersionGate.cs](<../PawnMind/src/Core/GameVersionGate.cs>) | 纯逻辑身份比较；缺失/非法 expected、运行时身份不可用、版本不符、MVID 变化均 fail-closed；MVID 归一化（大小写/连字符） |
-| [BridgeHealth.cs](<../PawnMind/src/Core/BridgeHealth.cs>) | `/health` 只读 DTO；`Latest` 固定 `UNVERIFIED` |
-| [BridgeConfig.cs](<../PawnMind/src/Core/BridgeConfig.cs>) | 新增 `expected_game_version` / `expected_assembly_mvid`；默认空；不自动填当前安装版 |
-| [GameVersionAdapter.cs](<../PawnMind/src/Game/GameVersionAdapter.cs>) | Game 层读取 `PlayerStore.VERSION_NUMBER`（反射，避免 const 编译期内联）和 `typeof(PlayerStore).Assembly.ManifestModule.ModuleVersionId`；不读文件/存档/隐藏字段 |
-| [ActionRouter.cs](<../PawnMind/src/Bridge/ActionRouter.cs>) | 所有非只读 op 在 dispatch 前过 version gate；纯读不受影响；重复/未知结果缓存优先 |
-| [BridgeServer.cs](<../PawnMind/src/Bridge/BridgeServer.cs>) | `/health` 输出 mod/game identity、expected、gate state、`latest: UNVERIFIED`；token 回显脱敏 |
-| [PawnMindMod.cs](<../PawnMind/src/PawnMindMod.cs>) | 在 `OnEnable`（Unity 主线程）捕获身份并计算唯一 gate；HTTP 只读缓存字符串 |
-| [GameVersionGateTests.cs](<../PawnMind/test/PawnMind.Tests/GameVersionGateTests.cs>) + 既有 tests | 纯逻辑、config、router、health 正负例 |
+| [GameVersionGate.cs](<../src/Core/GameVersionGate.cs>) | 纯逻辑身份比较；缺失/非法 expected、运行时身份不可用、版本不符、MVID 变化均 fail-closed；MVID 归一化（大小写/连字符） |
+| [BridgeHealth.cs](<../src/Core/BridgeHealth.cs>) | `/health` 只读 DTO；`Latest` 固定 `UNVERIFIED` |
+| [BridgeConfig.cs](<../src/Core/BridgeConfig.cs>) | 新增 `expected_game_version` / `expected_assembly_mvid`；默认空；不自动填当前安装版 |
+| [GameVersionAdapter.cs](<../src/Game/GameVersionAdapter.cs>) | Game 层读取 `PlayerStore.VERSION_NUMBER`（反射，避免 const 编译期内联）和 `typeof(PlayerStore).Assembly.ManifestModule.ModuleVersionId`；不读文件/存档/隐藏字段 |
+| [ActionRouter.cs](<../src/Bridge/ActionRouter.cs>) | 所有非只读 op 在 dispatch 前过 version gate；纯读不受影响；重复/未知结果缓存优先 |
+| [BridgeServer.cs](<../src/Bridge/BridgeServer.cs>) | `/health` 输出 mod/game identity、expected、gate state、`latest: UNVERIFIED`；token 回显脱敏 |
+| [PawnMindMod.cs](<../src/PawnMindMod.cs>) | 在 `OnEnable`（Unity 主线程）捕获身份并计算唯一 gate；HTTP 只读缓存字符串 |
+| [GameVersionGateTests.cs](<../test/PawnMind.Tests/GameVersionGateTests.cs>) + 既有 tests | 纯逻辑、config、router、health 正负例 |
 
 ## 门禁语义
 

@@ -47,7 +47,7 @@
 
 | 字段 | 采集方式 | 本规范起草时（2026-11-17） |
 |---|---|---|
-| workspace HEAD | `git rev-parse HEAD`（在 `/root/work/game_mods` 跑） | 本批次最终代码/文档 HEAD：`f7ae62c`（含修复 `7548ddb`；审阅提交见 `git log -1`）；评测时必须记录当时 HEAD 与工作树 |
+| workspace HEAD | `git rev-parse HEAD`（在 `<repo>` 跑） | 本批次最终代码/文档 HEAD：`f7ae62c`（含修复 `7548ddb`；审阅提交见 `git log -1`）；评测时必须记录当时 HEAD 与工作树 |
 | PawnMind 工作树状态 | `git status --porcelain` | 原样记录（评测时不得有未声明改动）；评测必须使用**干净构建**并记录 diff 清单 |
 | 游戏版本 | 游戏 UI / `health.game_version` | *Probably Stolen* **0.46D**，`VERSION 100-Rev13`（`docs/plans/NEXT_LIVE_SESSION.md`） |
 | 游戏 MVID | `bridge.conf.expected_assembly_mvid` + `health.game_assembly_mvid` | 两者必须一致；未配置时记录实际值 |
@@ -216,7 +216,7 @@
 每个 run 必须生成 JSON 轨迹（格式见 `agent/trace_validator.py` docstring）并运行：
 
 ```bash
-cd /root/work/game_mods/PawnMind
+cd <repo>/PawnMind
 .venv/bin/python -B agent/trace_validator.py /path/to/run-trace.json
 # exit 0 = 无 error（warning 允许）；1 = 有违规；2 = 输入不可读
 ```
@@ -233,7 +233,7 @@ cd /root/work/game_mods/PawnMind
 **L0 自检**（离线可跑，当前 `PASS`，2026-11-17）：
 
 ```bash
-cd /root/work/game_mods/PawnMind
+cd <repo>/PawnMind
 .venv/bin/python -B -m unittest discover -s agent/tests -p 'test_trace_validator.py' -v
 # Ran 77 tests ... OK
 .venv/bin/python -B -m unittest discover -s agent/tests -p 'test_skill_tool_refs.py' -v
@@ -276,7 +276,7 @@ L3 run 的失败/成功都必须保留：原始轨迹 JSON、MCP 日志、截图
 ### 7.3 可复现命令（起草时状态）
 
 ```bash
-cd /root/work/game_mods
+cd <repo>
 git rev-parse HEAD
 git status --porcelain
 

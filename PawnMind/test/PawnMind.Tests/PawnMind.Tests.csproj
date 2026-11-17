@@ -116,7 +116,7 @@
   </ItemGroup>
   <ItemGroup>
     <!-- Override on a non-Windows host by exporting PAWNMIND_NEWTONSOFT_DLL,
-         e.g. PAWNMIND_NEWTONSOFT_DLL=/root/work/game_managed/Newtonsoft.Json.dll -->
+         e.g. PAWNMIND_NEWTONSOFT_DLL=<game-managed>/Newtonsoft.Json.dll -->
     <Reference Include="Newtonsoft.Json">
       <HintPath Condition="'$(PAWNMIND_NEWTONSOFT_DLL)' != ''">$(PAWNMIND_NEWTONSOFT_DLL)</HintPath>
       <HintPath Condition="'$(PAWNMIND_NEWTONSOFT_DLL)' == ''">D:\Program Files\steam\steamapps\common\Probably Stolen\Probably Stolen_Data\Managed\Newtonsoft.Json.dll</HintPath>

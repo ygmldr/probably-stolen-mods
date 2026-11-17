@@ -10,17 +10,17 @@
 #   ./tools/setup_remote_host.sh
 #
 # Environment:
-#   DOTNET_ROOT_DIR  install directory for the SDK (default /root/.dotnet)
+#   DOTNET_ROOT_DIR  install directory for the SDK (default <dotnet>)
 #   DOTNET_CHANNEL   SDK channel (default 9.0; the test projects target net9.0)
 #   PYTHON_BIN       interpreter used to create .venv (default python3)
 #   MANAGED_DIR      directory holding the game's Managed DLLs (for adapter tests)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-DOTNET_ROOT_DIR="${DOTNET_ROOT_DIR:-/root/.dotnet}"
+DOTNET_ROOT_DIR="${DOTNET_ROOT_DIR:-<dotnet>}"
 DOTNET_CHANNEL="${DOTNET_CHANNEL:-9.0}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
-MANAGED_DIR="${MANAGED_DIR:-/root/work/game_managed}"
+MANAGED_DIR="${MANAGED_DIR:-<game-managed>}"
 
 say() { printf '[setup] %s\n' "$*"; }
 

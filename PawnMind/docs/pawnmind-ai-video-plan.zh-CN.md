@@ -36,7 +36,7 @@
 **可直接复制的派工模板**（主代理每次只替换阶段名和文件范围）：
 
 ```text
-工作区 /mnt/d/code/game_mods；唯一目标：执行 docs/pawnmind-ai-video-plan.zh-CN.md 的 S<N> 卡片。
+工作区 <repo>；唯一目标：执行 docs/pawnmind-ai-video-plan.zh-CN.md 的 S<N> 卡片。
 先按文档第 1 节读 README/AGENTS/能力矩阵/限制与相关源码，核查当前工作树。
 只改本卡片指定文件与对应测试；所有生产代码必须先写 Red 测试并实际运行确认预期失败，
 再最小实现 Green，最后跑完整离线 C#/Python 套件，报告测试数和 skip 数。
@@ -61,14 +61,14 @@ S6 只在**独立、无游戏存档的 OpenCode 工作目录**准备录制配置
 
 ## 1. 接手代理先读什么；现有什么、不具备什么
 
-**阅读顺序**：[仓库 README](<../README.md>) → [根 AGENTS](<../AGENTS.md>) → [PawnMind README](<../PawnMind/README.md>) 顶部状态 → [PawnMind AGENTS](<../PawnMind/AGENTS.md>) → [能力矩阵](<pawnmind-capability-matrix.zh-CN.md>) → [已知限制](<pawnmind-known-limitations.zh-CN.md>) → 本计划。历史文档含过时声明，**始终以当前源码、测试和本机实际游戏为准**。
+**阅读顺序**：[仓库 README](<../README.md>) → [根 AGENTS](<../AGENTS.md>) → [PawnMind README](<../README.md>) 顶部状态 → [PawnMind AGENTS](<../AGENTS.md>) → [能力矩阵](<pawnmind-capability-matrix.zh-CN.md>) → [已知限制](<pawnmind-known-limitations.zh-CN.md>) → 本计划。历史文档含过时声明，**始终以当前源码、测试和本机实际游戏为准**。
 
 **入口与约束**：
 
-- C# Mod：[PawnMindMod.cs](<../PawnMind/src/PawnMindMod.cs>)、[Bridge](<../PawnMind/src/Bridge/>)、[GameState.cs](<../PawnMind/src/Game/GameState.cs>)；MCP：[mcp_server.py](<../PawnMind/agent/mcp_server.py>)、[pawnmind_client.py](<../PawnMind/agent/pawnmind_client.py>)、[orchestrator.py](<../PawnMind/agent/orchestrator.py>)。目前 89 个 MCP 工具、规则式 `RulePolicy`（非 LLM），历史基线 C# 144 项/适配器契约/Python 8 项；这些数字需执行者重数。
-- 当前 [`new_game`](<../PawnMind/src/Bridge/GameActions.cs#L88-L105>) 把 `startType` 硬编码为 `APPRENTICE`、`skipIntro=true`，立即切换场景；没有列举/选择难度、特质和“确认前回读”的入口。[MCP 的 `new_game/load_game`](<../PawnMind/agent/mcp_server.py#L460-L468>) 目前没有专用槽位限制，`load_game` 可接任意整数；缺 `slot` 在[路由](<../PawnMind/src/PawnMindMod.cs#L118-L123>)传入 `-1`，已安装 Rev13 的同代静态代码显示它会进入新局初始化；离线阶段先封堵，S8 再与用户验证游戏行为。主菜单[合法动作](<../PawnMind/src/Core/LegalAction.cs#L62-L67>)还会直接列出 `new_game/load_game`。不能拿现有 `new_game` 录制声称 AI 选过开局。
-- [游戏快照](<../PawnMind/src/Bridge/StateSnapshot.cs#L31-L46>)主菜单仅有 `in_game=false` 等简项；[GameState.cs](<../PawnMind/src/Game/GameState.cs#L116-L153>)存在读旧存档索引/预览的方法，但尚未证明其在 MCP 状态中正确暴露，更不能把旧档预览泄给模型。[通用 UI `press`](<../PawnMind/src/Bridge/UiSnapshot.cs#L21-L108>)可调用任意活动按钮，不适合作为无约束开局工具。
-- [manifest.xml](<../PawnMind/manifest.xml#L6-L20>)仍写 0.2.1、0.46D、只读 M0；[项目引用](<../PawnMind/src/PawnMind.csproj#L18-L46>)、[测试脚本](<../PawnMind/test.sh#L4-L18>)和[适配器契约](<../PawnMind/test/PawnMind.AdapterTests/Program.cs#L12-L25>)绑固定游戏目录。只因对已安装 0.46D / Rev13 的测试全绿，不代表拍摄时正式分支的最新版仍能加载。
+- C# Mod：[PawnMindMod.cs](<../src/PawnMindMod.cs>)、[Bridge](<../src/Bridge>)、[GameState.cs](<../src/Game/GameState.cs>)；MCP：[mcp_server.py](<../agent/mcp_server.py>)、[pawnmind_client.py](<../agent/pawnmind_client.py>)、[orchestrator.py](<../agent/orchestrator.py>)。目前 89 个 MCP 工具、规则式 `RulePolicy`（非 LLM），历史基线 C# 144 项/适配器契约/Python 8 项；这些数字需执行者重数。
+- 当前 [`new_game`](<../src/Bridge/GameActions.cs>#L88-L105) 把 `startType` 硬编码为 `APPRENTICE`、`skipIntro=true`，立即切换场景；没有列举/选择难度、特质和“确认前回读”的入口。[MCP 的 `new_game/load_game`](<../agent/mcp_server.py>#L460-L468) 目前没有专用槽位限制，`load_game` 可接任意整数；缺 `slot` 在[路由](<../src/PawnMindMod.cs>#L118-L123)传入 `-1`，已安装 Rev13 的同代静态代码显示它会进入新局初始化；离线阶段先封堵，S8 再与用户验证游戏行为。主菜单[合法动作](<../src/Core/LegalAction.cs>#L62-L67)还会直接列出 `new_game/load_game`。不能拿现有 `new_game` 录制声称 AI 选过开局。
+- [游戏快照](<../src/Bridge/StateSnapshot.cs>#L31-L46)主菜单仅有 `in_game=false` 等简项；[GameState.cs](<../src/Game/GameState.cs>#L116-L153)存在读旧存档索引/预览的方法，但尚未证明其在 MCP 状态中正确暴露，更不能把旧档预览泄给模型。[通用 UI `press`](<../src/Bridge/UiSnapshot.cs>#L21-L108)可调用任意活动按钮，不适合作为无约束开局工具。
+- [manifest.xml](<../manifest.xml>#L6-L20)仍写 0.2.1、0.46D、只读 M0；[项目引用](<../src/PawnMind.csproj>#L18-L46)、[测试脚本](<../test.sh>#L4-L18)和[适配器契约](<../test/PawnMind.AdapterTests/Program.cs>#L12-L25)绑固定游戏目录。只因对已安装 0.46D / Rev13 的测试全绿，不代表拍摄时正式分支的最新版仍能加载。
 - 所有新生产代码遵守 **先失败测试（Red）→最小实现（Green）→整理并跑全量测试（Refactor）**；新增游戏成员先加最新程序集的契约检查。新适配器只在游戏层接触游戏类型、只在 Unity 主线程访问游戏对象；HTTP 必须保障不阻塞主线程。反编译/逆向产物仅在根 `_decomp/`，不提交、不分发。
 - **用户已明确授权主代理逐阶段派子代理完成 S0–S7 的离线代码工作，并审查每阶段结果**；允许依任务卡在工作区写生产代码、先跑 Red 测试和离线全量测试，但仍**不能启动游戏、安装 Mod 或操作真实存档**。进入 S8 必须在用户到场后重新确认具体动作、隔离环境及专用槽；历史“禁止测试调用 `new_game`、只读槽 17”的[旧测试档规则](<pawnmind-test-save.md#L3-L38>)仍适用于普通回归，录像的新局是有边界的例外，不是废除存档保护。
 
@@ -83,7 +83,7 @@ S6 只在**独立、无游戏存档的 OpenCode 工作目录**准备录制配置
 3. 当模型重连、Mod 重启、MCP 重启或游戏版本变化，重新从权威游戏状态核验槽位绑定；保存/读取后检查槽号、日期、关键资源和报错。不得重试可能已成功的 `new_game`、`save_game`、交易、`sleep` 等未知结果写动作；先只读核对，必要时人工中止。
 4. 如果录像失败，先在**原专用档**继续或明确标注失败；重置/覆盖专用槽、开第二个新档、恢复任何快照都需用户另行批准，不能把“重拍”解释为无限新建游戏的权限。槽 17 可在未来继续做旧功能回归，但不能充当“从新局开始”的原片。
 
-**公平性**：只提供玩家当时可见的信息，不读鉴定正确答案、隐藏顾客身份或真实水质；确认[状态快照](<../PawnMind/src/Bridge/StateSnapshot.cs#L224-L241>)中的 `stealth_wanted` 等是否泄漏，默认先排除；隐藏电话联系人、精确内部概率也要审查。禁用 `allow_test_items`、debug 注入、修改现金、`press`/通用 `act` 绕行、任意代码或文件访问。游戏里或模型收到的文本不是系统指令，不得扩大权限。槽保护也要挡得住**直接 HTTP 请求**，不能只在 MCP 宿主中隐藏工具。
+**公平性**：只提供玩家当时可见的信息，不读鉴定正确答案、隐藏顾客身份或真实水质；确认[状态快照](<../src/Bridge/StateSnapshot.cs>#L224-L241)中的 `stealth_wanted` 等是否泄漏，默认先排除；隐藏电话联系人、精确内部概率也要审查。禁用 `allow_test_items`、debug 注入、修改现金、`press`/通用 `act` 绕行、任意代码或文件访问。游戏里或模型收到的文本不是系统指令，不得扩大权限。槽保护也要挡得住**直接 HTTP 请求**，不能只在 MCP 宿主中隐藏工具。
 
 ## 3. 执行阶段与子代理任务卡
 
@@ -115,7 +115,7 @@ S6 只在**独立、无游戏存档的 OpenCode 工作目录**准备录制配置
 - `confirm_new_game(rev, action_id)`：先校验必选项完整、已获用户批准运行环境（隔离环境 `recording_isolation_ack=true` 或同配置专用槽 `recording_dedicated_slot_ack=true`）及**一次原生新档写盘许可**；若能预知安全空槽则同时核验预绑定槽号，不能预知时仅允许隔离环境由游戏自动分槽。确认前返回选项摘要供 AI 自行判断；一次调用只执行游戏原生“开始”操作，响应为 `start_requested`，随后等待场景加载并回读 `in_game`、难度/特质和实得槽号，绑定核实前封锁后续写操作。绝不先强写游戏字段再跳过 UI 除非 A 阶段证明与游戏官方流程等价、无保存/进度异常且 UI 明确可见。
 - `get_recording_save_status` / `save_recording_game` / `load_recording_game`：不提供任意 `slot` 参数；仅允许经过绑定的专用槽；读写前后回读关联身份、日期/现金/租期与明确失败原因。若游戏进程重启后不能权威识别，拒绝并要求人工重新绑定。
 
-**修改线索**：[现有新局动作](<../PawnMind/src/Bridge/GameActions.cs#L88-L122>)、[路由](<../PawnMind/src/PawnMindMod.cs#L89-L123>)、[菜单快照](<../PawnMind/src/Bridge/StateSnapshot.cs#L31-L46>)、[MCP 工具](<../PawnMind/agent/mcp_server.py#L460-L483>)、[适配器测试](<../PawnMind/test/PawnMind.AdapterTests/Program.cs#L85-L92>)。新增游戏类型访问先走 Game 适配层及契约；旧 `new_game/load_game`/`act`/`press` 必须不能绕过录像许可。
+**修改线索**：[现有新局动作](<../src/Bridge/GameActions.cs>#L88-L122)、[路由](<../src/PawnMindMod.cs>#L89-L123)、[菜单快照](<../src/Bridge/StateSnapshot.cs>#L31-L46)、[MCP 工具](<../agent/mcp_server.py>#L460-L483)、[适配器测试](<../test/PawnMind.AdapterTests/Program.cs>#L85-L92)。新增游戏类型访问先走 Game 适配层及契约；旧 `new_game/load_game`/`act`/`press` 必须不能绕过录像许可。
 
 **先红后绿测试**：在 fake 菜单覆盖实际选项列举、互斥/锁定/空集合/无效 ID/重复确认/scene load 延迟/误触旧档、HTTP 原始 op 与通用入口绕行、保存跨日/读档与进程重启、自动分配槽与期望不符时不写入；无用户存档作测试数据。Python MCP 工具 schema/参数/拒绝码及真实 stdio 回环均有测试。
 
@@ -123,10 +123,10 @@ S6 只在**独立、无游戏存档的 OpenCode 工作目录**准备录制配置
 
 ### D. 安全协议、主线程传输与数据公平（与 C 可并行离线开发；真机前必须完成）
 
-1. [HTTP 客户端](<../PawnMind/agent/pawnmind_client.py#L50-L76>)要明确禁重定向，用两个本地假服务先写负例证明 Bearer 不跨端口/域转发；异常/日志不能包含 token。
-2. 将所有写动作要求非空 `action_id` + 当前 `rev`，读取动作可独立分类；同 ID 不同规范化 op/参数判冲突、同请求只返首次结果。修[缺 rev/ID 会放行](<../PawnMind/src/Bridge/ActionRouter.cs#L71-L104>)及[64 条临时缓存](<../PawnMind/src/Core/ActionGate.cs#L26-L70>)语义；快照变更/菜单选择/自动保存不能以旧 rev 再写；不能承诺跨 Mod 重启 exactly-once。
+1. [HTTP 客户端](<../agent/pawnmind_client.py>#L50-L76)要明确禁重定向，用两个本地假服务先写负例证明 Bearer 不跨端口/域转发；异常/日志不能包含 token。
+2. 将所有写动作要求非空 `action_id` + 当前 `rev`，读取动作可独立分类；同 ID 不同规范化 op/参数判冲突、同请求只返首次结果。修[缺 rev/ID 会放行](<../src/Bridge/ActionRouter.cs>#L71-L104)及[64 条临时缓存](<../src/Core/ActionGate.cs>#L26-L70)语义；快照变更/菜单选择/自动保存不能以旧 rev 再写；不能承诺跨 Mod 重启 exactly-once。
 3. 服务端按**真实内部 op + args + 菜单/档位/录制阶段**实施可审计白名单；阻止任意参数 `act`、通用按钮 `press`、debug、别的存档及隐藏的系统入口绕行。合法动作只是建议，不是授权。录制时旧工具可在其它开发模式存在，但**录制入口**不得触达其高危动作。
-4. [BridgeServer.cs](<../PawnMind/src/Bridge/BridgeServer.cs#L100-L141>)由 Unity `Update` 驱动；修其阻塞发送/短写、无界连接、客户端断线与 `/events` envelope，遵守 ModLoader 对后台线程的限制。假 socket/本地网络先写失败测试，再修有界非阻塞逐帧写出；不在主线程等待模型、HTTP 或文件 IO。明确连接消失后写动作“成功、失败、结果未知”的处理。
+4. [BridgeServer.cs](<../src/Bridge/BridgeServer.cs>#L100-L141)由 Unity `Update` 驱动；修其阻塞发送/短写、无界连接、客户端断线与 `/events` envelope，遵守 ModLoader 对后台线程的限制。假 socket/本地网络先写失败测试，再修有界非阻塞逐帧写出；不在主线程等待模型、HTTP 或文件 IO。明确连接消失后写动作“成功、失败、结果未知”的处理。
 5. 不向模型暴露 `stealth_wanted`、未展示电话联系人、鉴定正确答案等隐藏信息；每次适配最新版本重比游戏 UI。同一回合 `get_state`、`get_legal_actions` 和 MCP 工具结果不得泄漏私人存档预览。
 
 **S1/S6 离线验收**：缺 rev/ID、stale、跨请求复用、重放、重连、302、UI 入口绕行、慢客户端、突发连接以及隐藏字段检查均有失败测试先红后绿；fake socket 长时运行无死锁/泄露。**真实游戏帧率/长时连接留在 S8 与用户一起验证**；未通过前不开放真机写操作。
@@ -135,11 +135,11 @@ S6 只在**独立、无游戏存档的 OpenCode 工作目录**准备录制配置
 
 **目标路径**：新局→开店→顾客到来与可见对话选择→按合法动作/预算购买和出售→收拾可见物品与结束营业→确认每日结算/自然存档→第二天继续→首次周租支付→保存→重启后只读核实/按许可读回。AI 不需要调用全部 89 个工具；选出足以完成该路径的语义工具，无法证明安全/正确的功能暂不开放。
 
-**S6 离线路线**：先用候选 OpenCode + Go/V4.1 Flash（账号/额度/服务适用性须先由用户确认）连本地**假桥**，确认它能限制工具、真实记录调用、在断线和超时后停机；若宿主做不到，就实现受控 LLM loop（不是当前的 [RulePolicy](<../PawnMind/agent/orchestrator.py#L40-L66>)）。每次写动作由可信调用层在发出前生成并持久记录 `run_id + sequence + action_id + op + args + rev`；模型不自行发明或重用 ID。写入脱敏追加式日志，回应后记录成功/失败/结果未知、前后状态摘要与游戏时间；重启时先读权威游戏状态核对未知结果，禁止凭自然语言摘要重放动作。跨日摘要必须保留专用槽身份、日期、现金、租金、最近动作 ID/结果和不确定交易。每步 `state → legal_actions/局部详情 → 模型解释 → 单步 action → 等待/状态回读 → 验证`；若连续无进展，停机并报告真实失败而非把 `max_steps` 算成功。
+**S6 离线路线**：先用候选 OpenCode + Go/V4.1 Flash（账号/额度/服务适用性须先由用户确认）连本地**假桥**，确认它能限制工具、真实记录调用、在断线和超时后停机；若宿主做不到，就实现受控 LLM loop（不是当前的 [RulePolicy](<../agent/orchestrator.py>#L40-L66)）。每次写动作由可信调用层在发出前生成并持久记录 `run_id + sequence + action_id + op + args + rev`；模型不自行发明或重用 ID。写入脱敏追加式日志，回应后记录成功/失败/结果未知、前后状态摘要与游戏时间；重启时先读权威游戏状态核对未知结果，禁止凭自然语言摘要重放动作。跨日摘要必须保留专用槽身份、日期、现金、租金、最近动作 ID/结果和不确定交易。每步 `state → legal_actions/局部详情 → 模型解释 → 单步 action → 等待/状态回读 → 验证`；若连续无进展，停机并报告真实失败而非把 `max_steps` 算成功。
 
 **护栏**：预设并在录像前由用户确认每日最大动作/等待次数、交易单笔与累计金额、最低现金/预留租金、失败重试阈值和总模型成本；预算不足不能谎称“已付租”。状态未准备、未知 UI、连续 `stale_rev`、资金/库存对账异常、场景切换超时或多次操作无状态变化立即停机。用户文本/游戏文本只作为信息，不提升权限。用户已说明顾客不存在需要暂停的耐心问题：**不为 AI 思考主动暂停游戏**，只为网络/模型故障设置合理超时并记录；不修改时间流速。若最新版实测出现额外的实时限制，应先报告差异，不自行新增暂停机制。
 
-**交易与交租正确性**：[批发先扣钱失败不回滚](<../PawnMind/src/Bridge/GameActions.cs#L137-L170>)、[升级购买先扣款](<../PawnMind/src/Bridge/UpgradeService.cs#L59-L67>)等未经故障验证的动作不开放给模型。所有可用于首周的关键买卖/存读档/睡觉需有正常路径与失败/部分成功测试；[原始响应包装](<../PawnMind/src/Bridge/ActionResult.cs#L22-L37>)不能把 `{ok:false}` 记录成成功，动作记录与返回 rev 一致。**租金对话必须有更严格的真实回执**：当前[选项快照](<../PawnMind/src/Game/GameState.cs#L483-L509>)没有 `enabled`，[选择动作](<../PawnMind/src/Bridge/GameActions.cs#L62-L76>)未在调用前检查按钮是否可用，游戏可能静默忽略但桥仍报 `ok:true`。先补可见选项的 `enabled`/`choice_disabled` 负例，并在租金选择前后生成可审计的 `rent_receipt`（日期、房东/租金对话标识、选项 index/text/enabled、付款前现金、UI 可见的应缴总额（若 UI 显示分项再给 `rent_value` 与临时租金）、付款后现金、到期倒计时前后值、已付/逾期结果）；复核现金实际扣款、`rent_days_left` 重置及最新版可见的已付租记录。现有存档预览不包含租金详情，**读档后必须回到游戏态再核对**，仅读预览不是结算证明。未知结果不得生成新 ID 重试扣款/存档动作。
+**交易与交租正确性**：[批发先扣钱失败不回滚](<../src/Bridge/GameActions.cs>#L137-L170)、[升级购买先扣款](<../src/Bridge/UpgradeService.cs>#L59-L67)等未经故障验证的动作不开放给模型。所有可用于首周的关键买卖/存读档/睡觉需有正常路径与失败/部分成功测试；[原始响应包装](<../src/Bridge/ActionResult.cs>#L22-L37)不能把 `{ok:false}` 记录成成功，动作记录与返回 rev 一致。**租金对话必须有更严格的真实回执**：当前[选项快照](<../src/Game/GameState.cs>#L483-L509)没有 `enabled`，[选择动作](<../src/Bridge/GameActions.cs>#L62-L76)未在调用前检查按钮是否可用，游戏可能静默忽略但桥仍报 `ok:true`。先补可见选项的 `enabled`/`choice_disabled` 负例，并在租金选择前后生成可审计的 `rent_receipt`（日期、房东/租金对话标识、选项 index/text/enabled、付款前现金、UI 可见的应缴总额（若 UI 显示分项再给 `rent_value` 与临时租金）、付款后现金、到期倒计时前后值、已付/逾期结果）；复核现金实际扣款、`rent_days_left` 重置及最新版可见的已付租记录。现有存档预览不包含租金详情，**读档后必须回到游戏态再核对**，仅读预览不是结算证明。未知结果不得生成新 ID 重试扣款/存档动作。
 
 **S5/S6 离线验收**：假 MCP/假游戏至少走完包含开局多选、一个对话分支、7 天或游戏实际第一租期、交易失败、存档重连、付租与付租失败这两类完整分支；计数余额守恒、不访问禁用动作、不把失败写进成功报告。**S8 才在用户到场时**逐日对照真实游戏可见画面；无法使用有限可见信息赚够租金时如实判目标失败，先讨论新增合规观察，不使用隐藏字段补答案。
 
@@ -169,7 +169,7 @@ cd PawnMind && ./build.sh
 
 1. 用游戏录屏软件采集主菜单**开始选择之前**直至首次交租；如展示读档，另记录从菜单进专用槽的真实画面。显示可核对的模型决策/MCP 调用时间线；敏感路径、token、个人桌面信息、其他存档预览一律不入镜或后期遮盖。保留原片/脱敏行动日志供查验，剪辑后不得重排顺序伪造因果。
 2. 发布审片逐项核对：是否真正调用了选择难度/特质工具；是否由模型而非人选择经营动作；每一笔交易与游戏画面一致；周租金额/扣除/状态持续的证据；读档未切换到另一个档；没有明示之外的人工干预。真实存在的卡住/失败应如实标示，而不是剪掉冒充一遍成功。
-3. 同步更新[总览](<../README.md>)、[PawnMind README](<../PawnMind/README.md>)、[能力矩阵](<pawnmind-capability-matrix.zh-CN.md>)、[已知限制](<pawnmind-known-limitations.zh-CN.md>)、[manifest](<../PawnMind/manifest.xml>)：说明最终验证的游戏 build、AI 模型、可用/受限工具、真机成功/失败样本。录制方案不是发布包：不能捆绑 API key、Bearer token、测试存档或 `_decomp/`。
+3. 同步更新[总览](<../README.md>)、[PawnMind README](<../README.md>)、[能力矩阵](<pawnmind-capability-matrix.zh-CN.md>)、[已知限制](<pawnmind-known-limitations.zh-CN.md>)、[manifest](<../manifest.xml>)：说明最终验证的游戏 build、AI 模型、可用/受限工具、真机成功/失败样本。录制方案不是发布包：不能捆绑 API key、Bearer token、测试存档或 `_decomp/`。
 4. 最新游戏后续再更新：先暂停写操作→重新扫描安装版本及契约→修适配器和测试→专用槽只读兼容性检查→允许继续拍摄；任何旧版录像注明其录制时的真实版本，不改写为“今天的最新版本”。
 
 **发布验收**：全部强制门禁签字/记录、原片及脱敏行动线可回放、视频说法与验收一致；不存在尚未处理的存档危险或协议越权，才可标为“AI 从新局自主经营至首次付租”。

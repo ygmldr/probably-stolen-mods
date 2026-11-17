@@ -8,7 +8,7 @@
 
 | 交付物 | 作用 |
 |---|---|
-| [`PawnMind/agent/dsh/pawnmind.patch.yml`](../PawnMind/agent/dsh/pawnmind.patch.yml) | DSH patch 覆盖层：MCP 客户端条目 + 默认模型条目 |
+| [`PawnMind/agent/dsh/pawnmind.patch.yml`](../agent/dsh/pawnmind.patch.yml) | DSH patch 覆盖层：MCP 客户端条目 + 默认模型条目 |
 | [`PawnMind/play/AGENTS.md`](../play/AGENTS.md) | “AI 当铺老板”试玩剧本，DSH 作为 project instructions 自动加载 |
 | 本文件 | 接入步骤、离线验证记录、未验证清单 |
 
@@ -20,16 +20,16 @@
 
 ```bash
 # 0) 在仓库根目录准备（变量只放本机 shell，不写进仓库）
-export PAWNMIND_HOME=/mnt/d/code/game_mods/PawnMind
+export PAWNMIND_HOME=<repo>/PawnMind
 export PAWNMIND_BRIDGE_CONF="/mnt/c/Users/<你>/AppData/LocalLow/Questing Goose Studio/Probably Stolen/ModData/pawnmind/bridge.conf"
 
 # 1) 先离线看组合结果（不启动、不联网、不调模型）
-cd /mnt/d/code/game_mods
+cd <repo>
 dsh --profile web --patch PawnMind/agent/dsh/pawnmind.patch.yml --dump-config | \
   grep -A9 'mcp-pawnmind'
 
 # 2) 真正启动（S8 才做；已有 web 实例时换端口）
-cd /mnt/d/code/game_mods/PawnMind/play
+cd <repo>/PawnMind/play
 dsh --profile web --patch ../agent/dsh/pawnmind.patch.yml --port 3090 --no-open
 ```
 
@@ -68,8 +68,8 @@ dsh --profile web --patch ../agent/dsh/pawnmind.patch.yml --port 3090 --no-open
 
 | 项 | 值 / 说明 |
 |---|---|
-| 仓库根 | `/mnt/d/code/game_mods`（WSL） |
-| PawnMind 包根（MCP `cwd`） | `/mnt/d/code/game_mods/PawnMind`；patch 里用 `PAWNMIND_HOME` 指向它 |
+| 仓库根 | `<repo>`（WSL） |
+| PawnMind 包根（MCP `cwd`） | `<repo>/PawnMind`；patch 里用 `PAWNMIND_HOME` 指向它 |
 | MCP 入口 | `agent/mcp_server.py`，以 `-m agent.mcp_server` 启动（依赖 cwd = 包根） |
 | WSL 解释器 | `PawnMind/.venv/bin/python`（已装 `mcp`） |
 | Windows 解释器 | `D:\code\game_mods\PawnMind\.venv-win\Scripts\python.exe`（若 DSH 跑在 Windows，**必须另建** venv：WSL 的 `.venv` 二进制不能在 Windows 上执行；patch 里的 `PAWNMIND_HOME` 改成 Windows 路径） |
@@ -78,7 +78,7 @@ dsh --profile web --patch ../agent/dsh/pawnmind.patch.yml --port 3090 --no-open
 | WSL 下对应路径 | `/mnt/c/Users/<你>/AppData/LocalLow/Questing Goose Studio/Probably Stolen/ModData/pawnmind/bridge.conf` |
 | DSH 版本 | `dsh --version` → `0.2.2-rc.1`（Node v24.22.3；`dsh` 在 `/home/ygsldr/.local/bin/dsh`） |
 
-[`pawnmind_client.py`](../PawnMind/agent/pawnmind_client.py) 的默认配置路径按 Windows 的 `~` 拼。**在 WSL 里不要依赖默认路径**，一律用 `PAWNMIND_BRIDGE_CONF` 显式传绝对路径。
+[`pawnmind_client.py`](../agent/pawnmind_client.py) 的默认配置路径按 Windows 的 `~` 拼。**在 WSL 里不要依赖默认路径**，一律用 `PAWNMIND_BRIDGE_CONF` 显式传绝对路径。
 
 ---
 
@@ -206,10 +206,10 @@ dsh --profile web --patch ../agent/dsh/pawnmind.patch.yml --port 3090 --no-open
 **形态 A（推荐）：工作目录 = `PawnMind/play`**
 
 ```bash
-export PAWNMIND_HOME=/mnt/d/code/game_mods/PawnMind
+export PAWNMIND_HOME=<repo>/PawnMind
 export PAWNMIND_BRIDGE_CONF="/mnt/c/Users/<你>/.../ModData/pawnmind/bridge.conf"
 
-cd /mnt/d/code/game_mods/PawnMind/play
+cd <repo>/PawnMind/play
 dsh --profile web --patch ../agent/dsh/pawnmind.patch.yml
 ```
 
@@ -220,7 +220,7 @@ dsh --profile web --patch ../agent/dsh/pawnmind.patch.yml
 **形态 B：工作目录 = 仓库根**
 
 ```bash
-cd /mnt/d/code/game_mods
+cd <repo>
 dsh --profile web --patch PawnMind/agent/dsh/pawnmind.patch.yml
 ```
 
@@ -271,7 +271,7 @@ dsh: [/home/ygsldr/.dsh/profiles/web/cordis.patch.yml] patch: entry "opencode-go
 关键输出 1：默认模型被**原地覆盖**（注意 `patched by` 那行和只有一条条目）：
 
 ```yaml
-# == @deepseek-ai/dsh-base, patched by /mnt/d/code/game_mods/PawnMind/agent/dsh/pawnmind.patch.yml
+# == @deepseek-ai/dsh-base, patched by <repo>/PawnMind/agent/dsh/pawnmind.patch.yml
 - id: agent-default-model
   name: '@deepseek-ai/dsh-agent-default-model'
   config:
@@ -282,7 +282,7 @@ dsh: [/home/ygsldr/.dsh/profiles/web/cordis.patch.yml] patch: entry "opencode-go
 关键输出 2：MCP 客户端作为新行插入（`!!js` 原样保留，说明求值发生在启动时）：
 
 ```yaml
-# == /mnt/d/code/game_mods/PawnMind/agent/dsh/pawnmind.patch.yml
+# == <repo>/PawnMind/agent/dsh/pawnmind.patch.yml
 - id: mcp-pawnmind
   name: '@deepseek-ai/dsh-mcp-client'
   config:
@@ -345,7 +345,7 @@ schema 里与本 patch 相关的两条（从 dump 出的 JSON Schema 里读，�
 |---|---|---|---|
 | 都不设 | `PawnMind/.venv/bin/python` | `PawnMind` | 占位符 `/ABSOLUTE/PATH/TO/...`（MCP 会启动失败，刻意 fail-loud） |
 | 只设 `PAWNMIND_BRIDGE_CONF` | `PawnMind/.venv/bin/python` | `PawnMind` | 真实 conf 绝对路径 |
-| 再设 `PAWNMIND_HOME` | `/mnt/d/code/game_mods/PawnMind/.venv/bin/python` | `/mnt/d/code/game_mods/PawnMind` | 真实 conf 绝对路径 |
+| 再设 `PAWNMIND_HOME` | `<repo>/PawnMind/.venv/bin/python` | `<repo>/PawnMind` | 真实 conf 绝对路径 |
 
 > 这个脚本只是把表达式当 JS 求值，用来核对字符串；它**不**证明 DSH 启动时会这样求值。
 
@@ -354,7 +354,7 @@ schema 里与本 patch 相关的两条（从 dump 出的 JSON Schema 里读，�
 用 `fake_game.py`（离线测试替身，**不是游戏**）起一个临时桥，按 patch 里那条命令的**等价绝对路径形式**跑一次真实 stdio 握手：
 
 ```bash
-$ cd /mnt/d/code/game_mods/PawnMind
+$ cd <repo>/PawnMind
 $ .venv/bin/python /tmp/verify_recording_mcp.py     # command=PawnMind/.venv/bin/python
                                                    # args=-m agent.mcp_server --tools recording --config <tmp>
 serverInfo.name = pawnmind
@@ -381,7 +381,7 @@ Ran 7 tests in 25.754s
 OK
 ```
 
-也就是说：`cwd=PawnMind` + `-m agent.mcp_server --tools recording` 这个**模块形式**能工作，94 个工具与 [`RECORDING_TOOL_NAMES`](../PawnMind/agent/mcp_server.py) 完全一致，`act` / `press` / `get_ui_snapshot` / `wait_until` / `wine_add_water` / `new_game` 都不在。既有测试 [`test_mcp_entrypoint.py`](../PawnMind/agent/tests/test_mcp_entrypoint.py)（`-m` 入口）与 [`test_mcp_tools_mode.py`](../PawnMind/agent/tests/test_mcp_tools_mode.py)（recording 集合）覆盖了同一层的回归。
+也就是说：`cwd=PawnMind` + `-m agent.mcp_server --tools recording` 这个**模块形式**能工作，94 个工具与 [`RECORDING_TOOL_NAMES`](../agent/mcp_server.py) 完全一致，`act` / `press` / `get_ui_snapshot` / `wait_until` / `wine_add_water` / `new_game` 都不在。既有测试 [`test_mcp_entrypoint.py`](../agent/tests/test_mcp_entrypoint.py)（`-m` 入口）与 [`test_mcp_tools_mode.py`](../agent/tests/test_mcp_tools_mode.py)（recording 集合）覆盖了同一层的回归。
 
 上面这段输出是按三列排版过的，原始输出是每行一个工具名。校验脚本是本轮的临时文件，**没有入库**；要复现就把它存成任意路径再跑：
 
@@ -390,7 +390,7 @@ OK
 
 ```python
 import asyncio, os, sys, tempfile
-PAWNMIND = "/mnt/d/code/game_mods/PawnMind"
+PAWNMIND = "<repo>/PawnMind"
 sys.path.insert(0, os.path.join(PAWNMIND, "agent"))
 from mcp import ClientSession
 from mcp.client.stdio import StdioServerParameters, stdio_client
@@ -460,7 +460,7 @@ dsh --profile headless --patch /tmp/pm-mcp.yml --json \
 
 理由很直接：这些就是游戏内容。砍掉它们，AI 只能站柜台低买高卖，等于把一款模拟经营玩成小卖部；而且夜间被动收入（自动售货/售水）、净水、酿酒恰恰是这个游戏的主要利润来源。
 
-`RECORDING_TOOL_NAMES`（[mcp_server.py](../PawnMind/agent/mcp_server.py)）仍是**硬白名单**：以后新增的工具默认**不会**进录制集，必须显式加上，`test_mcp_tools_mode.py` 会用真实 stdio 断言注册集合与它**完全相等**。
+`RECORDING_TOOL_NAMES`（[mcp_server.py](../agent/mcp_server.py)）仍是**硬白名单**：以后新增的工具默认**不会**进录制集，必须显式加上，`test_mcp_tools_mode.py` 会用真实 stdio 断言注册集合与它**完全相等**。
 
 ### 9.2 被排除的 6 个，以及理由
 
@@ -480,10 +480,10 @@ dsh --profile headless --patch /tmp/pm-mcp.yml --json \
 `@deepseek-ai/dsh-mcp-client` 的 schema 里**没有** per-tool allowlist 字段，所以 DSH 会暴露服务端注册的全部 94 个。实际有两层半：
 
 1. **服务端硬白名单**（`--tools recording`）：那 6 个旁路工具在协议里根本不存在；
-2. **宿主工具收紧**（[`play-headless.patch.yml`](../PawnMind/agent/dsh/play-headless.patch.yml)）：用 `--dump-config` 验证过，组合后模型侧启用的 tool 行只剩执行器，shell/文件/网页/子代理/工作流全部 `disabled: true`；
+2. **宿主工具收紧**（[`play-headless.patch.yml`](../agent/dsh/play-headless.patch.yml)）：用 `--dump-config` 验证过，组合后模型侧启用的 tool 行只剩执行器，shell/文件/网页/子代理/工作流全部 `disabled: true`；
 3. **剧本软约束**（[`PawnMind/play/AGENTS.md`](../play/AGENTS.md)）：只允许 `mcp__pawnmind__*`，单步、回读、`rev`、错误处置。
 
-[`demo_agent.py`](../PawnMind/agent/demo_agent.py) 的 `REQUIRED_TOOLS`（19 个）只是“脚本策略最小集”，不再是宿主 allowlist；`test_mcp_tools_mode.py` 仍断言它 ⊆ 服务端录制集，防止两处清单漂移。
+[`demo_agent.py`](../agent/demo_agent.py) 的 `REQUIRED_TOOLS`（19 个）只是“脚本策略最小集”，不再是宿主 allowlist；`test_mcp_tools_mode.py` 仍断言它 ⊆ 服务端录制集，防止两处清单漂移。
 
 ### 9.4 为什么还是安全的
 
@@ -568,7 +568,7 @@ dsh --profile headless --patch /tmp/pm-mcp.yml --json \
 ## 13. 离线演示（无游戏、无模型）
 
 ```bash
-cd /mnt/d/code/game_mods/PawnMind
+cd <repo>/PawnMind
 .venv/bin/python -m unittest discover -s agent/tests
 ```
 
@@ -632,6 +632,6 @@ S8 现场按 [runbook](pawnmind-s8-runbook.zh-CN.md) 走；本文件覆盖其中
 - 总计划：[`pawnmind-ai-video-plan.zh-CN.md`](pawnmind-ai-video-plan.zh-CN.md)
 - S8 现场步骤：[`pawnmind-s8-runbook.zh-CN.md`](pawnmind-s8-runbook.zh-CN.md)
 - 阶段证据：[S1](pawnmind-s1-offline-evidence.zh-CN.md)、[S3B](pawnmind-s3b-offline-evidence.zh-CN.md)、[S4](pawnmind-s4-offline-evidence.zh-CN.md)、[S5](pawnmind-s5-offline-evidence.zh-CN.md)、[S6A](pawnmind-s6a-offline-evidence.zh-CN.md)、[S6B](pawnmind-s6b-offline-evidence.zh-CN.md)
-- 代码：[`mcp_server.py`](../PawnMind/agent/mcp_server.py)、[`pawnmind_client.py`](../PawnMind/agent/pawnmind_client.py)、[`demo_agent.py`](../PawnMind/agent/demo_agent.py)、[`fake_game.py`](../PawnMind/agent/fake_game.py)
-- 宿主：[`PawnMind/agent/dsh/pawnmind.patch.yml`](../PawnMind/agent/dsh/pawnmind.patch.yml)、[`PawnMind/play/AGENTS.md`](../play/AGENTS.md)
+- 代码：[`mcp_server.py`](../agent/mcp_server.py)、[`pawnmind_client.py`](../agent/pawnmind_client.py)、[`demo_agent.py`](../agent/demo_agent.py)、[`fake_game.py`](../agent/fake_game.py)
+- 宿主：[`PawnMind/agent/dsh/pawnmind.patch.yml`](../agent/dsh/pawnmind.patch.yml)、[`PawnMind/play/AGENTS.md`](../play/AGENTS.md)
 - DSH 包文档（本机安装）：`@deepseek-ai/dsh`（`README.md`）、`@deepseek-ai/dsh-mcp-client`、`@deepseek-ai/dsh-agent-default-model`、`@deepseek-ai/dsh-agent-instructions`

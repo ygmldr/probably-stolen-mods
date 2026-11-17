@@ -60,7 +60,7 @@ holes → components → bboxGap → clusters → sameItem → category → maxR
 ## 4. 运行
 
 ```bash
-cd /mnt/d/code/game_mods/CompactSort
+cd <repo>/CompactSort
 
 # 自检（守恒 + 合法性）
 analysis/global_bench/run.sh --selftest

@@ -29,3 +29,6 @@ PawnMind/test-artifacts/
 
 # PawnMind local interaction history (runtime data, never committed)
 PawnMind/play/memory/
+
+# Internal engineering notes (not published)
+_internal/

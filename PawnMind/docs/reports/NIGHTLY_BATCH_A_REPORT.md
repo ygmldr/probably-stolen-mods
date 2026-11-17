@@ -1,6 +1,6 @@
 # NIGHTLY_BATCH_A_REPORT — Nightly Batch A 最终报告
 
-> 日期：2026-11-17（服务器侧续跑，CT101）。
+> 日期：2026-11-17（服务器侧续跑，build host）。
 > 范围：`PawnMind/docs/PAWNMIND_OVERNIGHT_LARGE_BATCH_AGENT_HANDOFF_2026-11-17.md` 的 A–G 全部模块。
 > 原则：离线 PASS 与实机 `NOT_RUN` 严格分开；`play_allowlist` 保持 0；未启动游戏、未读写存档、
 > 未安装/覆盖 DLL、未发布、未推送远程。
@@ -23,8 +23,8 @@
 | 实机清单 | `docs/plans/NEXT_LIVE_SESSION.md` |
 | 独立审阅 | `docs/reviews/NIGHTLY_{A,B,C,D,E,G}_*_REVIEW.md` + `NIGHTLY_F_INTEGRATION_REVIEW.md` |
 
-环境（本批次从零补齐）：CT101 + .NET SDK **9.0.321** + `PawnMind/.env.server` + Python venv；
-Unity 目标 Mod 可在 Linux 上直接编译（`dotnet build src/PawnMind.csproj -p:GameManaged=/root/work/game_managed`
+环境（本批次从零补齐）：build host + .NET SDK **9.0.321** + `PawnMind/.env.server` + Python venv；
+Unity 目标 Mod 可在 Linux 上直接编译（`dotnet build src/PawnMind.csproj -p:GameManaged=<game-managed>`
 → Build succeeded）。这是本批次相对交接文档最大的环境收益：**C# 与 Unity 目标编译都有了真实 gate**。
 
 ## A — 模式配置到执行的强制策略：完成（离线，本批次补审阅）
@@ -111,7 +111,7 @@ Unity 目标 Mod 可在 Linux 上直接编译（`dotnet build src/PawnMind.cspro
   manifest 0.3.0 vs tag v1.0.1 vs 文档 0.2.1 三处不一致。
 - 三个高风险：①manifest 缺 `files` capability（预测被扫描器拒绝）；②`reflection-external` 2026-12-10
   起 retiring，14 处 computed-Type 反射；③dist/源码/已安装不一致使游戏内现象不可归因。
-- **更正**：编译 gate 在 CT101 可跑（实测 PASS），不是 `NOT_RUN`；官方 Scanner/APIChanges 仍 `NOT_RUN`。
+- **更正**：编译 gate 在 build host 可跑（实测 PASS），不是 `NOT_RUN`；官方 Scanner/APIChanges 仍 `NOT_RUN`。
 - Workshop 安装草稿：未上架、未推送。
 
 ## F — 独立审阅与集成
@@ -142,7 +142,7 @@ A 的旧 `NOT_REVIEWED` 已补做。审阅发现的问题与处置：
 | D-2 | Low | 记录 | `process_restarted` 只表示进程内缓存被清空/run 变化；真重启只能 unknown_operation（无需改代码） |
 | E-2 | Low | 记录 | trace validator 在 pending 期禁止任何其他写，比桥更严格（有意保守，建议文档注明） |
 
-## 总测试摘要（CT101 实测，2026-11-17 05:0x）
+## 总测试摘要（build host 实测，2026-11-17 05:0x）
 
 | 套件 | 结果 | 命令 |
 |---|---|---|
@@ -151,7 +151,7 @@ A 的旧 `NOT_REVIEWED` 已补做。审阅发现的问题与处置：
 | 适配器契约 | **503 checks OK** | 同上 |
 | Python agent | **365 OK** | `.venv/bin/python -B -m unittest discover -s agent/tests` |
 | 策略生成物 | ok（sha256 `e0da5a24…`） | `tools/gen_policy_catalog.py --check` |
-| Unity 目标编译 | **Build succeeded** | `dotnet build src/PawnMind.csproj -c Release -p:GameManaged=/root/work/game_managed` |
+| Unity 目标编译 | **Build succeeded** | `dotnet build src/PawnMind.csproj -c Release -p:GameManaged=<game-managed>` |
 
 失败数 0；无删除/注释失败测试；无放宽 guard；`play_allowlist` 仍为 **0**。
 

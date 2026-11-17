@@ -224,7 +224,7 @@ sleep 返回 slept=true
 
 **背景（P0 修订发现的真实漏洞）**：`act` 在 C# 中递归调用 `DispatchAction(inner)`，而 `RecordingDispatchGuard.IsProtected` 只覆盖 8 个 op，`debug_*` 不在其中 → `act{action:"debug_grant"}` 可直达作弊入口。
 
-**实现**（[RecordingDispatchGuard.cs](<../PawnMind/src/Bridge/RecordingDispatchGuard.cs>)）：
+**实现**（[RecordingDispatchGuard.cs](<../src/Bridge/RecordingDispatchGuard.cs>)）：
 
 - `IsDebugOp` 列出 5 个 op；
 - `viaAct && IsDebugOp` → `recording_act_wrapper_forbidden`；

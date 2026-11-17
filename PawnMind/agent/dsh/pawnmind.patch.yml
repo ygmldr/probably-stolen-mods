@@ -14,7 +14,7 @@
 #
 # 启动前在本机 shell 里准备（都不写进仓库）：
 #
-#   export PAWNMIND_HOME=/mnt/d/code/game_mods/PawnMind          # PawnMind 包根（绝对路径）
+#   export PAWNMIND_HOME=<repo>/PawnMind          # PawnMind 包根（绝对路径）
 #   export PAWNMIND_BRIDGE_CONF="/mnt/c/Users/<你>/AppData/LocalLow/Questing Goose Studio/Probably Stolen/ModData/pawnmind/bridge.conf"
 #   # 模型认证：opencode-go 路由的内置引用是 OPENCODE_API_KEY；但本机 web profile
 #   # 把它覆盖成了 OPENCODE_GO_API_KEY，且凭据库里可能已有该引用。以实际

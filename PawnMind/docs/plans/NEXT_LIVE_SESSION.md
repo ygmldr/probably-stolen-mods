@@ -18,7 +18,7 @@
 
 ```bash
 # Windows/WSL 工作站
-cd /mnt/d/code/game_mods/PawnMind
+cd <repo>/PawnMind
 ./build.sh                        # 先跑全量测试，再打包 dist/PawnMind
 sha256sum dist/PawnMind/PawnMind.dll
 ```
