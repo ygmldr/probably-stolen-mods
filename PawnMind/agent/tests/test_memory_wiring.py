@@ -35,7 +35,7 @@ class MemoryWiringTests(unittest.TestCase):
 
     def _call(self, tool_name, arguments=None):
         params = StdioServerParameters(
-            command=os.path.join(ROOT, ".venv", "bin", "python"),
+            command=sys.executable,
             args=["-m", "agent.mcp_server", "--tools", "recording",
                   "--config", self.conf, "--memory", "on",
                   "--memory-db", self.db],
@@ -83,7 +83,7 @@ class MemoryWiringTests(unittest.TestCase):
 
     def test_memory_off_writes_nothing(self):
         params = StdioServerParameters(
-            command=os.path.join(ROOT, ".venv", "bin", "python"),
+            command=sys.executable,
             args=["-m", "agent.mcp_server", "--tools", "recording",
                   "--config", self.conf, "--memory", "off",
                   "--memory-db", self.db],

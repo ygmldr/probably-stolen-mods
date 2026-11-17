@@ -7,6 +7,7 @@ would be rejected server-side anyway; it must not be advertised that way.
 import asyncio
 import json
 import os
+import sys
 import unittest
 
 from mcp import ClientSession, StdioServerParameters
@@ -39,7 +40,7 @@ READ_ONLY = {
 
 def _write_tool_schemas():
     params = StdioServerParameters(
-        command=os.path.join(ROOT, ".venv", "bin", "python"),
+        command=sys.executable,
         args=["-m", "agent.mcp_server", "--tools", "full", "--config", CONF],
         cwd=ROOT,
     )
