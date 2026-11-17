@@ -8,6 +8,7 @@ import asyncio
 import json
 import os
 import sys
+import tempfile
 import unittest
 
 from mcp import ClientSession, StdioServerParameters
@@ -15,7 +16,8 @@ from mcp.client.stdio import stdio_client
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
-CONF = os.path.join(ROOT, "test-artifacts", "audit-bridge.conf")
+#: Written per run: test-artifacts/ is ignored, so a clean clone has no fixture.
+FAKE_TOKEN = "0123456789abcdef0123456789abcdef"
 
 # Tools that mutate game state through POST /action and therefore need `rev`.
 # Read-only tools are covered by the router allowlist instead.
@@ -38,10 +40,10 @@ READ_ONLY = {
 }
 
 
-def _write_tool_schemas():
+def _write_tool_schemas(config_path):
     params = StdioServerParameters(
         command=sys.executable,
-        args=["-m", "agent.mcp_server", "--tools", "full", "--config", CONF],
+        args=["-m", "agent.mcp_server", "--tools", "full", "--config", config_path],
         cwd=ROOT,
     )
 
@@ -58,7 +60,14 @@ def _write_tool_schemas():
 class WriteToolsRequireRevTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.schemas = _write_tool_schemas()
+        handle, cls.config_path = tempfile.mkstemp(prefix="pawnmind-schema-", suffix=".conf")
+        with os.fdopen(handle, "w", encoding="utf-8") as config:
+            config.write("port=15528\ntoken=%s\nrun_mode=test\nallow_test_mode=true\n"
+                         % FAKE_TOKEN)
+        try:
+            cls.schemas = _write_tool_schemas(cls.config_path)
+        finally:
+            os.unlink(cls.config_path)
 
     def test_every_write_tool_requires_rev(self):
         offenders = []
