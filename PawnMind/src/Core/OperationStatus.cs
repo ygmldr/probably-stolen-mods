@@ -53,17 +53,23 @@ namespace PawnMind.Core
         }
 
         /// <summary>
-        /// Classifies one dispatch result from the flags the bridge puts in the
+        /// Classifies one dispatch result from the facts the bridge puts in the
         /// response. Pending wins over ok: a running native flow may still emit a
         /// provisional ok, and that must never be reported as completed.
+        ///
+        /// A failed action with an unknown dispatch fact is uncertain, not
+        /// rejected: "we could not tell whether the native call ran" is exactly
+        /// the case where a blind retry is forbidden.
         /// </summary>
-        public static string Classify(bool ok, bool pending, bool uncertain, bool dispatched)
+        public static string Classify(bool ok, bool pending, bool uncertain, string dispatch)
         {
+            string claim = DispatchStatus.Normalize(dispatch);
             if (pending) return Running;
             if (uncertain) return Uncertain;
             if (ok) return Completed;
-            if (!dispatched) return Rejected;
-            return Failed;
+            if (claim == DispatchStatus.NotDispatched) return Rejected;
+            if (claim == DispatchStatus.Dispatched) return Failed;
+            return Uncertain;
         }
     }
 
@@ -80,6 +86,42 @@ namespace PawnMind.Core
         }
     }
 
+    /// <summary>
+    /// R4/F4b: whether the native call ran is its own fact, produced by the
+    /// service that knows. It is never inferred from ok, from the presence of a
+    /// JSON body or from an exception: "we do not know" is a real answer and must
+    /// not be serialized as false (a safe refusal) or as true (a failed attempt).
+    /// </summary>
+    public static class DispatchStatus
+    {
+        /// <summary>A guard refused before the native call; nothing ran.</summary>
+        public const string NotDispatched = "not_dispatched";
+
+        /// <summary>The native call was issued.</summary>
+        public const string Dispatched = "dispatched";
+
+        /// <summary>No trustworthy statement exists; treat as possibly dispatched.</summary>
+        public const string Unknown = "unknown";
+
+        public static bool IsValid(string status)
+        {
+            return status == NotDispatched || status == Dispatched
+                || status == Unknown;
+        }
+
+        /// <summary>Normalizes an absent/invalid claim to the conservative value.</summary>
+        public static string Normalize(string status)
+        {
+            return IsValid(status) ? status : Unknown;
+        }
+
+        /// <summary>True when a second dispatch of the same op must be refused.</summary>
+        public static bool MayHaveRun(string status)
+        {
+            return status != NotDispatched;
+        }
+    }
+
     /// <summary>Stable error codes for the operation query.</summary>
     public static class OperationErrors
     {
@@ -88,6 +130,9 @@ namespace PawnMind.Core
         public const string OperationPending = "operation_pending";
         public const string OperationUnavailable = "operation_unavailable";
         public const string MissingOperationId = "missing_operation_id";
+
+        /// <summary>R4/F1b: a run-changing action is already in flight.</summary>
+        public const string RunChangePending = "run_change_pending";
 
         public const string ProcessRestarted = "process_restarted";
     }
@@ -107,12 +152,45 @@ namespace PawnMind.Core
         public long Revision { get; set; }
         public long ResultRevision { get; set; }
         public string Error { get; set; }
-        public bool Dispatched { get; set; }
+
+        /// <summary>R4/F4b: the service's own dispatch claim (tri-state).</summary>
+        public string Dispatch { get; set; }
+
+        /// <summary>R4/F1b: the request was a run-changing operation.</summary>
+        public bool RunChangeRequested { get; set; }
+
+        /// <summary>
+        /// R4/F1b: requested, confirmed, unknown or not_requested. Only "confirmed"
+        /// may evict the previous run's evidence.
+        /// </summary>
+        public string RunChange { get; set; }
+
+        /// <summary>
+        /// The opaque native run identity observed right before dispatch. Never
+        /// serialized to the client; only used to prove the switch happened.
+        /// </summary>
+        public string RunIdBefore { get; set; }
+
+        /// <summary>Set once, so the eviction and the receipt reset happen once.</summary>
+        public bool RunChangeApplied { get; set; }
+
+        /// <summary>
+        /// R4/F3b: what the verifier actually observed when it promoted the
+        /// operation. Null when the promotion has no readback evidence.
+        /// </summary>
+        public string CompletionEvidence { get; set; }
+
+        public bool RunChangeConfirmed
+        {
+            get { return RunChange == RunChangeStatus.Confirmed; }
+        }
 
         public OperationRecord()
         {
             Execution = ExecutionStatus.Prepared;
             Delivery = DeliveryStatus.PendingDelivery;
+            Dispatch = DispatchStatus.Unknown;
+            RunChange = RunChangeStatus.NotRequested;
         }
 
         public OperationRecord Copy()
@@ -127,7 +205,12 @@ namespace PawnMind.Core
                 Revision = Revision,
                 ResultRevision = ResultRevision,
                 Error = Error,
-                Dispatched = Dispatched
+                Dispatch = Dispatch,
+                RunChangeRequested = RunChangeRequested,
+                RunChange = RunChange,
+                RunIdBefore = RunIdBefore,
+                RunChangeApplied = RunChangeApplied,
+                CompletionEvidence = CompletionEvidence
             };
         }
 

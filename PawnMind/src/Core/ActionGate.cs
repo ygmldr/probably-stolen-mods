@@ -123,7 +123,7 @@ namespace PawnMind.Core
                 Fingerprint = requestFingerprint ?? string.Empty,
                 Execution = ok ? ExecutionStatus.Completed : ExecutionStatus.Rejected,
                 Delivery = DeliveryStatus.Delivered,
-                Dispatched = ok,
+                Dispatch = ok ? DispatchStatus.Dispatched : DispatchStatus.NotDispatched,
                 Error = ok ? null : ResponseError(response)
             };
             RememberResult(actionId, requestFingerprint, response, operation);
@@ -176,7 +176,7 @@ namespace PawnMind.Core
                 ResultRevision = revision,
                 Execution = ExecutionStatus.Prepared,
                 Delivery = DeliveryStatus.PendingDelivery,
-                Dispatched = false
+                Dispatch = DispatchStatus.NotDispatched
             };
             RememberResult(actionId, requestFingerprint, null, operation);
             return operation;
@@ -184,7 +184,7 @@ namespace PawnMind.Core
 
         /// <summary>Completes a prepared operation; only the router calls this.</summary>
         public void Complete(string actionId, string response, string execution,
-            string delivery, long resultRevision, string error, bool dispatched)
+            string delivery, long resultRevision, string error, string dispatch)
         {
             Entry entry;
             if (!TryFind(actionId, out entry)) return;
@@ -198,10 +198,11 @@ namespace PawnMind.Core
                 : DeliveryStatus.Delivered;
             entry.Operation.ResultRevision = resultRevision;
             entry.Operation.Error = error;
-            // F4: dispatched is the service's own claim, never inferred from the
-            // execution axis. A pending/failed result that says nothing reached the
-            // game must stay dispatched=false.
-            entry.Operation.Dispatched = dispatched;
+            // F4/R4-F4b: the dispatch fact is the service's own tri-state claim,
+            // never inferred from the execution axis. A service that cannot say
+            // whether the native call ran stays "unknown"; it is not silently
+            // downgraded to "not dispatched" (which would read as a safe refusal).
+            entry.Operation.Dispatch = DispatchStatus.Normalize(dispatch);
         }
 
         /// <summary>
@@ -243,8 +244,30 @@ namespace PawnMind.Core
                 OperationRecord operation = pair.Value.Operation;
                 if (operation == null) continue;
                 if (!string.Equals(operation.Op, op, StringComparison.Ordinal)) continue;
-                if (!operation.Dispatched) continue;
+                // unknown may have run: it blocks a second native call just like a
+                // confirmed dispatch. Only "nothing ran" is safe to ignore.
+                if (!DispatchStatus.MayHaveRun(operation.Dispatch)) continue;
                 if (ExecutionStatus.IsTerminal(operation.Execution)) continue;
+                return operation.Copy();
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// R4/F1b: the run-changing operation whose switch has been requested but
+        /// not confirmed. While one exists a second run-changing write would be a
+        /// blind retry of a native load/new-game that may already be in flight.
+        /// </summary>
+        public OperationRecord FindUnconfirmedRunChange()
+        {
+            foreach (KeyValuePair<string, Entry> pair in _results)
+            {
+                OperationRecord operation = pair.Value.Operation;
+                if (operation == null) continue;
+                if (!operation.RunChangeRequested) continue;
+                if (operation.RunChangeConfirmed) continue;
+                if (!DispatchStatus.MayHaveRun(operation.Dispatch)) continue;
                 return operation.Copy();
             }
 

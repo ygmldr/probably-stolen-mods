@@ -88,6 +88,9 @@ namespace PawnMind.Bridge
                 return result;
             }
 
+            // R4/F4b: from here on a native UI callback is issued, so a later
+            // failure is a dispatched failure, not a refusal.
+            result.Dispatched = true;
             NewGameControlCallResult call = control.Open();
             if (!CallSucceeded(result, call)) return result;
 
@@ -171,6 +174,9 @@ namespace PawnMind.Bridge
                 return result;
             }
 
+            // R4/F4b: from here on a native UI callback is issued, so a later
+            // failure is a dispatched failure, not a refusal.
+            result.Dispatched = true;
             NewGameControlCallResult call = control.TurnPage(row, direction);
             if (!CallSucceeded(result, call)) return result;
 
@@ -317,6 +323,9 @@ namespace PawnMind.Bridge
                 return result;
             }
 
+            // R4/F4b: from here on a native UI callback is issued, so a later
+            // failure is a dispatched failure, not a refusal.
+            result.Dispatched = true;
             NewGameControlCallResult call = control.FocusSelectedPerk(lookup);
             if (!CallSucceeded(result, call)) return result;
 
@@ -399,6 +408,9 @@ namespace PawnMind.Bridge
                 return result;
             }
 
+            // R4/F4b: from here on a native UI callback is issued, so a later
+            // failure is a dispatched failure, not a refusal.
+            result.Dispatched = true;
             NewGameControlCallResult call = control.BlurPerk(lookup);
             if (!CallSucceeded(result, call)) return result;
 
@@ -503,6 +515,9 @@ namespace PawnMind.Bridge
                 return result;
             }
 
+            // R4/F4b: from here on a native UI callback is issued, so a later
+            // failure is a dispatched failure, not a refusal.
+            result.Dispatched = true;
             NewGameControlCallResult call = control.Continue(before.Phase);
             if (!CallSucceeded(result, call)) return result;
 
@@ -584,6 +599,8 @@ namespace PawnMind.Bridge
         private static bool CallSucceeded(NewGameMenuActionResult result,
             NewGameControlCallResult call)
         {
+            // The port tells us when it refused to invoke the native callback.
+            if (call == null || !call.Called) result.Dispatched = false;
             if (call == null)
             {
                 result.Error = NewGameMenuErrors.NativeNotCalled;
@@ -701,6 +718,7 @@ namespace PawnMind.Bridge
             var payload = new JObject();
             payload["ok"] = result != null && result.Success;
             payload["op"] = "select_new_game_option";
+            payload["dispatched"] = result != null && result.Dispatched;
             if (result == null)
             {
                 payload["error"] = "no_result";
@@ -724,6 +742,7 @@ namespace PawnMind.Bridge
             var payload = new JObject();
             payload["ok"] = result != null && result.Success;
             payload["op"] = op;
+            payload["dispatched"] = result != null && result.Dispatched;
             if (result == null)
             {
                 payload["error"] = "no_result";

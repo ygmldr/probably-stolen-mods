@@ -159,7 +159,13 @@ public sealed class PawnMindMod : IMod
                 delegate(string op) { return ModePolicy.Refusal(op); },
                 // D2: GET /operation re-checks a running shop operation against a
                 // read-only game readback. Never dispatches and never writes.
-                VerifyOperation);
+                VerifyOperation,
+                // R4/F1b: the opaque native run identity. It is only compared by the
+                // router and is never serialized to a client. Rent receipts belong
+                // to the old run, so they are dropped only once the switch is
+                // confirmed, not when the request is accepted.
+                delegate { return GameState.ReadRunId(); },
+                ResetRunBoundEvidence);
 
             // S3B menu writes are evaluated by the same S4 slot policy. The
             // default (recording unconfigured) still refuses every write before
@@ -254,18 +260,27 @@ public sealed class PawnMindMod : IMod
     private static ActionResult DispatchAction(string op, JObject request)
     {
         ActionResult result = DispatchActionCore(op, request);
-        if (result != null && result.Ok && IsRunChangeOp(op))
+        if (result != null && result.Ok && RunChangeOps.IsRunChangeOp(op))
         {
-            // D2/PP-RECOVERY-01 + F1: a new game or a loaded save starts a new run.
-            // Mark the result; the router evicts the old run's evidence *after*
-            // completing this operation, so the caller's own action id keeps its
-            // response and stays idempotent. Rent receipts belong to the old run
-            // and are dropped immediately.
-            FirstWeekService service = FirstWeekService.Current;
-            if (service != null) service.ResetRentReceipts();
-            result = result.WithRunChanged();
+            // D2/PP-RECOVERY-01 + R4/F1b: a new game or a loaded save *requests* a
+            // run switch. Nothing is evicted and no rent receipt is dropped here:
+            // "the native load was accepted" is not "the run identity changed".
+            // The router owns that decision because it can read the native run id
+            // and it also sees the asynchronous completion on later reads.
+            result = result.WithRunChangeRequested();
         }
         return result;
+    }
+
+    /// <summary>
+    /// R4/F1b: runs once, after a run switch is confirmed by a native identity
+    /// readback. Old-run evidence that is not an <see cref="OperationRecord"/>
+    /// (the first-rent receipts) is dropped here instead of at request time.
+    /// </summary>
+    private static void ResetRunBoundEvidence()
+    {
+        FirstWeekService service = FirstWeekService.Current;
+        if (service != null) service.ResetRentReceipts();
     }
 
     private static ActionResult DispatchActionCore(string op, JObject request)
@@ -890,15 +905,16 @@ public sealed class PawnMindMod : IMod
         record.Execution = ExecutionStatus.Completed;
         record.Error = null;
         record.ResultRevision = StateSnapshot.CurrentRevision;
+        // R4/F3b: the completion states what was observed instead of leaving the
+        // model to infer it from the execution axis.
+        JObject evidence = new JObject();
+        evidence["source"] = "shop_day_readback";
+        evidence["shop_state"] = after.ShopState;
+        evidence["readable"] = true;
+        evidence["in_game"] = true;
+        evidence["observed_rev"] = record.ResultRevision;
+        record.CompletionEvidence = evidence.ToString(Newtonsoft.Json.Formatting.None);
         return record;
-    }
-
-    private static bool IsRunChangeOp(string op)
-    {
-        return op == "load_game"
-            || op == "load_recording_game"
-            || op == "new_game"
-            || op == "confirm_new_game";
     }
 
     private static void CaptureOutcome(ActionOutcome outcome)

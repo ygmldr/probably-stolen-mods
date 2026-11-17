@@ -1,5 +1,6 @@
 using System;
 using Newtonsoft.Json;
+using PawnMind.Core;
 using Newtonsoft.Json.Linq;
 
 namespace PawnMind.Bridge
@@ -12,30 +13,81 @@ namespace PawnMind.Bridge
         public string RawJson { get; private set; }
 
         /// <summary>
-        /// A successful new_game/load_game switches the run: the router must evict
-        /// the previous run's operation evidence *after* completing this one.
+        /// The action asked the game to load a save or start a new run. This is a
+        /// *request*, not a completed switch: the router only evicts the previous
+        /// run's evidence once a native run identity readback confirms the switch
+        /// (R4 / F1b). A pending load, a confirmed prompt and an unreadable run
+        /// identity all leave the old evidence in place.
         /// </summary>
-        public bool RunChanged { get; private set; }
+        public bool RunChangeRequested { get; private set; }
 
-        public ActionResult WithRunChanged()
+        /// <summary>
+        /// R4/F4b: whether the native call ran, as claimed by the service that
+        /// produced this result. A RawJson write response declares it explicitly;
+        /// a response that says nothing is <see cref="DispatchStatus.Unknown"/> and
+        /// is never turned into a safe-looking refusal.
+        /// </summary>
+        public string Dispatch { get; private set; }
+
+        public ActionResult WithRunChangeRequested()
         {
-            RunChanged = true;
+            RunChangeRequested = true;
             return this;
         }
 
+        /// <summary>The action ran and reported success: the native call happened.</summary>
         public static ActionResult Success(string op)
         {
-            return new ActionResult { Ok = true, Op = op };
+            return new ActionResult
+            {
+                Ok = true, Op = op, Dispatch = DispatchStatus.Dispatched
+            };
         }
 
+        /// <summary>
+        /// A guard refused before any native call. This is the *only* shape that is
+        /// allowed to claim "nothing ran"; a failure raised after the native call
+        /// must use <see cref="Failed"/>.
+        /// </summary>
         public static ActionResult Failure(string op, string error)
         {
-            return new ActionResult { Ok = false, Op = op, Error = error };
+            return new ActionResult
+            {
+                Ok = false, Op = op, Error = error,
+                Dispatch = DispatchStatus.NotDispatched
+            };
+        }
+
+        /// <summary>The native call was issued and the action did not achieve it.</summary>
+        public static ActionResult Failed(string op, string error)
+        {
+            return new ActionResult
+            {
+                Ok = false, Op = op, Error = error,
+                Dispatch = DispatchStatus.Dispatched
+            };
+        }
+
+        /// <summary>
+        /// The native call may or may not have run (an exception, a lost readback).
+        /// Never retried blindly and never reported as a safe rejection.
+        /// </summary>
+        public static ActionResult UnknownDispatch(string op, string error)
+        {
+            return new ActionResult
+            {
+                Ok = false, Op = op, Error = error,
+                Dispatch = DispatchStatus.Unknown
+            };
         }
 
         public static ActionResult SuccessRaw(string op, string json)
         {
-            var result = new ActionResult { Op = op, RawJson = json };
+            // Absent a trustworthy claim the raw producer is treated as unknown.
+            var result = new ActionResult
+            {
+                Op = op, RawJson = json, Dispatch = DispatchStatus.Unknown
+            };
 
             if (string.IsNullOrEmpty(json))
             {
@@ -58,6 +110,7 @@ namespace PawnMind.Bridge
                     return result;
                 }
 
+                result.Dispatch = ReadDispatch(raw);
                 result.Ok = (bool)ok;
                 if (!result.Ok)
                 {
@@ -73,6 +126,20 @@ namespace PawnMind.Bridge
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// Reads the service's dispatch claim. Only a real JSON boolean counts;
+        /// anything else is "unknown", including a missing field, a string and a
+        /// value the producer invented.
+        /// </summary>
+        private static string ReadDispatch(JObject raw)
+        {
+            JToken value = raw["dispatched"];
+            if (value == null || value.Type != JTokenType.Boolean)
+                return DispatchStatus.Unknown;
+
+            return (bool)value ? DispatchStatus.Dispatched : DispatchStatus.NotDispatched;
         }
 
         public string ToJson(long revision)

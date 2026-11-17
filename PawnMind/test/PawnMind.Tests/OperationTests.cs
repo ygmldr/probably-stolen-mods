@@ -30,7 +30,8 @@ namespace PawnMind.Tests
             long revision,
             Func<string, JObject, ActionResult> dispatch,
             Func<string, string> authorize = null,
-            Func<OperationRecord, OperationRecord> verifier = null)
+            Func<OperationRecord, OperationRecord> verifier = null,
+            Func<string> readRunId = null)
         {
             return new ActionRouter(
                 new ActionGate(),
@@ -42,7 +43,8 @@ namespace PawnMind.Tests
                 delegate { return OpenGate(); },
                 null,
                 authorize,
-                verifier);
+                verifier,
+                readRunId);
         }
 
         private static string PendingResponse(string op)
@@ -60,14 +62,15 @@ namespace PawnMind.Tests
             var gate = new ActionGate();
             gate.Begin("op-1", "end_day", 4);
             gate.Complete("op-1", "{\"ok\":true}", ExecutionStatus.Completed,
-                DeliveryStatus.Delivered, 5, null, true);
+                DeliveryStatus.Delivered, 5, null, DispatchStatus.Dispatched);
 
             OperationRecord record = gate.Find("op-1");
             Assert.NotNull(record, "operation recorded");
             Assert.Equal(ExecutionStatus.Completed, record.Execution, "execution completed");
             Assert.Equal(DeliveryStatus.Delivered, record.Delivery, "delivery delivered");
             Assert.Equal(5L, record.ResultRevision, "result revision");
-            Assert.True(record.Dispatched, "dispatched");
+            Assert.Equal(DispatchStatus.Dispatched, record.Dispatch,
+                "the service claimed the native call ran");
         }
 
         [Test]
@@ -76,7 +79,7 @@ namespace PawnMind.Tests
             var gate = new ActionGate();
             gate.Begin("op-2", "confirm_trade", 7);
             gate.Complete("op-2", "{\"ok\":true}", ExecutionStatus.Completed,
-                DeliveryStatus.Delivered, 8, null, true);
+                DeliveryStatus.Delivered, 8, null, DispatchStatus.Dispatched);
 
             Assert.True(gate.MarkUndelivered("op-2"), "delivery axis updated");
             OperationRecord record = gate.Find("op-2");
@@ -93,7 +96,7 @@ namespace PawnMind.Tests
             var gate = new ActionGate();
             gate.Begin("old", "confirm_trade", 3);
             gate.Complete("old", "{\"ok\":true}", ExecutionStatus.Completed,
-                DeliveryStatus.Delivered, 4, null, true);
+                DeliveryStatus.Delivered, 4, null, DispatchStatus.Dispatched);
 
             Assert.Equal(1, gate.ClearOperations(), "one operation cleared");
             Assert.Null(gate.Find("old"), "a cleared operation cannot be replayed");
@@ -202,12 +205,25 @@ namespace PawnMind.Tests
         public static void F1_Run_Change_Evicts_Old_Operations_But_Keeps_Current()
         {
             int dispatches = 0;
-            ActionRouter router = Router(3, delegate(string op, JObject request)
-            {
-                dispatches++;
-                if (op == "load_game") return ActionResult.Success(op).WithRunChanged();
-                return ActionResult.Success(op);
-            });
+            // R4/F1b: eviction now needs a confirmed run identity, not just an
+            // accepted load request.
+            string runId = "run-1";
+            ActionRouter router = Router(
+                3,
+                delegate(string op, JObject request)
+                {
+                    dispatches++;
+                    if (op == "load_game")
+                    {
+                        runId = "run-2";
+                        return ActionResult.Success(op).WithRunChangeRequested();
+                    }
+
+                    return ActionResult.Success(op);
+                },
+                null,
+                null,
+                delegate { return runId; });
 
             router.Handle("{\"op\":\"open_shop\",\"action_id\":\"old-run\",\"rev\":3}");
             Assert.NotNull(router.GetOperationJson("old-run")["execution_status"], "old op recorded");

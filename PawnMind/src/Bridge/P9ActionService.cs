@@ -10,7 +10,8 @@ namespace PawnMind.Bridge
     {
         public static string DeliverRequestJson(string id)
         {
-            if (string.IsNullOrEmpty(id)) return "{\"ok\":false,\"error\":\"missing_id\"}";
+            if (string.IsNullOrEmpty(id))
+                return "{\"ok\":false,\"error\":\"missing_id\",\"dispatched\":false}";
 
             StoreRequest request = null;
             try
@@ -26,16 +27,22 @@ namespace PawnMind.Bridge
             bool fillable = false;
             try { fillable = request != null && request.CanFillRequest(); } catch { }
             RequestCheck check = RequestValidator.Validate(request != null, fillable);
-            if (check != RequestCheck.Ok) return "{\"ok\":false,\"error\":\"" + (check == RequestCheck.NotFound ? "request_not_found" : "not_fillable") + "\"}";
+            if (check != RequestCheck.Ok)
+                return "{\"ok\":false,\"error\":\""
+                    + (check == RequestCheck.NotFound ? "request_not_found" : "not_fillable")
+                    + "\",\"dispatched\":false}";
 
             try
             {
+                // R4/F4b: the native fill is issued from here on.
                 request.FillRequest();
-                return "{\"ok\":true,\"cash\":" + GameState.GetCash() + "}";
+                return "{\"ok\":true,\"dispatched\":true,\"cash\":"
+                    + GameState.GetCash() + "}";
             }
             catch (Exception e)
             {
-                return "{\"ok\":false,\"error\":\"deliver_failed\",\"detail\":\"" + Escape(e.Message) + "\"}";
+                return "{\"ok\":false,\"error\":\"deliver_failed\",\"dispatched\":true,"
+                    + "\"detail\":\"" + Escape(e.Message) + "\"}";
             }
         }
 
@@ -59,18 +66,20 @@ namespace PawnMind.Bridge
             {
                 string error = check == ReportCheck.NoClient ? "no_client"
                     : check == ReportCheck.AlreadyReported ? "already_reported" : "cannot_report";
-                return "{\"ok\":false,\"error\":\"" + error + "\"}";
+                return "{\"ok\":false,\"error\":\"" + error + "\",\"dispatched\":false}";
             }
 
             try
             {
                 PlayerStore.Instance.OnCustomerReported();
-                return "{\"ok\":true,\"is_wanted\":" + (client.isWanted ? "true" : "false")
+                return "{\"ok\":true,\"dispatched\":true,\"is_wanted\":"
+                    + (client.isWanted ? "true" : "false")
                     + ",\"report_reward\":" + client.reportReward + "}";
             }
             catch (Exception e)
             {
-                return "{\"ok\":false,\"error\":\"report_failed\",\"detail\":\"" + Escape(e.Message) + "\"}";
+                return "{\"ok\":false,\"error\":\"report_failed\",\"dispatched\":true,"
+                    + "\"detail\":\"" + Escape(e.Message) + "\"}";
             }
         }
 
@@ -82,22 +91,27 @@ namespace PawnMind.Bridge
             try { acceptable = offer != null && offer.IsBarterAcceptable(); } catch { }
 
             BarterCheck check = BarterValidator.Validate(offer != null, acceptable);
-            if (check != BarterCheck.Ok) return "{\"ok\":false,\"error\":\"" + (check == BarterCheck.NoOffer ? "no_barter_offer" : "not_acceptable") + "\"}";
+            if (check != BarterCheck.Ok)
+                return "{\"ok\":false,\"error\":\""
+                    + (check == BarterCheck.NoOffer ? "no_barter_offer" : "not_acceptable")
+                    + "\",\"dispatched\":false}";
 
             try
             {
                 offer.OnBarterAccepted();
-                return "{\"ok\":true}";
+                return "{\"ok\":true,\"dispatched\":true}";
             }
             catch (Exception e)
             {
-                return "{\"ok\":false,\"error\":\"barter_failed\",\"detail\":\"" + Escape(e.Message) + "\"}";
+                return "{\"ok\":false,\"error\":\"barter_failed\",\"dispatched\":true,"
+                    + "\"detail\":\"" + Escape(e.Message) + "\"}";
             }
         }
 
         public static string ArrestWantedJson(string id)
         {
-            if (string.IsNullOrEmpty(id)) return "{\"ok\":false,\"error\":\"missing_id\"}";
+            if (string.IsNullOrEmpty(id))
+                return "{\"ok\":false,\"error\":\"missing_id\",\"dispatched\":false}";
             try
             {
                 if (!PlayerStore.Instance.wantedStatus.ContainsKey(id))

@@ -75,6 +75,10 @@ namespace PawnMind.Core
                 return result;
             }
 
+            // R4/F4b: the native selection callback is issued from here on, so a
+            // later failure is a dispatched failure rather than a refusal.
+            result.Dispatched = true;
+
             NewGameSelectCallResult call;
             try
             {
@@ -92,6 +96,7 @@ namespace PawnMind.Core
             }
             if (!call.Called)
             {
+                result.Dispatched = false;
                 result.Error = string.IsNullOrEmpty(call.Error)
                     ? NewGameMenuErrors.NativeNotCalled
                     : call.Error;

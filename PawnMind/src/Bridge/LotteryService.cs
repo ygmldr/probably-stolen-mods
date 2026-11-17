@@ -75,19 +75,24 @@ namespace PawnMind.Bridge
         public static string RedeemJson(int itemId)
         {
             GameItem item = GameState.FindItemAnywhere(itemId);
-            if (item == null) return "{\"ok\":false,\"error\":\"item_not_found\"}";
-            if (!SafeTag(item, "LOTTERY_TICKET_TAG")) return "{\"ok\":false,\"error\":\"not_a_ticket\"}";
+            if (item == null)
+                return "{\"ok\":false,\"error\":\"item_not_found\",\"dispatched\":false}";
+            if (!SafeTag(item, "LOTTERY_TICKET_TAG"))
+                return "{\"ok\":false,\"error\":\"not_a_ticket\",\"dispatched\":false}";
             if (!SafeBool(delegate { return LotteryHelper.CanRedeemPrize(item); }))
-                return "{\"ok\":false,\"error\":\"cannot_redeem\"}";
+                return "{\"ok\":false,\"error\":\"cannot_redeem\",\"dispatched\":false}";
 
             try
             {
+                // R4/F4b: the native redeem is issued from here on.
                 LotteryHelper.TryRedeemPrize(item);
-                return "{\"ok\":true,\"cash\":" + GameState.GetCash() + "}";
+                return "{\"ok\":true,\"dispatched\":true,\"cash\":"
+                    + GameState.GetCash() + "}";
             }
             catch (Exception e)
             {
-                return "{\"ok\":false,\"error\":\"redeem_failed\",\"detail\":\"" + Escape(e.Message) + "\"}";
+                return "{\"ok\":false,\"error\":\"redeem_failed\",\"dispatched\":true,"
+                    + "\"detail\":\"" + Escape(e.Message) + "\"}";
             }
         }
 

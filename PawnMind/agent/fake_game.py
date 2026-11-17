@@ -190,6 +190,9 @@ class FakeGame:
             "name": "pawnmind",
             "fake": True,
             "mode": "fake_game",
+            # R4/F5b: the MCP surface now requires the bridge to report a run
+            # mode. The offline double is a test-mode bridge.
+            "run_mode": "test",
             "note": "offline test double; not the real game",
             "game_version": FAKE_GAME_VERSION,
             "game_assembly_mvid": FAKE_ASSEMBLY_MVID,

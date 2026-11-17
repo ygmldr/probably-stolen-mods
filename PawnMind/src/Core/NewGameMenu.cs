@@ -252,6 +252,9 @@ namespace PawnMind.Core
         public string TargetId;
         public NewGameReadback Readback;
         public NewGameMenuView View;
+
+        /// <summary>R4/F4b: whether the native selection callback was issued.</summary>
+        public bool Dispatched;
     }
 
     /// <summary>

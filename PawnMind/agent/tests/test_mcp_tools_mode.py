@@ -8,6 +8,7 @@ allowlist subset relation, and the argument error path.
 """
 
 import asyncio
+import json
 import os
 import subprocess
 import sys
@@ -29,6 +30,9 @@ sys.path.insert(0, AGENT_DIR)
 
 import demo_agent  # noqa: E402
 import mcp_server  # noqa: E402
+import tool_policy  # noqa: E402
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from mode_fixture import FakeBridge, dead_config  # noqa: E402
 
 #: The recording surface: every tool a human player could equivalently use.
 #: Keep this list explicit so a broadened server whitelist cannot silently
@@ -154,23 +158,44 @@ FORBIDDEN_IN_RECORDING = (
 )
 
 
-@unittest.skipIf(ClientSession is None, "mcp package not installed")
-class ToolsModeTests(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        handle, cls.config_path = tempfile.mkstemp()
-        with os.fdopen(handle, "w") as config:
-            config.write("port=15528\ntoken=%s\n" % ("0" * 32))
+class ModeTestCase(unittest.TestCase):
+    """Shared fake-bridge plumbing for the mode fixtures."""
 
-    @classmethod
-    def tearDownClass(cls):
-        if os.path.exists(cls.config_path):
-            os.unlink(cls.config_path)
+    def setUp(self):
+        self._bridges = []
+        self._configs = []
 
-    def _list_tools(self, *extra_args):
+    def tearDown(self):
+        for bridge in self._bridges:
+            bridge.close()
+        for path in self._configs:
+            if os.path.exists(path):
+                os.unlink(path)
+
+    def bridge(self, mode="test", policy_sha256=None, include_mode=True):
+        instance = FakeBridge(mode, policy_sha256, include_mode)
+        self._bridges.append(instance)
+        path = instance.config()
+        self._configs.append(path)
+        return instance, path
+
+    def _env(self, **extra):
+        env = dict(os.environ)
+        env.update({key: str(value) for key, value in extra.items()})
+        return env
+
+    def _list_tools(self, *extra_args, bridge=None, config_path=None, env=None):
+        if config_path is None:
+            if bridge is None:
+                bridge, config_path = self.bridge("test")
+            else:
+                config_path = bridge.config()
+                self._configs.append(config_path)
+
         params = StdioServerParameters(
             command=sys.executable,
-            args=[MCP_SERVER, "--config", self.config_path] + list(extra_args),
+            args=[MCP_SERVER, "--config", config_path] + list(extra_args),
+            env=env,
         )
 
         async def scenario():
@@ -182,9 +207,43 @@ class ToolsModeTests(unittest.TestCase):
 
         return asyncio.run(scenario())
 
-    def _list_tool_names(self, *extra_args):
-        return set(self._list_tools(*extra_args))
+    def _list_tool_names(self, *extra_args, bridge=None, config_path=None, env=None):
+        return set(self._list_tools(*extra_args, bridge=bridge, config_path=config_path,
+                                    env=env))
 
+    def _call_tool(self, name, arguments, config_path, *extra_args, env=None,
+                   mutate=None):
+        """Start one MCP session and call a tool, optionally mutating the bridge."""
+
+        params = StdioServerParameters(
+            command=sys.executable,
+            args=[MCP_SERVER, "--config", config_path] + list(extra_args),
+            env=env,
+        )
+
+        async def scenario():
+            async with stdio_client(params) as (read, write):
+                async with ClientSession(read, write) as session:
+                    await session.initialize()
+                    first = await session.call_tool(name, arguments)
+                    if mutate is not None:
+                        mutate()
+                    second = await session.call_tool(name, arguments)
+                    return first, second
+
+        return asyncio.run(scenario())
+
+    @staticmethod
+    def _payload(result):
+        text = result.content[0].text
+        try:
+            return json.loads(text)
+        except ValueError:
+            return {"raw": text}
+
+
+@unittest.skipIf(ClientSession is None, "mcp package not installed")
+class ToolsModeTests(ModeTestCase):
     def test_full_mode_is_the_default_and_keeps_the_whole_surface(self):
         default_names = self._list_tool_names()
         explicit_names = self._list_tool_names("--tools", "full")
@@ -349,7 +408,8 @@ class ToolsModeTests(unittest.TestCase):
         self.assertIsNone(mcp_server.allowed_tools_for_mode("test"), "test is unfiltered")
 
     def test_play_mode_exposes_only_local_tools(self):
-        names = self._list_tool_names("--mode", "play")
+        _, config_path = self.bridge("play")
+        names = self._list_tool_names("--mode", "play", config_path=config_path)
         self.assertNotIn("get_state", names)
         self.assertNotIn("open_shop", names)
         self.assertNotIn("confirm_trade", names)
@@ -357,14 +417,17 @@ class ToolsModeTests(unittest.TestCase):
                         "only local tools survive a play-mode filter: %r" % (sorted(names),))
 
     def test_bootstrap_mode_hides_snapshot_reads(self):
-        names = self._list_tool_names("--mode", "bootstrap")
+        _, config_path = self.bridge("bootstrap")
+        names = self._list_tool_names("--mode", "bootstrap", config_path=config_path)
         for hidden in ("get_state", "get_run_summary", "get_legal_actions",
                        "wait_for_change", "wait_for_events", "wait_until"):
             self.assertNotIn(hidden, names, "bootstrap must not expose " + hidden)
         self.assertIn("get_new_game_options", names)
 
     def test_explicit_test_mode_keeps_the_full_surface(self):
-        self.assertEqual(116, len(self._list_tool_names("--mode", "test")))
+        _, config_path = self.bridge("test")
+        self.assertEqual(116, len(self._list_tool_names("--mode", "test",
+                                                       config_path=config_path)))
 
     def test_demo_allowlist_is_a_subset_of_the_recording_surface(self):
         demo_tools = demo_agent.ALLOWED_OPS
@@ -379,9 +442,11 @@ class ToolsModeTests(unittest.TestCase):
         self.assertTrue(demo_agent.RECORDING_TOOLS <= mcp_server.RECORDING_TOOL_NAMES)
 
     def test_invalid_tools_value_exits_non_zero_with_a_clear_error(self):
+        config_path = dead_config()
+        self._configs.append(config_path)
         completed = subprocess.run(
             [sys.executable, MCP_SERVER,
-             "--config", self.config_path, "--tools", "recording-only"],
+             "--config", config_path, "--tools", "recording-only"],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             timeout=60,
@@ -393,6 +458,80 @@ class ToolsModeTests(unittest.TestCase):
         self.assertIn("full", stderr)
         self.assertIn("recording", stderr)
         self.assertNotIn("Traceback", stderr)
+
+
+@unittest.skipIf(ClientSession is None, "mcp package not installed")
+class ModeLockdownTests(ModeTestCase):
+    """R4/F5b: the registered surface is fail-closed and cannot go stale."""
+
+    def test_r4_f5_01_unreachable_bridge_is_locked(self):
+        config_path = dead_config()
+        self._configs.append(config_path)
+
+        names = self._list_tool_names("--tools", "full", config_path=config_path)
+
+        self.assertTrue(names <= set(mcp_server.LOCAL_TOOL_NAMES),
+                        "an unreachable bridge must not expose game tools: %r"
+                        % (sorted(names),))
+        self.assertNotIn("get_state", names)
+        self.assertNotIn("open_shop", names)
+        self.assertNotIn("new_game", names)
+        self.assertIn("memory_status", names, "the local tools stay available")
+
+    def test_r4_f5_02_unusable_health_is_locked(self):
+        for mode, include in (("test", False), ("locked", True), ("debug", True), ("", True)):
+            _, config_path = self.bridge(mode, include_mode=include)
+            names = self._list_tool_names(config_path=config_path)
+            self.assertTrue(
+                names <= set(mcp_server.LOCAL_TOOL_NAMES),
+                "run_mode=%r (present=%r) must lock the surface, got %r"
+                % (mode, include, sorted(names)),
+            )
+
+    def test_r4_f5_03_play_without_live_evidence_exposes_nothing(self):
+        _, config_path = self.bridge("play")
+        names = self._list_tool_names("--mode", "play", config_path=config_path)
+
+        policy = tool_policy.load_policy()
+        self.assertEqual(set(), set(tool_policy.play_allowlist(policy)),
+                         "the fixture assumes an empty live-evidence allowlist")
+        self.assertEqual(set(mcp_server.LOCAL_TOOL_NAMES), names,
+                         "play exposes only the local tools while the list is empty")
+
+    def test_r4_f5_04_requested_test_mode_needs_a_test_bridge(self):
+        _, config_path = self.bridge("play")
+        names = self._list_tool_names("--mode", "test", config_path=config_path)
+
+        self.assertTrue(names <= set(mcp_server.LOCAL_TOOL_NAMES),
+                        "explicit --mode test must not override the bridge: %r"
+                        % (sorted(names),))
+        self.assertNotEqual(116, len(names))
+
+    def test_r4_f5_05_mode_change_refuses_the_stale_surface(self):
+        bridge, config_path = self.bridge("bootstrap")
+
+        first, second = self._call_tool(
+            "get_new_game_options", {}, config_path, "--mode", "bootstrap",
+            env=self._env(PAWNMIND_MODE_RECHECK_SECONDS=0),
+            mutate=bridge.lock,
+        )
+
+        self.assertFalse(first.is_error, "the registered tool works while it matches")
+        payload = self._payload(second)
+        self.assertEqual("mode_changed", payload.get("error"),
+                         "a stale surface refuses instead of calling the bridge: %r"
+                         % (payload,))
+        self.assertIn("restart", (payload.get("detail") or "").lower())
+
+    def test_r4_f5_06_bootstrap_still_hides_every_snapshot_reader(self):
+        _, config_path = self.bridge("bootstrap")
+        names = self._list_tool_names("--mode", "bootstrap", config_path=config_path)
+
+        for hidden in ("get_state", "get_run_summary", "get_legal_actions",
+                       "wait_for_change", "wait_for_events", "wait_until",
+                       "get_ui_snapshot", "press"):
+            self.assertNotIn(hidden, names, "bootstrap must not expose " + hidden)
+        self.assertIn("get_new_game_options", names)
 
 
 if __name__ == "__main__":

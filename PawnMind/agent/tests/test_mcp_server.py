@@ -48,6 +48,7 @@ class _BridgeHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/health":
             self._json({"ok": True, "name": "pawnmind",
+                        "run_mode": "test",
                         "policy_sha256": _policy_sha256()})
         elif self.path == "/state":
             self._json({

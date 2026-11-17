@@ -11,9 +11,12 @@ namespace PawnMind.Bridge
         public static string SetModeJson(int penId, int mode)
         {
             GameItem pen = GameState.FindItemAnywhere(penId);
-            if (pen == null) return "{\"ok\":false,\"error\":\"item_not_found\"}";
-            if (!SafeTag(pen, "MARKING_PEN_TAG")) return "{\"ok\":false,\"error\":\"not_marking_pen\"}";
-            if (!MarkingPenMode.IsValid(mode)) return "{\"ok\":false,\"error\":\"bad_mode\"}";
+            if (pen == null)
+                return "{\"ok\":false,\"error\":\"item_not_found\",\"dispatched\":false}";
+            if (!SafeTag(pen, "MARKING_PEN_TAG"))
+                return "{\"ok\":false,\"error\":\"not_marking_pen\",\"dispatched\":false}";
+            if (!MarkingPenMode.IsValid(mode))
+                return "{\"ok\":false,\"error\":\"bad_mode\",\"dispatched\":false}";
 
             pen.ModifyTag("MARKING_PEN_MODE_INT", delegate(TagState state)
             {
@@ -23,6 +26,7 @@ namespace PawnMind.Bridge
             return JsonConvert.SerializeObject(new Dictionary<string, object>
             {
                 { "ok", true },
+                { "dispatched", true },
                 { "mode", mode },
                 { "color_id", MarkingPenMode.ColorId(mode) },
                 { "eraser", mode == MarkingPenMode.Eraser }

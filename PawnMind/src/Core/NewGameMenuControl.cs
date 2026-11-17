@@ -74,5 +74,8 @@ namespace PawnMind.Core
         public NewGameMenuView View;
         public NewGameReadback Readback;
         public bool PromptPending;
+
+        /// <summary>R4/F4b: whether the native control call was issued.</summary>
+        public bool Dispatched;
     }
 }

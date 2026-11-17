@@ -49,17 +49,21 @@ namespace PawnMind.Bridge
         public static string AnalyzeJson(int analyzerId, int targetId)
         {
             GameItem analyzer = GameState.FindItemAnywhere(analyzerId);
-            if (analyzer == null) return "{\"ok\":false,\"error\":\"analyzer_not_found\"}";
+            if (analyzer == null)
+                return "{\"ok\":false,\"error\":\"analyzer_not_found\",\"dispatched\":false}";
 
             AnalyzerKind kind = AnalyzerKinds.FromIdentifier(analyzer.identifier);
-            if (kind == AnalyzerKind.None) return "{\"ok\":false,\"error\":\"not_an_analyzer\"}";
+            if (kind == AnalyzerKind.None)
+                return "{\"ok\":false,\"error\":\"not_an_analyzer\",\"dispatched\":false}";
             if (kind == AnalyzerKind.Gene)
             {
                 bool scanning = false;
                 try { scanning = PlayerStore.Instance.isGeneScannerScanning; } catch { }
+                // The gene scanner reports a toggle; no native call is issued.
                 return JsonConvert.SerializeObject(new Dictionary<string, object>
                 {
                     { "ok", true },
+                    { "dispatched", false },
                     { "kind", "gene" },
                     { "scanning", scanning },
                     { "note", "gene scanner is a toggle; gene details stay in visible item text" }
@@ -67,10 +71,11 @@ namespace PawnMind.Bridge
             }
 
             GameItem target = GameState.FindItemAnywhere(targetId);
-            if (target == null) return "{\"ok\":false,\"error\":\"target_not_found\"}";
+            if (target == null)
+                return "{\"ok\":false,\"error\":\"target_not_found\",\"dispatched\":false}";
 
             if (!Safe(delegate { return analyzer.CanTarget(target); }))
-                return "{\"ok\":false,\"error\":\"cannot_target\"}";
+                return "{\"ok\":false,\"error\":\"cannot_target\",\"dispatched\":false}";
 
             try
             {
@@ -78,11 +83,14 @@ namespace PawnMind.Bridge
             }
             catch (Exception e)
             {
-                return "{\"ok\":false,\"error\":\"analyze_failed\",\"detail\":\"" + Escape(e.Message) + "\"}";
+                return "{\"ok\":false,\"error\":\"analyze_failed\",\"dispatched\":true,"
+                    + "\"detail\":\"" + Escape(e.Message) + "\"}";
             }
 
             var payload = new Dictionary<string, object>();
             payload["ok"] = true;
+            // R4/F4b: the analyzer was targeted from here on.
+            payload["dispatched"] = true;
             payload["kind"] = kind.ToString().ToLowerInvariant();
             payload["analyzer"] = analyzer.name;
             payload["target"] = target.name;

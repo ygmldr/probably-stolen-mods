@@ -577,6 +577,28 @@ namespace PawnMind.Game
             ui.SelectChoice(index);
         }
 
+        /// <summary>
+        /// R4/F1b: the opaque native run identity, or null when it is not readable
+        /// (main menu, loading screen, no PlayerStore). The bridge only compares it
+        /// to prove that a load/new game really switched the run; it is never
+        /// serialized to a client and never substituted by rev/day/scene.
+        /// </summary>
+        public static string ReadRunId()
+        {
+            try
+            {
+                if (!PlayerStore.HasInstance) return null;
+                PlayerStore store = PlayerStore.Instance;
+                if (store == null) return null;
+                string runId = store.runID;
+                return string.IsNullOrEmpty(runId) ? null : runId;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
         public static RentSnapshot ReadRentSnapshot()
         {
             try

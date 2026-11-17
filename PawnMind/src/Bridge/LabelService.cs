@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using PawnMind.Core;
 using PawnMind.Game;
 
@@ -34,7 +35,8 @@ namespace PawnMind.Bridge
         public static string SetJson(int itemId, string category, string conditionId)
         {
             GameItem item = GameState.FindItemAnywhere(itemId);
-            if (item == null) return "{\"ok\":false,\"error\":\"item_not_found\"}";
+            if (item == null)
+                return "{\"ok\":false,\"error\":\"item_not_found\",\"dispatched\":false}";
 
             ItemFeature target = null;
             bool categoryExists = false;
@@ -70,13 +72,26 @@ namespace PawnMind.Bridge
             }
 
             LabelCheck check = LabelValidator.Validate(true, editable, categoryExists, conditionExists);
-            if (check != LabelCheck.Ok) return "{\"ok\":false,\"error\":\"" + ErrorCode(check) + "\"}";
+            if (check != LabelCheck.Ok)
+                return "{\"ok\":false,\"error\":\"" + ErrorCode(check) + "\",\"dispatched\":false}";
 
             target.fakeCondition = chosen;
             target.SetExposed(false);
             WaterFeatureHelper.OnWaterLabelUpdated(target, chosenIndex);
 
-            return ListJson(itemId);
+            // R4/F4b: the label write ran; report it with the fresh readback.
+            JObject view;
+            try
+            {
+                view = JObject.Parse(ListJson(itemId));
+            }
+            catch (Exception)
+            {
+                return "{\"ok\":true,\"dispatched\":true,\"written\":true}";
+            }
+
+            view["dispatched"] = true;
+            return view.ToString(Formatting.None);
         }
 
         private static Dictionary<string, object> Describe(ItemFeature feature)

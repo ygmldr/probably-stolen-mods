@@ -44,17 +44,18 @@ namespace PawnMind.Bridge
 
         public static string BuyJson(string id)
         {
-            if (string.IsNullOrEmpty(id)) return "{\"ok\":false,\"error\":\"missing_id\"}";
+            if (string.IsNullOrEmpty(id)) return "{\"ok\":false,\"error\":\"missing_id\",\"dispatched\":false}";
 
             NetworkUpgrade upgrade;
             if (!PlayerStore.Instance.networkUpgrade.TryGetValue(id, out upgrade) || upgrade == null)
-                return "{\"ok\":false,\"error\":\"unknown_upgrade\"}";
+                return "{\"ok\":false,\"error\":\"unknown_upgrade\",\"dispatched\":false}";
 
             bool unlocked = SafeBool(upgrade.IsUnlocked);
             bool prerequisite = SafeBool(upgrade.IsHavePrerequisite);
             bool enoughCash = GameState.GetCash() >= upgrade.cost;
             UpgradeCheck check = UpgradeValidator.Validate(true, unlocked, prerequisite, enoughCash);
-            if (check != UpgradeCheck.Ok) return "{\"ok\":false,\"error\":\"" + ErrorCode(check) + "\"}";
+            if (check != UpgradeCheck.Ok) return "{\"ok\":false,\"error\":\"" + ErrorCode(check)
+                + "\",\"dispatched\":false}";
 
             try
             {
@@ -63,12 +64,14 @@ namespace PawnMind.Bridge
             }
             catch (Exception e)
             {
-                return "{\"ok\":false,\"error\":\"upgrade_failed\",\"detail\":\"" + Escape(e.Message) + "\"}";
+                return "{\"ok\":false,\"error\":\"upgrade_failed\",\"dispatched\":true,\"detail\":\""
+                    + Escape(e.Message) + "\"}";
             }
 
             return JsonConvert.SerializeObject(new Dictionary<string, object>
             {
                 { "ok", true },
+                { "dispatched", true },
                 { "id", id },
                 { "cost", upgrade.cost },
                 { "cash", GameState.GetCash() }

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using PawnMind.Core;
 using PawnMind.Game;
 
@@ -68,8 +69,10 @@ namespace PawnMind.Bridge
         public static string CallJson(long number)
         {
             PhoneUIManager ui = PhoneUIManager.Instance;
-            if (ui == null) return "{\"ok\":false,\"error\":\"no_phone_ui\"}";
-            if (!StorePhoneClient.IsNumberExist(number)) return "{\"ok\":false,\"error\":\"unknown_number\"}";
+            if (ui == null)
+                return "{\"ok\":false,\"error\":\"no_phone_ui\",\"dispatched\":false}";
+            if (!StorePhoneClient.IsNumberExist(number))
+                return "{\"ok\":false,\"error\":\"unknown_number\",\"dispatched\":false}";
 
             StorePhoneClient client = StorePhoneClient.GetPhoneClientByNumber(number);
             bool answers = PhoneUIManager.WillAnswerCall(number);
@@ -80,12 +83,14 @@ namespace PawnMind.Bridge
             }
             catch (Exception e)
             {
-                return "{\"ok\":false,\"error\":\"call_failed\",\"detail\":\"" + Escape(e.Message) + "\"}";
+                return "{\"ok\":false,\"error\":\"call_failed\",\"dispatched\":true,"
+                    + "\"detail\":\"" + Escape(e.Message) + "\"}";
             }
 
             return JsonConvert.SerializeObject(new Dictionary<string, object>
             {
                 { "ok", true },
+                { "dispatched", true },
                 { "number", number },
                 { "name", client == null ? "" : SafeName(client) },
                 { "will_answer", answers },
@@ -115,30 +120,34 @@ namespace PawnMind.Bridge
         public static string AdvanceJson()
         {
             DialoguePhoneUIManager ui = DialoguePhoneUIManager.Instance;
-            if (ui == null) return "{\"ok\":false,\"error\":\"no_phone_dialogue\"}";
+            if (ui == null)
+                return "{\"ok\":false,\"error\":\"no_phone_dialogue\",\"dispatched\":false}";
             try
             {
                 ui.OnAdvancePressed();
-                return StateJson();
+                return WithDispatched(StateJson());
             }
             catch (Exception e)
             {
-                return "{\"ok\":false,\"error\":\"advance_failed\",\"detail\":\"" + Escape(e.Message) + "\"}";
+                return "{\"ok\":false,\"error\":\"advance_failed\",\"dispatched\":true,"
+                    + "\"detail\":\"" + Escape(e.Message) + "\"}";
             }
         }
 
         public static string ChooseJson(int index)
         {
             DialoguePhoneUIManager ui = DialoguePhoneUIManager.Instance;
-            if (ui == null) return "{\"ok\":false,\"error\":\"no_phone_dialogue\"}";
+            if (ui == null)
+                return "{\"ok\":false,\"error\":\"no_phone_dialogue\",\"dispatched\":false}";
             try
             {
                 ui.SelectChoice(index);
-                return StateJson();
+                return WithDispatched(StateJson());
             }
             catch (Exception e)
             {
-                return "{\"ok\":false,\"error\":\"choose_failed\",\"detail\":\"" + Escape(e.Message) + "\"}";
+                return "{\"ok\":false,\"error\":\"choose_failed\",\"dispatched\":true,"
+                    + "\"detail\":\"" + Escape(e.Message) + "\"}";
             }
         }
 
@@ -171,16 +180,33 @@ namespace PawnMind.Bridge
         public static string EndJson()
         {
             PhoneUIManager ui = PhoneUIManager.Instance;
-            if (ui == null) return "{\"ok\":false,\"error\":\"no_phone_ui\"}";
+            if (ui == null)
+                return "{\"ok\":false,\"error\":\"no_phone_ui\",\"dispatched\":false}";
             try
             {
                 ui.OnPhoneDialogEnd();
                 ui.CloseUI();
-                return "{\"ok\":true}";
+                return "{\"ok\":true,\"dispatched\":true}";
             }
             catch (Exception e)
             {
-                return "{\"ok\":false,\"error\":\"end_call_failed\",\"detail\":\"" + Escape(e.Message) + "\"}";
+                return "{\"ok\":false,\"error\":\"end_call_failed\",\"dispatched\":true,"
+                    + "\"detail\":\"" + Escape(e.Message) + "\"}";
+            }
+        }
+
+        /// <summary>Marks a state read that followed a native call (R4/F4b).</summary>
+        private static string WithDispatched(string stateJson)
+        {
+            try
+            {
+                JObject view = JObject.Parse(stateJson);
+                view["dispatched"] = true;
+                return view.ToString(Formatting.None);
+            }
+            catch (Exception)
+            {
+                return stateJson;
             }
         }
 

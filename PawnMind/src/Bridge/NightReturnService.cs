@@ -79,6 +79,8 @@ namespace PawnMind.Bridge
             var row = new JObject();
             row["ok"] = true;
             row["op"] = op;
+            // R4/F4b: the native Return ran; say so instead of leaving it implicit.
+            row["dispatched"] = true;
             row["return_requested"] = true;
             row["items_on_ground"] = itemsOnGround;
             row["note"] = itemsOnGround > 0

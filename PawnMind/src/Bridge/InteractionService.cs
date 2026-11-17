@@ -56,7 +56,7 @@ namespace PawnMind.Bridge
             }
             catch (Exception e)
             {
-                return ActionResult.Failure("activate_item", "activation_failed: " + e.Message);
+                return ActionResult.Failed("activate_item", "activation_failed: " + e.Message);
             }
         }
 
@@ -74,7 +74,7 @@ namespace PawnMind.Bridge
             }
             catch (Exception e)
             {
-                return ActionResult.Failure("toggle_item", "toggle_failed: " + e.Message);
+                return ActionResult.Failed("toggle_item", "toggle_failed: " + e.Message);
             }
         }
 
@@ -95,7 +95,7 @@ namespace PawnMind.Bridge
             }
             catch (Exception e)
             {
-                return ActionResult.Failure("use_tool", "use_failed: " + e.Message);
+                return ActionResult.Failed("use_tool", "use_failed: " + e.Message);
             }
         }
 

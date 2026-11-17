@@ -31,18 +31,22 @@ namespace PawnMind.Bridge
         public static string AddWaterJson(int itemId, int ml)
         {
             GameItem item = GameState.FindItemAnywhere(itemId);
-            if (item == null) return "{\"ok\":false,\"error\":\"item_not_found\"}";
-            if (!SafeTag(item, "WINE_CONTAINER_TAG")) return "{\"ok\":false,\"error\":\"not_wine_bottle\"}";
+            if (item == null)
+                return "{\"ok\":false,\"error\":\"item_not_found\",\"dispatched\":false}";
+            if (!SafeTag(item, "WINE_CONTAINER_TAG"))
+                return "{\"ok\":false,\"error\":\"not_wine_bottle\",\"dispatched\":false}";
             if (ml <= 0) ml = 750;
 
             try
             {
                 WaterHelper.AddPureWater(item, ml <= 0 ? -1 : ml * 1000);
-                return "{\"ok\":true,\"ml\":" + WaterHelper.GetCurrentCapacityML(item) + "}";
+                return "{\"ok\":true,\"dispatched\":true,\"ml\":"
+                    + WaterHelper.GetCurrentCapacityML(item) + "}";
             }
             catch (Exception e)
             {
-                return "{\"ok\":false,\"error\":\"add_water_failed\",\"detail\":\"" + Escape(e.Message) + "\"}";
+                return "{\"ok\":false,\"error\":\"add_water_failed\",\"dispatched\":true,"
+                    + "\"detail\":\"" + Escape(e.Message) + "\"}";
             }
         }
 
@@ -50,31 +54,40 @@ namespace PawnMind.Bridge
         {
             GameItem bottle = GameState.FindItemAnywhere(bottleId);
             GameItem item = GameState.FindItemAnywhere(itemId);
-            if (bottle == null) return "{\"ok\":false,\"error\":\"bottle_not_found\"}";
-            if (item == null) return "{\"ok\":false,\"error\":\"item_not_found\"}";
+            if (bottle == null)
+                return "{\"ok\":false,\"error\":\"bottle_not_found\",\"dispatched\":false}";
+            if (item == null)
+                return "{\"ok\":false,\"error\":\"item_not_found\",\"dispatched\":false}";
 
             GameGridInventory grid = GraphUtils.FindChildType<GameGridInventory>(bottle);
-            if (grid == null) return "{\"ok\":false,\"error\":\"no_ingredient_grid\"}";
+            if (grid == null)
+                return "{\"ok\":false,\"error\":\"no_ingredient_grid\",\"dispatched\":false}";
 
+            // R4/F4b: the transfer is attempted from here on.
             GameInventory moved = grid.TryAcceptAll(item);
             if (moved == null || item.parentInventory != grid)
-                return "{\"ok\":false,\"error\":\"cannot_add_ingredient\"}";
+                return "{\"ok\":false,\"error\":\"cannot_add_ingredient\",\"dispatched\":true}";
 
-            return "{\"ok\":true,\"bottle\":" + bottleId + ",\"item\":" + itemId + "}";
+            return "{\"ok\":true,\"dispatched\":true,\"bottle\":" + bottleId
+                + ",\"item\":" + itemId + "}";
         }
 
         public static string StartJson(int itemId)
         {
             GameItem item = GameState.FindItemAnywhere(itemId);
-            if (item == null) return "{\"ok\":false,\"error\":\"item_not_found\"}";
+            if (item == null)
+                return "{\"ok\":false,\"error\":\"item_not_found\",\"dispatched\":false}";
             try
             {
+                // R4/F4b: the native fermentation start is issued here.
                 bool started = WineHelper.TryStartFermentation(item);
-                return "{\"ok\":" + (started ? "true" : "false") + ",\"started\":" + (started ? "true" : "false") + "}";
+                return "{\"ok\":" + (started ? "true" : "false") + ",\"dispatched\":true,"
+                    + "\"started\":" + (started ? "true" : "false") + "}";
             }
             catch (Exception e)
             {
-                return "{\"ok\":false,\"error\":\"fermentation_failed\",\"detail\":\"" + Escape(e.Message) + "\"}";
+                return "{\"ok\":false,\"error\":\"fermentation_failed\",\"dispatched\":true,"
+                    + "\"detail\":\"" + Escape(e.Message) + "\"}";
             }
         }
 

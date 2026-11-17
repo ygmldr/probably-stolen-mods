@@ -52,7 +52,8 @@ namespace PawnMind.Bridge
                 Available = location != null && location.IsAvailable(),
                 Outside = GameState.IsOutside
             });
-            if (check != NightCheck.Ok) return "{\"ok\":false,\"error\":\"" + ErrorCode(check) + "\"}";
+            if (check != NightCheck.Ok)
+                return "{\"ok\":false,\"error\":\"" + ErrorCode(check) + "\",\"dispatched\":false}";
 
             try
             {
@@ -61,24 +62,32 @@ namespace PawnMind.Bridge
                     MapUIManager.Instance.OpenUI();
                 }
 
+                // R4/F4b: the travel callback is issued from here on.
                 MapUIManager.Instance.Travel(location);
-                return "{\"ok\":true,\"location\":\"" + location.Id + "\"}";
+                return "{\"ok\":true,\"dispatched\":true,\"location\":\""
+                    + location.Id + "\"}";
             }
             catch (Exception e)
             {
-                return "{\"ok\":false,\"error\":\"go_out_failed\",\"detail\":\"" + Escape(e.Message) + "\"}";
+                return "{\"ok\":false,\"error\":\"go_out_failed\",\"dispatched\":true,"
+                    + "\"detail\":\"" + Escape(e.Message) + "\"}";
             }
         }
 
         public static string ScavengeJson()
         {
             if (GameState.CurrentLocationId != "dumping_ground")
-                return "{\"ok\":false,\"error\":\"not_at_dumping_ground\"}";
+                return "{\"ok\":false,\"error\":\"not_at_dumping_ground\",\"dispatched\":false}";
 
             bool canScavenge;
             try { canScavenge = ScavHelper.CanScavenge(); }
-            catch (Exception e) { return "{\"ok\":false,\"error\":\"scav_check_failed\",\"detail\":\"" + Escape(e.Message) + "\"}"; }
-            if (!canScavenge) return "{\"ok\":false,\"error\":\"no_attempts_left\"}";
+            catch (Exception e)
+            {
+                return "{\"ok\":false,\"error\":\"scav_check_failed\",\"dispatched\":false,"
+                    + "\"detail\":\"" + Escape(e.Message) + "\"}";
+            }
+            if (!canScavenge)
+                return "{\"ok\":false,\"error\":\"no_attempts_left\",\"dispatched\":false}";
 
             int before = AfterhourCount();
             try
@@ -87,7 +96,8 @@ namespace PawnMind.Bridge
             }
             catch (Exception e)
             {
-                return "{\"ok\":false,\"error\":\"scavenge_failed\",\"detail\":\"" + Escape(e.Message) + "\"}";
+                return "{\"ok\":false,\"error\":\"scavenge_failed\",\"dispatched\":true,"
+                    + "\"detail\":\"" + Escape(e.Message) + "\"}";
             }
 
             int after = AfterhourCount();
@@ -111,6 +121,7 @@ namespace PawnMind.Bridge
             return JsonConvert.SerializeObject(new Dictionary<string, object>
             {
                 { "ok", true },
+                { "dispatched", true },
                 { "gained_count", Math.Max(0, after - before) },
                 { "items", gained },
                 { "time_left", ScavHelper.GetScavTimeLeft() },
@@ -121,7 +132,8 @@ namespace PawnMind.Bridge
 
         public static string ReturnHomeJson()
         {
-            if (!GameState.IsOutside) return "{\"ok\":false,\"error\":\"not_outside\"}";
+            if (!GameState.IsOutside)
+                return "{\"ok\":false,\"error\":\"not_outside\",\"dispatched\":false}";
 
             int itemsOnGround = AfterhourCount();
             try
@@ -130,12 +142,14 @@ namespace PawnMind.Bridge
             }
             catch (Exception e)
             {
-                return "{\"ok\":false,\"error\":\"return_failed\",\"detail\":\"" + Escape(e.Message) + "\"}";
+                return "{\"ok\":false,\"error\":\"return_failed\",\"dispatched\":true,"
+                    + "\"detail\":\"" + Escape(e.Message) + "\"}";
             }
 
             return JsonConvert.SerializeObject(new Dictionary<string, object>
             {
                 { "ok", true },
+                { "dispatched", true },
                 { "return_requested", true },
                 { "items_on_ground", itemsOnGround },
                 { "note", itemsOnGround > 0 ? "items on the ground may block the return" : "return is asynchronous; poll /state.outside" }

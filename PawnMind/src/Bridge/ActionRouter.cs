@@ -97,6 +97,15 @@ namespace PawnMind.Bridge
         // non-terminal operation and may promote running/uncertain to completed or
         // failed. It must be a read-only game probe; null keeps the status frozen.
         private readonly Func<OperationRecord, OperationRecord> _operationVerifier;
+
+        // R4/F1b: an opaque native run identity. Only an observed *change* may
+        // evict the previous run's evidence; null means the identity is not
+        // readable, which is "unknown", never "unchanged" and never "changed".
+        private readonly Func<string> _readRunId;
+
+        // Runs after a run change is confirmed (rent receipts belong to the old
+        // run). Never called for a request, a pending switch or an unknown one.
+        private readonly Action _onRunChangeConfirmed;
         private bool _operationsCleared;
 
         public ActionRouter(
@@ -109,7 +118,9 @@ namespace PawnMind.Bridge
             Func<WriteGateDecision> writeGate = null,
             Action<ActionOutcome> onOutcome = null,
             Func<string, string> authorize = null,
-            Func<OperationRecord, OperationRecord> operationVerifier = null)
+            Func<OperationRecord, OperationRecord> operationVerifier = null,
+            Func<string> readRunId = null,
+            Action onRunChangeConfirmed = null)
         {
             if (gate == null) throw new ArgumentNullException("gate");
             if (revision == null) throw new ArgumentNullException("revision");
@@ -125,6 +136,8 @@ namespace PawnMind.Bridge
             _onOutcome = onOutcome;
             _authorize = authorize;
             _operationVerifier = operationVerifier;
+            _readRunId = readRunId;
+            _onRunChangeConfirmed = onRunChangeConfirmed;
         }
 
         public string Handle(string body)
@@ -237,8 +250,31 @@ namespace PawnMind.Bridge
             OperationRecord pending = _gate.FindPendingFor(op);
             if (pending != null) return Scrub(OperationPending(op, pending));
 
+            // R4/F1b: a run-changing write whose switch is not yet confirmed must
+            // not be re-issued under a new action id. That would be a blind retry
+            // of a native load that may already be in flight.
+            string effectiveOp = RunChangeOps.Resolve(op, (string)request["action"]);
+            bool runChange = RunChangeOps.IsRunChangeOp(effectiveOp);
+            if (runChange)
+            {
+                OperationRecord unconfirmed = _gate.FindUnconfirmedRunChange();
+                if (unconfirmed != null) return Scrub(RunChangePending(op, unconfirmed));
+            }
+
+            // The identity must be sampled before the native call: comparing two
+            // post-dispatch reads would prove nothing.
+            string runIdBefore = runChange ? SafeReadRunId() : null;
+
             OperationRecord operation = _gate.Begin(actionId, op, currentRevision, fingerprint);
+            operation.RunChangeRequested = runChange;
+            operation.RunIdBefore = runIdBefore;
+            operation.RunChange = runChange ? RunChangeStatus.Requested : RunChangeStatus.NotRequested;
+
             ActionResult result = Dispatch(op, request);
+            operation.Dispatch = result.Dispatch;
+
+            string runIdAfter = runChange ? SafeReadRunId() : null;
+            if (runChange) operation.RunChange = RunChangePolicy.Classify(runIdBefore, runIdAfter);
 
             long responseRevision;
             if (!TryRefreshRevision(out responseRevision))
@@ -248,12 +284,12 @@ namespace PawnMind.Bridge
                 // so a retry with the same id returns the same answer without a
                 // second dispatch.
                 string unknown = OutcomeUnknown(op, currentRevision);
-                bool unknownDispatched = DispatchedClaim(result);
-                string envelope = DecorateResponse(actionId, unknown,
-                    ExecutionStatus.Uncertain, DeliveryStatus.Delivered, false, unknownDispatched);
-                _gate.Complete(actionId, envelope, ExecutionStatus.Uncertain,
-                    DeliveryStatus.Delivered, currentRevision, "outcome_unknown", unknownDispatched);
-                if (result.RunChanged) _gate.ClearOperationsExcept(actionId);
+                _gate.Complete(actionId, unknown, ExecutionStatus.Uncertain,
+                    DeliveryStatus.Delivered, currentRevision, "outcome_unknown",
+                    operation.Dispatch);
+                string envelope = DecorateResponse(actionId, unknown, _gate.Find(actionId));
+                _gate.Replace(actionId, unknown, envelope);
+                ApplyRunChange(actionId);
                 _history.Add(
                     HistoryText(Scrub(op)),
                     Scrub(JsonForAudit(request)),
@@ -264,12 +300,12 @@ namespace PawnMind.Bridge
             }
 
             string response = result.ToJson(responseRevision);
-            string execution = Classify(result, response, out string error, out bool dispatched);
-            string decorated = DecorateResponse(actionId, response, execution,
-                DeliveryStatus.Delivered, false, dispatched);
-            _gate.Complete(actionId, decorated, execution, DeliveryStatus.Delivered,
-                responseRevision, error, dispatched);
-            if (result.RunChanged) _gate.ClearOperationsExcept(actionId);
+            string execution = Classify(result, response, out string error);
+            _gate.Complete(actionId, response, execution, DeliveryStatus.Delivered,
+                responseRevision, error, operation.Dispatch);
+            string decorated = DecorateResponse(actionId, response, _gate.Find(actionId));
+            _gate.Replace(actionId, response, decorated);
+            ApplyRunChange(actionId);
             _history.Add(
                 HistoryText(Scrub(op)),
                 Scrub(JsonForAudit(request)),
@@ -373,13 +409,32 @@ namespace PawnMind.Bridge
             }
 
             record = Verify(record);
+            ApplyRunChange(record.OperationId);
+            record = _gate.Find(record.OperationId) ?? record;
             payload["ok"] = record.Ok;
             payload["known"] = true;
             payload["operation_id"] = record.OperationId;
             payload["op"] = record.Op;
             payload["execution_status"] = record.Execution;
             payload["delivery_status"] = record.Delivery;
-            payload["dispatched"] = record.Dispatched;
+            payload["dispatch_status"] = DispatchStatus.Normalize(record.Dispatch);
+            payload["dispatched"] = DispatchedJson(record.Dispatch);
+            if (record.RunChange != RunChangeStatus.NotRequested)
+            {
+                payload["run_change_status"] = record.RunChange;
+                payload["run_change_confirmed"] = record.RunChangeConfirmed;
+            }
+            if (ExecutionStatus.IsSuccess(record.Execution)
+                && !string.IsNullOrEmpty(record.CompletionEvidence))
+            {
+                try
+                {
+                    payload["completion_evidence"] = JObject.Parse(record.CompletionEvidence);
+                }
+                catch (Exception)
+                {
+                }
+            }
             payload["error"] = record.Error == null ? JValue.CreateNull() : new JValue(record.Error);
             payload["rev"] = record.Revision;
             payload["result_rev"] = record.ResultRevision;
@@ -408,6 +463,17 @@ namespace PawnMind.Bridge
         private OperationRecord Verify(OperationRecord record)
         {
             if (record == null) return null;
+
+            // A run switch is verified on every read even when the execution axis
+            // is already terminal: "the load request completed" and "the run
+            // identity changed" are different facts (R4/F1b).
+            OperationRecord checkedRecord = VerifyRunChange(record.Copy());
+            if (checkedRecord.RunChangeConfirmed && !record.RunChangeConfirmed)
+            {
+                _gate.Update(checkedRecord);
+                record = checkedRecord.Copy();
+            }
+
             if (ExecutionStatus.IsTerminal(record.Execution)) return record;
             if (_operationVerifier == null) return record;
 
@@ -425,19 +491,98 @@ namespace PawnMind.Bridge
             }
         }
 
+        /// <summary>
+        /// R4/F1b: re-checks an unconfirmed run switch. A load completes
+        /// asynchronously, so the identity may only become readable on a later
+        /// get_operation / wait_operation read. Promotion to "confirmed" evicts the
+        /// previous run's evidence exactly once.
+        /// </summary>
+        private OperationRecord VerifyRunChange(OperationRecord record)
+        {
+            if (record == null || !record.RunChangeRequested) return record;
+            if (record.RunChangeConfirmed) return record;
+            if (!DispatchStatus.MayHaveRun(record.Dispatch)) return record;
+
+            string runIdAfter = SafeReadRunId();
+            if (string.IsNullOrEmpty(runIdAfter)) return record;
+
+            string status = RunChangePolicy.Classify(record.RunIdBefore, runIdAfter);
+            if (status != RunChangeStatus.Confirmed) return record;
+
+            record.RunChange = status;
+            return record;
+        }
+
+        /// <summary>
+        /// Evicts the previous run's evidence once, and only after a confirmed
+        /// switch. The switching operation's own id survives, so its response and
+        /// idempotency are intact.
+        /// </summary>
+        private void ApplyRunChange(string actionId)
+        {
+            OperationRecord record = _gate.Find(actionId);
+            if (record == null || !record.RunChangeConfirmed || record.RunChangeApplied)
+                return;
+
+            record.RunChangeApplied = true;
+            _gate.Update(record);
+            _gate.ClearOperationsExcept(actionId);
+
+            Action callback = _onRunChangeConfirmed;
+            if (callback == null) return;
+            try
+            {
+                callback();
+            }
+            catch (Exception)
+            {
+                // A failing bookkeeping callback must not undo the confirmed fact.
+            }
+        }
+
+        private string SafeReadRunId()
+        {
+            if (_readRunId == null) return null;
+            try
+            {
+                return _readRunId();
+            }
+            catch (Exception)
+            {
+                // An unreadable identity is unknown, never "unchanged".
+                return null;
+            }
+        }
+
         private string DecorateCached(string actionId, string cached)
         {
             OperationRecord record = _gate.Find(actionId);
             if (record == null) return cached;
 
-            bool redelivered = record.Delivery == DeliveryStatus.Undelivered;
-            return DecorateResponse(actionId, cached, record.Execution, record.Delivery,
-                redelivered, record.Dispatched);
+            OperationRecord checkedRecord = VerifyRunChange(record);
+            if (checkedRecord.RunChangeConfirmed && !record.RunChangeConfirmed)
+                _gate.Update(checkedRecord);
+
+            ApplyRunChange(actionId);
+            record = _gate.Find(actionId) ?? checkedRecord;
+            return DecorateResponse(actionId, cached, record);
         }
 
-        private string DecorateResponse(string actionId, string response,
-            string execution, string delivery, bool redelivered, bool dispatched)
+        /// <summary>
+        /// Adds the envelope facts to a response body. The record is the single
+        /// source of truth: execution, delivery, dispatch and run-change facts are
+        /// never re-derived from the body being decorated.
+        ///
+        /// R4/F3b: a promoted operation keeps the dispatch-time body verbatim under
+        /// <c>initial_result</c> and exposes only the current, provable facts at the
+        /// top level. Rebuilding from the immutable cached body makes the retry
+        /// deterministic and stops the historical snapshot from being re-read as a
+        /// completion-time snapshot.
+        /// </summary>
+        private string DecorateResponse(string actionId, string response, OperationRecord record)
         {
+            if (record == null) return response;
+
             JObject json;
             try
             {
@@ -449,48 +594,100 @@ namespace PawnMind.Bridge
                 return response;
             }
 
-            bool completed = ExecutionStatus.IsSuccess(execution);
+            bool completed = ExecutionStatus.IsSuccess(record.Execution);
 
-            // F3: a promoted operation must not keep the facts of the state it was
-            // promoted from (pending:true + ok:true is unreadable for a model). The
-            // original body is preserved once, under initial_result, as evidence.
+            // The body only says "the dispatch is still running" when it carries one
+            // of the non-terminal markers. Equal facts never re-promote.
             JObject initial = null;
             if (completed
                 && (JsonBool(json, "pending") || JsonBool(json, "uncertain") || JsonBool(json, "unknown")))
             {
                 initial = (JObject)json.DeepClone();
-                json.Remove("pending");
-                json.Remove("uncertain");
-                json.Remove("unknown");
-                json.Remove("error");
-                if (json["shop_closed_after"] != null) json["shop_closed_after"] = true;
+                // Defensive: never nest a previous promotion inside the new one.
+                initial.Remove("initial_result");
+
+                json = new JObject();
+                JToken op = initial["op"];
+                if (op != null && op.Type == JTokenType.String) json["op"] = op;
+                json["initial_result"] = initial;
+                json["initial_result_note"] =
+                    "the dispatch-time response; its readback describes the moment of"
+                    + " the call, not the moment it completed";
             }
 
             json["ok"] = completed;
             json["operation_id"] = actionId;
-            json["execution_status"] = execution;
-            json["delivery_status"] = delivery;
-            json["dispatched"] = dispatched;
-            if (initial != null) json["initial_result"] = initial;
+            json["execution_status"] = record.Execution;
+            json["delivery_status"] = record.Delivery;
+            json["dispatch_status"] = DispatchStatus.Normalize(record.Dispatch);
+            json["dispatched"] = DispatchedJson(record.Dispatch);
 
-            if (redelivered) json["redelivered"] = true;
+            if (completed && !string.IsNullOrEmpty(record.CompletionEvidence))
+            {
+                try
+                {
+                    json["completion_evidence"] = JObject.Parse(record.CompletionEvidence);
+                }
+                catch (Exception)
+                {
+                    // Never surface a malformed evidence blob as a fact.
+                }
+            }
+
+            if (record.RunChange != RunChangeStatus.NotRequested)
+            {
+                json["run_change_status"] = record.RunChange;
+                json["run_change_confirmed"] = record.RunChangeConfirmed;
+                if (!record.RunChangeConfirmed)
+                {
+                    json["run_change_next"] = "the run switch was requested but not"
+                        + " confirmed by a run identity readback: call get_operation"
+                        + " (or wait_operation) for this action id; do not start a new"
+                        + " action id for a load/new game";
+                }
+            }
+
+            // An unknown dispatch fact is exactly the case where a retry under a new
+            // action id is forbidden; say so in the response itself.
+            if (!completed && json["next"] == null
+                && string.Equals(record.Execution, ExecutionStatus.Uncertain, StringComparison.Ordinal))
+            {
+                json["next"] = "the outcome is unknown: do not retry with a new action"
+                    + " id; read the state and decide";
+            }
+
+            if (string.Equals(record.Delivery, DeliveryStatus.Undelivered, StringComparison.Ordinal))
+                json["redelivered"] = true;
+
             return json.ToString(Formatting.None);
         }
 
-        /// <summary>The service's own dispatched claim; a bare refusal dispatched nothing.</summary>
-        private static bool DispatchedClaim(ActionResult result)
+        /// <summary>
+        /// boolean when known, null when the bridge cannot say. An explicit null is
+        /// the wire form of "unknown"; it must never be serialised as false.
+        /// </summary>
+        private static JToken DispatchedJson(string dispatch)
         {
-            if (result == null) return false;
-            if (result.RawJson == null) return result.Ok;
-            try
-            {
-                JObject raw = JObject.Parse(result.RawJson);
-                return raw["dispatched"] == null || JsonBool(raw, "dispatched");
-            }
-            catch (Exception)
-            {
-                return true;
-            }
+            string claim = DispatchStatus.Normalize(dispatch);
+            if (claim == DispatchStatus.Dispatched) return new JValue(true);
+            if (claim == DispatchStatus.NotDispatched) return new JValue(false);
+            return JValue.CreateNull();
+        }
+
+        private string RunChangePending(string op, OperationRecord blocking)
+        {
+            var payload = new JObject();
+            payload["ok"] = false;
+            payload["error"] = OperationErrors.RunChangePending;
+            payload["op"] = op;
+            payload["rev"] = CurrentRevision();
+            payload["run_change_status"] = blocking.RunChange;
+            payload["run_change_confirmed"] = false;
+            payload["blocking_operation_id"] = blocking.OperationId;
+            payload["next"] = "a load/new game is already in flight; call get_operation"
+                + " for the blocking id and wait for run_change_status=confirmed"
+                + " before issuing another run-changing action";
+            return payload.ToString(Formatting.None);
         }
 
         private string OperationPending(string op, OperationRecord pending)
@@ -503,13 +700,14 @@ namespace PawnMind.Bridge
             payload["blocking_operation_id"] = pending.OperationId;
             payload["execution_status"] = pending.Execution;
             payload["delivery_status"] = pending.Delivery;
+            payload["dispatch_status"] = DispatchStatus.Normalize(pending.Dispatch);
+            payload["dispatched"] = DispatchedJson(pending.Dispatch);
             payload["next"] = "call get_operation or wait_operation for the blocking id;"
                 + " do not start a new action id for the same op";
             return payload.ToString(Formatting.None);
         }
 
-        private static string Classify(ActionResult result, string response, out string error,
-            out bool dispatched)
+        private static string Classify(ActionResult result, string response, out string error)
         {
             error = result == null ? null : result.Error;
             JObject json = null;
@@ -527,17 +725,10 @@ namespace PawnMind.Bridge
                 || JsonBool(json, "unknown")
                 || string.Equals(error, "outcome_unknown", StringComparison.Ordinal);
 
-            if (json != null && json["dispatched"] != null)
-            {
-                dispatched = JsonBool(json, "dispatched");
-            }
-            else
-            {
-                // Raw services spell out dispatched. A bare Success ran the action;
-                // a bare Failure is a pre-dispatch guard refusal, which is the
-                // conservative reading.
-                dispatched = result != null && (result.RawJson != null || result.Ok);
-            }
+            // R4/F4b: exactly one source. The service's own claim is parsed once by
+            // ActionResult; ok, the presence of a body and thrown exceptions are not
+            // evidence about whether the native call ran.
+            string dispatch = result == null ? DispatchStatus.Unknown : result.Dispatch;
 
             if (!ok && string.IsNullOrEmpty(error) && json != null)
             {
@@ -545,7 +736,7 @@ namespace PawnMind.Bridge
                 if (code != null && code.Type == JTokenType.String) error = (string)code;
             }
 
-            return ExecutionStatus.Classify(ok, pending, unknown, dispatched);
+            return ExecutionStatus.Classify(ok, pending, unknown, dispatch);
         }
 
         private static bool HasControlCharacter(string value)
@@ -588,7 +779,9 @@ namespace PawnMind.Bridge
             }
             catch (Exception)
             {
-                return ActionResult.Failure(op, "exception");
+                // The native call may already have run: an exception is not a
+                // pre-dispatch refusal (R4/F4b).
+                return ActionResult.UnknownDispatch(op, "exception");
             }
         }
 

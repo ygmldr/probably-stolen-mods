@@ -57,7 +57,7 @@ namespace PawnMind.Bridge
             }
             catch (Exception)
             {
-                return ActionResult.Failure("open_shop", "open_shop_failed");
+                return ActionResult.Failed("open_shop", "open_shop_failed");
             }
 
             return ActionResult.Success("open_shop");
@@ -123,7 +123,7 @@ namespace PawnMind.Bridge
             }
             catch (Exception)
             {
-                return ActionResult.Failure("dismiss_current_client", "dismiss_failed");
+                return ActionResult.Failed("dismiss_current_client", "dismiss_failed");
             }
 
             return ActionResult.Success("dismiss_current_client");
@@ -174,7 +174,7 @@ namespace PawnMind.Bridge
             }
             catch (Exception e)
             {
-                return ActionResult.Failure("buy_wholesale", "wholesale_failed: " + e.Message);
+                return ActionResult.Failed("buy_wholesale", "wholesale_failed: " + e.Message);
             }
 
             return ActionResult.Success("buy_wholesale");
@@ -224,7 +224,7 @@ namespace PawnMind.Bridge
                 if (targetGrid != null && TryRepack(targetGrid, item) && item.parentInventory == targetGrid)
                     return ActionResult.Success("move_item");
 
-                return ActionResult.Failure("move_item", "no_space");
+                return ActionResult.Failed("move_item", "no_space");
             }
 
             GameGridInventory grid = target as GameGridInventory;
@@ -256,14 +256,14 @@ namespace PawnMind.Bridge
             }
 
             GameInventory parent = item.parentInventory;
-            if (parent == null || !parent.Expel(item)) return ActionResult.Failure("move_item", "detach_failed");
+            if (parent == null || !parent.Expel(item)) return ActionResult.Failed("move_item", "detach_failed");
 
             item.modifiedShape = new GridShapeBuilder(item.modifiedShape).SetTransform(shape);
             if (!grid.UncheckedAccept(item))
             {
                 item.modifiedShape = originalShape;
                 parent.UncheckedAccept(item);
-                return ActionResult.Failure("move_item", "no_space");
+                return ActionResult.Failed("move_item", "no_space");
             }
 
             item.ValidateShapeState();

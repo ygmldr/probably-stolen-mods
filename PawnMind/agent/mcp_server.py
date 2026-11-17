@@ -15,6 +15,7 @@ Run:
 """
 
 import argparse
+import functools
 import os
 import sys
 import threading
@@ -420,8 +421,25 @@ LOCAL_TOOL_NAMES = frozenset({"memory_bootstrap", "memory_get", "memory_retrieve
                               "memory_status"})
 
 
+def _guard_tool(function, mode_guard):
+    """Wrap one tool so a stale surface refuses instead of running.
+
+    ``functools.wraps`` keeps ``__wrapped__``/``__annotations__`` intact, so the
+    MCP schema is still derived from the real signature.
+    """
+
+    @functools.wraps(function)
+    def wrapper(*args, **kwargs):
+        refusal = mode_guard.check()
+        if refusal is not None:
+            return refusal
+        return function(*args, **kwargs)
+
+    return wrapper
+
+
 def build_server(client, tool_set=TOOL_SET_FULL, memory_provider=None,
-                 allowed_tools=None):
+                 allowed_tools=None, mode_guard=None):
     if tool_set not in TOOL_SET_CHOICES:
         raise ValueError("unknown tool set: %r" % (tool_set,))
 
@@ -448,7 +466,14 @@ def build_server(client, tool_set=TOOL_SET_FULL, memory_provider=None,
             if (allowed_tools is not None and name not in LOCAL_TOOL_NAMES
                     and name not in allowed_tools):
                 return function
-            return server.tool(*args, **kwargs)(function)
+
+            # F5b: a start-up surface is a promise. Refuse the call when the
+            # bridge has since moved to another mode instead of quietly serving a
+            # tool the bridge would now reject.
+            guarded = function
+            if mode_guard is not None and name not in LOCAL_TOOL_NAMES:
+                guarded = _guard_tool(function, mode_guard)
+            return server.tool(*args, **kwargs)(guarded)
 
         return decorator
 
@@ -568,7 +593,7 @@ def build_server(client, tool_set=TOOL_SET_FULL, memory_provider=None,
 
     @tool()
     def get_operation(operation_id: str) -> dict:
-        """Read-only (no rev): two-axis status of one write action, {ok, known, operation_id, op, execution_status, delivery_status, dispatched, error, rev, result_rev}. ok:true only when execution_status=completed. Use it after a lost response or an uncertain/pending write; unknown_operation means the in-process record is gone (mod restart or run change) - re-read get_state instead of replaying with a new action_id."""
+        """Read-only (no rev): two-axis status of one write action, {ok, known, operation_id, op, execution_status, delivery_status, dispatch_status, dispatched, run_change_status, run_change_confirmed, completion_evidence, error, rev, result_rev}. ok:true only when execution_status=completed. dispatch_status is not_dispatched|dispatched|unknown; unknown means the native call may have run, so never retry it with a new action_id (dispatched is then null). run_change_status is present for load/new-game actions: requested (accepted, run identity not confirmed yet), confirmed (the switch is proven, old evidence evicted) or unknown. completion_evidence states what the verifier observed when it promoted the operation. Use it after a lost response or an uncertain/pending write; unknown_operation means the in-process record is gone (mod restart or run change) - re-read get_state instead of replaying with a new action_id."""
         error = _check_operation_id(operation_id)
         if error is not None:
             return error
@@ -1246,8 +1271,9 @@ def main():
         default=os.environ.get("PAWNMIND_MODE", "auto"),
         help=(
             "register only the tools the bridge run mode can execute: bootstrap, "
-            "play (live-evidenced only), test (no filtering). auto asks /health and "
-            "falls back to test when the bridge is not running"
+            "play (live-evidenced only), test (no filtering). auto follows /health. "
+            "An unreachable, unknown or mismatched bridge locks the surface down to "
+            "the local memory tools instead of exposing the unfiltered test set"
         ),
     )
     parser.add_argument(
@@ -1338,11 +1364,15 @@ def main():
         args.memories_db or _default_memories_db(),
         events_db=memory_events_db)
     try:
-        mode = _detect_mode(client, args.mode)
+        mode, reason = _resolve_mode(client, args.mode)
         allowed = allowed_tools_for_mode(mode)
+        if mode == "locked":
+            print("pawnmind: tool surface locked (%s); only the local memory tools "
+                  "are registered" % reason, file=sys.stderr)
         build_server(client, args.tools,
                      memory_provider=memory_provider,
-                     allowed_tools=allowed).run()
+                     allowed_tools=allowed,
+                     mode_guard=_ModeGuard(client, mode)).run()
     finally:
         memory_provider.close()
         if recorder is not None:
@@ -1350,29 +1380,124 @@ def main():
     return 0
 
 
+#: Run modes the bridge can report and the MCP server can honour.
+BRIDGE_MODES = ("bootstrap", "play", "test")
+
+#: The fail-closed surface: no game tool at all, only the local memory tools.
+LOCKED_MODE = "locked"
+
+
 def allowed_tools_for_mode(mode, policy=None):
-    """Tools a run mode may expose. ``None`` means "no filtering" (test)."""
+    """Tools a run mode may expose.
+
+    ``None`` means "no filtering" and is reserved for the explicitly requested
+    test surface. Every unresolved state maps to ``locked`` -> an empty set, so a
+    missing bridge can never expose the full 116-tool surface (R4/F5b).
+    """
     import tool_policy
+
+    if mode == LOCKED_MODE:
+        return set()
 
     policy = policy or tool_policy.load_policy()
     if mode == "play":
         # Only reviewed live evidence counts: never the candidate allowlist.
         return set(tool_policy.play_allowlist(policy))
-    if mode in ("bootstrap", "test"):
-        return None if mode == "test" else set(tool_policy.allowlist(policy, mode))
+    if mode == "bootstrap":
+        return set(tool_policy.allowlist(policy, mode))
+    if mode == "test":
+        return None
     raise ValueError("unknown mode: %r" % (mode,))
 
 
-def _detect_mode(client, requested):
-    """Resolve ``auto`` by asking the bridge; an unreachable bridge keeps full."""
-    if requested != "auto":
-        return requested
+def _bridge_mode(client):
+    """The mode the bridge reports, or ``None`` when it cannot be trusted."""
     try:
-        health = client.health()
+        health = client.health() or {}
     except Exception:
-        return "test"
-    mode = (health or {}).get("run_mode")
-    return mode if mode in ("bootstrap", "play", "test") else "test"
+        return None
+    mode = health.get("run_mode")
+    return mode if mode in BRIDGE_MODES + (LOCKED_MODE,) else None
+
+
+def _resolve_mode(client, requested):
+    """Resolve the mode and explain it; unresolved always means ``locked``.
+
+    R4/F5b: the test surface is unfiltered, so it may only be enabled by an
+    explicit ``--mode test`` *and* a bridge that really reports ``test``. An
+    unreachable bridge, a missing/invalid ``run_mode`` and any requested/reported
+    mismatch all lock the surface down.
+    """
+    reported = _bridge_mode(client)
+
+    if requested == "auto":
+        if reported is None:
+            return LOCKED_MODE, "the bridge did not report a usable run_mode"
+        return reported, "bridge run_mode=%s" % reported
+
+    if reported is None:
+        return LOCKED_MODE, "the bridge did not report a usable run_mode"
+    if reported != requested:
+        return LOCKED_MODE, "requested %s but the bridge reports %s" % (requested, reported)
+    return requested, "requested %s and the bridge agrees" % requested
+
+
+def _detect_mode(client, requested):
+    """Backwards-compatible wrapper around :func:`_resolve_mode`."""
+    return _resolve_mode(client, requested)[0]
+
+
+class _ModeGuard:
+    """Refuses calls once the bridge no longer matches the registered surface.
+
+    The MCP tool registry is built once at start-up. The C# gate stays the final
+    authority, but a long-running session must not keep offering tools the bridge
+    has since locked (R4/F5-05). The health fingerprint is cached briefly so a
+    normal call does not pay for an extra HTTP round trip every time.
+    """
+
+    RECHECK_SECONDS = 2.0
+
+    def __init__(self, client, mode, interval=None):
+        self.client = client
+        self.mode = mode
+        # Tests shrink the window; production keeps the short cache.
+        try:
+            configured = float(os.environ.get("PAWNMIND_MODE_RECHECK_SECONDS", ""))
+        except ValueError:
+            configured = None
+        if configured is None or configured < 0:
+            configured = self.RECHECK_SECONDS if interval is None else interval
+        self.interval = configured
+        self._checked_at = 0.0
+        self._refusal = None
+
+    def check(self):
+        now = time.monotonic()
+        if now - self._checked_at < self.interval:
+            return self._refusal
+        self._checked_at = now
+        self._refusal = self._evaluate()
+        return self._refusal
+
+    def _evaluate(self):
+        try:
+            reported = _bridge_mode(self.client)
+        except Exception:
+            return None
+        if reported is None:
+            # The bridge is gone or unreadable: the call itself will fail.
+            return None
+        if reported == self.mode:
+            return None
+        return {
+            "ok": False,
+            "error": "mode_changed",
+            "detail": (
+                "the bridge run_mode is now %r but this MCP server registered the "
+                "%r surface; restart the MCP server before continuing" % (reported, self.mode)
+            ),
+        }
 
 
 def _default_memory_db():

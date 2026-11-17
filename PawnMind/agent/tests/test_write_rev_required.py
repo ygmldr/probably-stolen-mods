@@ -14,6 +14,9 @@ import unittest
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from mode_fixture import FakeBridge  # noqa: E402
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 #: Written per run: test-artifacts/ is ignored, so a clean clone has no fixture.
@@ -83,14 +86,21 @@ def _write_tool_schemas(config_path):
 class WriteToolsRequireRevTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        # R4/F5b: the registered surface follows the bridge's reported run_mode,
+        # so the schema probe needs a bridge that really reports `test`.
+        cls.bridge = FakeBridge("test")
         handle, cls.config_path = tempfile.mkstemp(prefix="pawnmind-schema-", suffix=".conf")
         with os.fdopen(handle, "w", encoding="utf-8") as config:
-            config.write("port=15528\ntoken=%s\nrun_mode=test\nallow_test_mode=true\n"
-                         % FAKE_TOKEN)
+            config.write("port=%d\ntoken=%s\nrun_mode=test\nallow_test_mode=true\n"
+                         % (cls.bridge.port, FAKE_TOKEN))
         try:
             cls.schemas = _write_tool_schemas(cls.config_path)
         finally:
             os.unlink(cls.config_path)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.bridge.close()
 
     def test_every_write_tool_requires_rev(self):
         """F6: a write tool that omits rev entirely must fail, not be skipped.

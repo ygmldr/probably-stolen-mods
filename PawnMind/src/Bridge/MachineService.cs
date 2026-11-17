@@ -131,29 +131,36 @@ namespace PawnMind.Bridge
         {
             GameItem machine = GameState.FindItemAnywhere(machineId);
             GameItem item = GameState.FindItemAnywhere(itemId);
-            if (machine == null) return "{\"ok\":false,\"error\":\"machine_not_found\"}";
-            if (item == null) return "{\"ok\":false,\"error\":\"item_not_found\"}";
+            if (machine == null)
+                return "{\"ok\":false,\"error\":\"machine_not_found\",\"dispatched\":false}";
+            if (item == null)
+                return "{\"ok\":false,\"error\":\"item_not_found\",\"dispatched\":false}";
 
             MachineSlot slot = FindSlot(machine, slotIndex);
-            if (slot == null) return "{\"ok\":false,\"error\":\"slot_not_found\"}";
+            if (slot == null)
+                return "{\"ok\":false,\"error\":\"slot_not_found\",\"dispatched\":false}";
 
+            // R4/F4b: the inventory transfer was attempted from here on.
             GameInventory moved = slot.Inventory.TryAcceptAll(item);
             if (moved == null || item.parentInventory != slot.Inventory)
-                return "{\"ok\":false,\"error\":\"cannot_insert\"}";
+                return "{\"ok\":false,\"error\":\"cannot_insert\",\"dispatched\":true}";
 
-            return "{\"ok\":true,\"slot\":" + slotIndex + "}";
+            return "{\"ok\":true,\"dispatched\":true,\"slot\":" + slotIndex + "}";
         }
 
         public static string CollectJson(int machineId, int slotIndex)
         {
             GameItem machine = GameState.FindItemAnywhere(machineId);
-            if (machine == null) return "{\"ok\":false,\"error\":\"machine_not_found\"}";
+            if (machine == null)
+                return "{\"ok\":false,\"error\":\"machine_not_found\",\"dispatched\":false}";
 
             MachineSlot slot = FindSlot(machine, slotIndex);
-            if (slot == null) return "{\"ok\":false,\"error\":\"slot_not_found\"}";
+            if (slot == null)
+                return "{\"ok\":false,\"error\":\"slot_not_found\",\"dispatched\":false}";
 
             GameInventory main = GameState.GetContainer("main");
-            if (main == null) return "{\"ok\":false,\"error\":\"no_main_inventory\"}";
+            if (main == null)
+                return "{\"ok\":false,\"error\":\"no_main_inventory\",\"dispatched\":false}";
 
             List<GameItem> items = new List<GameItem>(slot.Inventory.childItems);
             var rows = new List<Dictionary<string, object>>();
@@ -175,6 +182,7 @@ namespace PawnMind.Bridge
             return JsonConvert.SerializeObject(new Dictionary<string, object>
             {
                 { "ok", true },
+                { "dispatched", true },
                 { "moved", rows }
             });
         }

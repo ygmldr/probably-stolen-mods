@@ -40,7 +40,8 @@ namespace PawnMind.Bridge
 
         public static string ToggleServiceJson(string id, bool on)
         {
-            if (string.IsNullOrEmpty(id)) return "{\"ok\":false,\"error\":\"missing_id\"}";
+            if (string.IsNullOrEmpty(id))
+                return "{\"ok\":false,\"error\":\"missing_id\",\"dispatched\":false}";
 
             StoreService service = null;
             try
@@ -58,10 +59,13 @@ namespace PawnMind.Bridge
                 service != null && service.unlocked,
                 service != null && service.isMandatory,
                 service != null && service.currentCooldown > 0);
-            if (check != ServiceCheck.Ok) return "{\"ok\":false,\"error\":\"" + ErrorCode(check) + "\"}";
+            if (check != ServiceCheck.Ok)
+                return "{\"ok\":false,\"error\":\"" + ErrorCode(check) + "\",\"dispatched\":false}";
 
+            // R4/F4b: the toggle is written from here on.
             service.isUsing = on;
-            return "{\"ok\":true,\"id\":\"" + id + "\",\"using\":" + (on ? "true" : "false") + "}";
+            return "{\"ok\":true,\"dispatched\":true,\"id\":\"" + id
+                + "\",\"using\":" + (on ? "true" : "false") + "}";
         }
 
         public static string HusbandryJson()

@@ -58,7 +58,8 @@ class _Bridge(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == "/health":
-            self._json({"ok": True, "policy_sha256": _policy_sha256()})
+            self._json({"ok": True, "run_mode": "test",
+                        "policy_sha256": _policy_sha256()})
             return
         with LOCK:
             self._json(dict(STATE))
