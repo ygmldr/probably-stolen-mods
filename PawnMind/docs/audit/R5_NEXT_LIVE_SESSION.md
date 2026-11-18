@@ -30,7 +30,8 @@
    - git rev-parse HEAD（记录 SHA；工作树 dirty diff 必须记录并说明）
    - dist/PawnMind/PawnMind.dll 与将安装文件逐字节一致（SHA256）
    - 工具面：full=117 / recording=107（B1 落地后；以实际注册与 policy 校验为准）
-   - trace validator v1.2.0 / trace schema v2
+   - 弹窗/覆盖层 typed 路径：`get_pending_prompt` 的 `kind`/`target`/enabled 字段与 `close_windows` 的 `overlays` 已就绪；Play 仍需 promotion
+   - trace validator v1.3.0 / trace schema v2
 3) 存档：
    - 记录目标专用槽的原生索引与"游戏下一个自动分配槽"（必须相等）
    - 记录现有玩家存档列表（只读；不打开、不写入）

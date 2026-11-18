@@ -98,7 +98,7 @@ PawnMind.dll  ── HTTP 127.0.0.1:15528 ──  Python MCP (stdio)
 | `src/Core/` | 纯逻辑，**不允许** `UnityEngine` 或游戏类型 |
 | `src/Bridge/` | HTTP、鉴权、revision、状态快照、动作路由、operation 状态 |
 | `src/Game/` | 唯一允许直连/反射游戏类型的层，所有访问都在主线程 |
-| `agent/mcp_server.py` | stdio MCP 服务，116 个工具（`--tools recording` 只注册 106 个） |
+| `agent/mcp_server.py` | stdio MCP 服务，117 个工具（`--tools recording` 只注册 107 个） |
 | `agent/pawnmind_client.py` | HTTP 客户端（长轮询 `/events`） |
 | `agent/orchestrator.py` | 最小 observe→decide→act 闭环 + `RulePolicy` 基线 |
 
@@ -132,7 +132,7 @@ PawnMind.dll  ── HTTP 127.0.0.1:15528 ──  Python MCP (stdio)
 
 ## 当前状态（2026-11-17）
 
-- MCP 工具：**116 个**（`--tools recording` → 106）
+- MCP 工具：**117 个**（`--tools recording` → 107；R5-B1 新增 `stage_negotiation_item`）
 - 测试：C# **750** + 脚本门禁 **53** + 适配器契约 **503** + Python **365**，全绿
 - 策略指纹：`policy_schema=2`，`sha256=e0da5a24…`；`play_allowlist` 仍为 **0**
 - **尚未真机验证**：离线 PASS 都是静态 / fake / loopback 证据；实机清单见

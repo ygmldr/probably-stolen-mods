@@ -31,11 +31,11 @@ namespace PawnMind.Core
             "CanvasScreenLayer2/_DialogueOptionUI/Panel/CloseButton",
             "CanvasScreenLayer2/_DialogueOptionUI/Panel/ApplyButton",
 
-            // The shutter/day-end confirmation. end_day raises it and nothing else
-            // answers it: answer_prompt does not recognise this modal, so without
-            // this entry the day-end tablet never appears and the day cannot end.
-            // The snapshot carries the button text (是/否), so the caller chooses
-            // explicitly instead of guessing an index.
+            // The negotiation tablet confirm panel. R5/B2 made it a typed modal
+            // through get_pending_prompt/answer_prompt (kind negotiation_confirm),
+            // so this press entry is legacy/test-only fallback and must never be
+            // the Play path. The snapshot carries the button text (是/否), so the
+            // caller chooses explicitly instead of guessing an index.
             "NegotiationTablet/Confirm/Buttons/Button"
         };
 
