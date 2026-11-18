@@ -40,7 +40,8 @@
 
 - F7 只在游戏窗口聚焦时生效；`debug_pulse` 的日志行这次没出现在 `Player.log`（`debug_dump` 文件正常）。
 - 不注入系统键鼠；所有自动化走 HTTP。
-- 全主线程非阻塞 HTTP，无 Thread/ThreadPool/Task/协程；已避开新扫描器的 `threads` 退役项。
+- 全主线程非阻塞 HTTP，无 Thread/ThreadPool/Task；`threads` 退役项在扫描中**未命中**
+  （`ScreenshotService` 用的是自有 `MonoBehaviour` 的 `StartCoroutine`，官方规则属免费项）。
 - `load_game` 只支持菜单读档；不会主动读玩家存档列表。
 - 测试档会新建存档槽；旧档不会被修改。
 
@@ -68,3 +69,30 @@
 
 - 突袭战斗未接（RaidManager 需要 RaidScene，未暴露只读入口）。
 - 陈酿 1 天无品质变化，需多日验证。
+
+## 10. 扫描器与发布阻塞（2026-11-18 实测）
+
+官方 `mod-scan pawnmind`（游戏 F8 控制台，原始输出见 `docs/audit/MOD_SCANNER_ROUND4.md` §6）：
+
+```
+declared: network, reflection-external
+detected: files, network, reflection-external
+UNDECLARED (enable would be refused): files
+findings (41): files 5 / network 22 / reflection-external 14
+DEPRECATED: reflection-external refused by the game update of December 10, 2026
+```
+
+三条独立阻塞：
+
+1. **今天：`files` 未声明** → 普通玩家激活会被拒。本机之所以能跑，是因为
+   `trust=DeveloperMode`（开发者模式跳过未声明能力检查）。修法二选一：
+   在 `manifest.xml` 声明 `files`（并披露截图 + 存档索引读取），或去掉
+   `ScreenCapture` 与 `System.IO`（但 2026-12-10 起 `SaveFiles.IndexLoad` 仍计 `files`）。
+2. **2026-12-10 起：`reflection-external` 被拒**。14 条里 10 条可用"调用点内联
+   `typeof(...)`"消除；剩下 **4 条结构性不可消除**——`NewGamePerksUI.SlotView` 是
+   私有嵌套类，外部拿不到 `typeof(SlotView)`，只能 `view.GetType()`。
+   需要游戏作者提供公开访问器，或放弃"逐行 perk 卡片"读取。
+3. **工坊：`network` 需要"开发者已验证"**（扫描器 `VERIFICATION` 行）。
+   本地 `Mods/` 安装不受影响；上工坊则需申请验证。
+
+> 结论：**PawnMind 目前只能本地使用**；工坊发布在 (1)(2)(3) 解决前是 BLOCKED。

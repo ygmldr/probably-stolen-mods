@@ -131,14 +131,15 @@ REQUIRE_GAME=1 ./test.sh
 
 | # | 风险 / 缺口 | 级别 | 下一步 |
 |---|---|---|---|
-| 1 | F7：**LIVE 已确认**加载器检测到 `files` 而清单未声明（仅靠 `DeveloperMode` 才能运行）；`mod-scan` 逐条输出仍缺 | **发布阻塞** | 重启游戏（已补 `dev.txt`）→ F8 → `mod-scan pawnmind` |
+| 1 | **官方扫描已跑通**：`UNDECLARED: files`（今天拒绝激活）+ 14 条 `reflection-external`（12-10 起拒绝，其中 4 条结构性） | **发布阻塞** | 见 `MOD_SCANNER_ROUND4.md` §7 的三条阻塞与决策 |
 | 2 | ~~已安装 DLL ≠ 本轮构建~~ | **已解决** | 2026-11-18 覆盖安装 `6adef8ac…`，与 `dist` 逐字节一致；旧版备份在 `_internal/install-backup-2026-11-18/` |
-| 3 | `reflection-external`（`NewGameMenuAdapter.cs:400` computed type）2026-12-10 起被拒 | 高 | 向作者申请公开访问器，或放弃逐行 perk 读取 |
+| 3 | `reflection-external` 14 条：10 条可用"调用点内联 `typeof()`"消除；**4 条结构性**（`NewGamePerksUI.SlotView` 私有嵌套类） | **高（12-10 硬阻塞）** | 向作者申请公开访问器，或放弃逐行 perk 卡片读取 |
 | 4 | 跨局未确认期间的**普通写**未被阻止 | 中 | L3 前由 Skill 流程覆盖；如需硬保证要设计"切换窗口"锁 |
 | 5 | `ActionResult.Failure` 的"派发前拒绝"仍是约定，无静态检查器 | 中 | 新写动作 review 对照 `RAW_DISPATCH_AUDIT.md` |
 | 6 | `initial_result` / `candidate_actions` 尚未进 benchmark schema | 低 | 与实机 schema 冻结一起做 |
 | 7 | C-2（B12 原生方向）、C-3（顾客实例切换）、`PP-READ-01` 运行时 `Refresh()` | 中 | 需要实机 |
 | 8 | `dist` 与 HEAD 已对齐，并已安装到 `Mods/PawnMind/` | — | 已关闭 |
+| 9 | `network` 声明使工坊版本从 2026-12-10 起需要"开发者已验证"（本地不受影响） | **产品级** | 决定是否上工坊；上则需申请验证 |
 
 ## 7. 下轮建议（按优先级）
 

@@ -162,12 +162,21 @@ C# 仍是最终门禁。
 
 ## 5. F7 — 官方 ModScanner
 
-- `mod-scan` 原始输出：**NOT_RUN**（Agent 不启动游戏；用户按 F8 时 `dev.txt` 缺失，
-  已补建，待重启后采集）。
-- **`files` 预测已被 LIVE 确认**：游戏加载器的审计行在 2026-11-18 23:21 报告
-  `caps=files, network, reflection-external`，而 `manifest.xml` 只声明后两者；
-  当前能运行仅因 `trust=DeveloperMode`。普通玩家机器上 `detected ⊄ declared` → 拒绝激活。
-- 静态预测与完整 disposition：`docs/audit/MOD_SCANNER_ROUND4.md`（§3 预测、§5 LIVE）。
+- **官方 `mod-scan` 已跑通**（2026-11-18 23:28，用户 F8 控制台，原始输出见
+  `docs/audit/MOD_SCANNER_ROUND4.md` §6）：
+  `declared: network, reflection-external` / `detected: files, network, reflection-external`
+  → `UNDECLARED (enable would be refused): files`。
+- 41 条 finding：`files` 5、`network` 22、`reflection-external` 14；
+  另有 `from December 10, 2026 (3)`（`SaveFiles.IndexLoad`）与
+  `DEPRECATED: reflection-external`。
+- **自我更正**：上一轮静态分析只指出 1 处 computed type（`view.GetType()`）；
+  实测有 **14 条**，其中 **10 条**来自"把 `typeof(X)` 当参数传进泛型辅助方法后
+  再反射"（扫描器按 computed 计）。预测方向对，规模低估。
+- 三条独立阻塞：今天 `files` 未声明；2026-12-10 起 `reflection-external`（4 条结构性，
+  `SlotView` 是私有嵌套类）；工坊发布还需 `network` 的"开发者已验证"。
+  详见 `MOD_SCANNER_ROUND4.md` §7。
+- 本轮**未加** `files` 到清单：新增高权限能力属于 brief §8 的"必须停下并上报"，
+  需要用户/产品决定（声明 vs 关闭截图 vs 阻塞发布）。
 - `reflection-external` 已声明，但 `NewGameMenuAdapter.cs:400` 的
   `view.GetType()` 是 computed type，属于官方**计划于 2026-12-10 拒绝**的能力。
   `SlotView` 是私有嵌套类（`_decomp/NewGamePerksUI.cs:7`），没有 `typeof()` 替代。
@@ -184,7 +193,7 @@ C# 仍是最终门禁。
 |---|---|---|
 | **A** 操作事实正确性 | `R4-F1-*`、`R4-F4-*` 全绿；无提前清理；无派发猜测；旧 F1/F4 回归通过 | **PASS** |
 | **B** 协议与工具暴露 | `R4-F3-*`、`R4-F5-*` 全绿；重试证据无矛盾；MCP 故障关闭；C# 门禁未改 | **PASS** |
-| **C** 发布兼容 | 官方 `mod-scan` 完整证据 + 已安装 DLL 匹配 | **BLOCKED**（DLL 匹配已满足，扫描证据仍缺） |
+| **C** 发布兼容 | 官方 `mod-scan` 完整证据 + 已安装 DLL 匹配 | **BLOCKED**（证据与 DLL 匹配均已满足；`declared ⊉ detected`，F7-03 不通过） |
 | **D** Play / 首周租金 | 既定 live gates 独立通过 | **NOT GRANTED**（本轮默认不授予） |
 
 `play_allowlist` 仍为空；未因本轮全绿而填入任何 `live_evidence`。
