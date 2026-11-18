@@ -291,6 +291,27 @@ namespace PawnMind.Core
             return null;
         }
 
+        /// <summary>
+        /// Non-terminal operations, newest first. Read-only: the caller can then ask
+        /// get_operation for one id. Without this a stuck operation is unreachable
+        /// once it falls out of the bounded history (R4-D).
+        /// </summary>
+        public List<OperationRecord> ListNonTerminal(int limit)
+        {
+            var found = new List<OperationRecord>();
+            foreach (KeyValuePair<string, Entry> pair in _results)
+            {
+                OperationRecord operation = pair.Value.Operation;
+                if (operation == null) continue;
+                if (ExecutionStatus.IsTerminal(operation.Execution)) continue;
+                found.Add(operation.Copy());
+            }
+
+            found.Reverse();
+            if (limit > 0 && found.Count > limit) found = found.GetRange(0, limit);
+            return found;
+        }
+
         /// <summary>Stores an updated record (the operation verifier).</summary>
         public bool Update(OperationRecord record)
         {

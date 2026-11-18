@@ -98,6 +98,24 @@ namespace PawnMind.Tests
             Assert.Equal("day_not_changed", error, "stable code");
         }
 
+        /// <summary>
+        /// R4-C: without the day-end tablet the native click is a silent no-op, so the
+        /// bridge must refuse before dispatching. A no-op sleep leaves a running
+        /// operation behind that blocks every later sleep (live session, 2026-11-19).
+        /// </summary>
+        [Test]
+        public static void Sleep_Without_The_Day_End_Panel_Is_Not_Dispatched()
+        {
+            RecordingHarness harness = Bound(3, 4, 600);
+            harness.StatePort.State.EndOfDayReady = false;
+
+            ActionResult result = harness.Service.Sleep();
+
+            Assert.False(result.Ok, "no panel, no sleep");
+            Assert.Equal(RecordingSaveErrors.EndOfDayPanelClosed, result.Error, "stable code");
+            Assert.Equal(0, harness.NativePort.SleepCalls, "the native click is never issued");
+        }
+
         [Test]
         public static void Sleep_Unreadable_Before_Does_Not_Call_Native()
         {

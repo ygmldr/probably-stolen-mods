@@ -727,6 +727,34 @@ namespace PawnMind.Tests
         }
 
         /// <summary>
+        /// R4-D: a stuck sleep can outlive the bounded action history. It must stay
+        /// discoverable, otherwise its operation id is unreachable and the block on
+        /// later sleeps can never be resolved.
+        /// </summary>
+        [Test]
+        public static void R4_F1_14_Non_Terminal_Operations_Are_Listable()
+        {
+            ActionRouter router = Router(3, delegate(string op, JObject request)
+            {
+                return ActionResult.SuccessRaw(op,
+                    "{\"ok\":false,\"op\":\"sleep\",\"dispatched\":true,"
+                    + "\"pending\":true,\"error\":\"saving\"}");
+            });
+
+            router.Handle(Write("sleep", "sleep-1", 3));
+
+            JObject listed = router.GetOperationJson("*");
+            Assert.True((bool)listed["ok"], "the listing is a read");
+            Assert.Equal(1, (int)listed["count"], "one non-terminal operation");
+            JArray rows = (JArray)listed["operations"];
+            Assert.Equal("sleep-1", (string)rows[0]["operation_id"], "the stuck id is visible");
+            Assert.Equal(ExecutionStatus.Running, (string)rows[0]["execution_status"], "still running");
+
+            JObject one = router.GetOperationJson("sleep-1");
+            Assert.Equal("sleep-1", (string)one["operation_id"], "the id still resolves normally");
+        }
+
+        /// <summary>
         /// R4-F1-10: starting a new game from the main menu has no previous run id,
         /// so "requested" must still become "confirmed" once a run appears. Without
         /// this the switch is unconfirmable forever and blocks every later load.

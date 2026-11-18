@@ -143,7 +143,11 @@
    - `ok:true` 仅当 `execution_status:"completed"`；非终态时 `next` 给出下一步建议。
    - 未知 id：`ok:false` + `known:false` + `error:"unknown_operation"`；
      若期间发生 new game / 读档 / 进程重启，还会带 `process_restarted:true`，**禁止自动重放**。
-5. `wait_operation(operation_id, timeout_ms)`：Python 侧有界轮询（≤10s），不阻塞 Unity 主线程。
+5. `get_operation("*")`：列出**非终态**操作（`{ok, count, operations:[{operation_id, op, execution_status,
+   delivery_status, dispatch_status, revoked…}]}`）。当一个 `sleep`/`save` 卡住、又已经掉出
+   `get_action_history` 的容量时，这是唯一能拿回它的 `action_id` 的办法；拿到后连续
+   `get_operation(id)` 两三次即可让它按读回结果收敛（`completed` 或 `failed`）。
+6. `wait_operation(operation_id, timeout_ms)`：Python 侧有界轮询（≤10s），不阻塞 Unity 主线程。
    - 终态返回终态 payload；
    - 超时返回 `ok:false` + `status:"pending"` + `execution_status` + `operation_id` + `next`
      （另带 `timed_out:true`），**绝不是假成功**。
@@ -455,7 +459,7 @@ confirm_trade(item_id=<该商品>, side=...)      # 用新的 action_id 重试
 | 操作查询 | `get_operation` 返回 `known/ok/operation_id/op/execution_status/delivery_status/dispatch_status/dispatched/run_change_status/run_change_confirmed/completion_evidence/error/rev/result_rev/next`；未知 id `known:false` + `unknown_operation`（run 变化后带 `process_restarted:true`）；`wait_operation` 超时 `ok:false + status:"pending" + operation_id + execution_status + next` |
 | 交易证据 | `business_complete`、`client_unchanged`、`items_transferred`、`cash_before`、`cash_after`（整数）、`cash_changed`、`staged_item_id`、`client_intent`、`evidence.{called,error,business_complete,client_unchanged,items_transferred,cash_before,cash_after,staged_item_id_after}`；拒绝时 `dispatched:false`；静默 return → `error:"outcome_unverified"` + `execution_status:"uncertain"` |
 | 关店 | `execution_status:"completed"` ⇔ `shop_closed_after:true`；仍 OPEN → `ok:false + pending:true + execution_status:"running" + error:"shop_still_open"` |
-| 睡觉 | `day_changed`、`save_evidence`（`save_completed`/`save_unknown`）、`save_completed`、`save_unknown`；`last_save_time` 不算落盘证据；`day_changed:false` = running/pending |
+| 睡觉 | `day_changed`、`save_evidence`（`save_completed`/`save_unknown`）、`save_completed`、`save_unknown`；`last_save_time` 不算落盘证据；`day_changed:false` = running/pending；**日终面板没开时 `error:"end_of_day_panel_closed"` + `not_dispatched"`（世界没动，可换新 id 重试）**；卡住的 sleep 由 verifier 按 day 回读收敛为 `completed`/`failed("day_not_changed")` |
 | 快照 | `legal_actions`（`availability="available"`）与 `candidate_actions`（`availability="unknown"`、`requires="native_guard"`）；举报用纯字段 `reported`/`is_wanted` |
 | 工具面 | full = 116，recording = 106；`get_operation` / `wait_operation` 已注册且均在 recording 面 |
 | MCP 模式 | 注册面 = bridge 报告的 `run_mode`；`auto` 在 bridge 不可达/未知时 **locked**（只留本地 memory 工具），显式 `--mode test` 也必须 bridge 报告 `test`；运行中模式漂移 → `error:"mode_changed"`，需重启 MCP |

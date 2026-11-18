@@ -138,7 +138,7 @@ move_item(item, "back")   # 放回 → 触发原生 OpenUI()
 
 ## 3.3 第 4–6 次会话：仍未解决的问题
 
-### C. `sleep` 被模态面板吞掉点击（未修）
+### C. `sleep` 被模态面板吞掉点击（**已修**）
 
 `EndOfDayUIManager.OnEndDayButtonClick` 在「对话与打字机设置」
 （`CanvasScreenLayer2/_DialogueOptionUI`）模态面板开着时**静默无效**。
@@ -148,19 +148,27 @@ move_item(item, "back")   # 放回 → 触发原生 OpenUI()
 `TryResolveSleep`（本轮新增）能在 3 次回读后把它判成 `failed("day_not_changed")`，
 但**前提是能拿到那个 op 的 id**——见 D。
 
-下一步：在 `Sleep()` 派发前检查"日终面板是否真的可点"（`EndOfDayUIManager.IsOpen`
-或 `_DialogueOptionUI` 是否遮挡），不满足就直接 `not_dispatched` 拒绝，
-从源头避免无效点击。
+修法：`RecordingGameState.EndOfDayReady`（适配器读 `EndOfDayUIManager.IsOpen`），
+`RecordingSaveService.Sleep` 在派发前检查；不满足返回
+`error:"end_of_day_panel_closed"` + `not_dispatched`——世界没变，换个 action id
+重试是安全的。适配器契约新增 `EndOfDayUIManager.IsOpen`（契约数 503 → 504）。
+测试：`Sleep_Without_The_Day_End_Panel_Is_Not_Dispatched`。
 
-### D. 录制门处理的操作不进 action history（未修）
+### D. 卡住的操作会掉出 history，再也拿不到 id（**已修**）
 
 `sleep` / `save_game` / `load_game` 等由 `RecordingDispatchGuard` 处理的操作
 **不出现在 `get_action_history`**。于是：
 - 一旦某个 `sleep` 卡在非终态，`FindPendingFor` 会挡住后续所有 `sleep`；
 - 而 agent 拿不到它的 `action_id`，无法用 `get_operation` 触发收敛 → **会话彻底不可恢复**。
 
-下一步：要么让守卫处理的操作也写历史，要么给 `get_operation` 一个"列出非终态操作"
-的读接口（只读，不含写权限）。后者更小且不改变审计语义。
+真实原因不是"守卫不写历史"，而是 **history 是有界的（100 条）**：一个营业日有上百次
+写操作，卡住的 `sleep` 很快被挤出去，`action_id` 就再也找不回来了。
+
+修法：`get_operation("*")` 返回**非终态操作**列表（最多 20 条，只读）。
+拿到 id 后连续 `get_operation(id)` 两三次，`sleep` 的 verifier 就会把它收敛成
+`completed` 或 `failed("day_not_changed")`，阻塞随之解除。
+实现：`ActionGate.ListNonTerminal` + `ActionRouter.ListOperationsJson`。
+测试：`R4_F1_14_Non_Terminal_Operations_Are_Listable`。
 
 ## 4. 复现
 

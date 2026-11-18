@@ -291,6 +291,15 @@ namespace PawnMind.Bridge
                 return Failure(op, RecordingSaveErrors.ReadbackUnavailable);
             }
 
+            // R4-C: without the day-end tablet the native click is a no-op, and a
+            // no-op sleep used to leave an operation running that blocked every
+            // later sleep. Refuse before dispatching; the world does not change, so
+            // a retry with a new action id is safe.
+            if (!game.EndOfDayReady)
+            {
+                return Failure(op, RecordingSaveErrors.EndOfDayPanelClosed);
+            }
+
             // The game only advances the day from CLOSED, and only when no
             // non-dismissable client (the landlord) is queued. Checking here as
             // well is what stops a sleep from skipping the rent collection.

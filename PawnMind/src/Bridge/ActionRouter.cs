@@ -379,6 +379,11 @@ namespace PawnMind.Bridge
         /// </summary>
         public JObject GetOperationJson(string operationId)
         {
+            // "*" lists the non-terminal operations so a stuck one stays reachable
+            // even after it leaves the bounded action history (R4-D).
+            if (string.Equals(operationId, "*", StringComparison.Ordinal))
+                return ListOperationsJson();
+
             var payload = new JObject();
 
             if (string.IsNullOrEmpty(operationId) || operationId.Trim().Length == 0
@@ -447,6 +452,36 @@ namespace PawnMind.Bridge
                     : "still running: call wait_operation or read state again; do not re-dispatch";
             }
 
+            return payload;
+        }
+
+        private JObject ListOperationsJson()
+        {
+            var payload = new JObject();
+            payload["ok"] = true;
+            payload["operations"] = new JArray();
+
+            JArray rows = (JArray)payload["operations"];
+            foreach (OperationRecord operation in _gate.ListNonTerminal(20))
+            {
+                var row = new JObject();
+                row["operation_id"] = operation.OperationId;
+                row["op"] = operation.Op;
+                row["execution_status"] = operation.Execution;
+                row["delivery_status"] = operation.Delivery;
+                row["dispatch_status"] = DispatchStatus.Normalize(operation.Dispatch);
+                row["dispatched"] = DispatchedJson(operation.Dispatch);
+                row["rev"] = operation.Revision;
+                row["result_rev"] = operation.ResultRevision;
+                row["error"] = operation.Error == null
+                    ? JValue.CreateNull()
+                    : new JValue(operation.Error);
+                rows.Add(row);
+            }
+
+            payload["count"] = rows.Count;
+            payload["next"] = "call get_operation with one of these ids; a sleep or"
+                + " save that never finished must be resolved before retrying it";
             return payload;
         }
 
