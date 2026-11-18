@@ -136,6 +136,32 @@ move_item(item, "back")   # 放回 → 触发原生 OpenUI()
   挂起的 sleep 判终态，解除阻塞。
 测试：`Sleep_Verifier_Sees_The_Day_Advance`、`Sleep_Verifier_Gives_Up_After_Repeated_No_Op_Readbacks`。
 
+## 3.3 第 4–6 次会话：仍未解决的问题
+
+### C. `sleep` 被模态面板吞掉点击（未修）
+
+`EndOfDayUIManager.OnEndDayButtonClick` 在「对话与打字机设置」
+（`CanvasScreenLayer2/_DialogueOptionUI`）模态面板开着时**静默无效**。
+该面板会在每天/每位顾客后重新出现，脚本里的 `press` 能关掉它，
+但只要有一次 `sleep` 在面板打开时发出，就会得到一个"点过但世界没变"的操作。
+
+`TryResolveSleep`（本轮新增）能在 3 次回读后把它判成 `failed("day_not_changed")`，
+但**前提是能拿到那个 op 的 id**——见 D。
+
+下一步：在 `Sleep()` 派发前检查"日终面板是否真的可点"（`EndOfDayUIManager.IsOpen`
+或 `_DialogueOptionUI` 是否遮挡），不满足就直接 `not_dispatched` 拒绝，
+从源头避免无效点击。
+
+### D. 录制门处理的操作不进 action history（未修）
+
+`sleep` / `save_game` / `load_game` 等由 `RecordingDispatchGuard` 处理的操作
+**不出现在 `get_action_history`**。于是：
+- 一旦某个 `sleep` 卡在非终态，`FindPendingFor` 会挡住后续所有 `sleep`；
+- 而 agent 拿不到它的 `action_id`，无法用 `get_operation` 触发收敛 → **会话彻底不可恢复**。
+
+下一步：要么让守卫处理的操作也写历史，要么给 `get_operation` 一个"列出非终态操作"
+的读接口（只读，不含写权限）。后者更小且不改变审计语义。
+
 ## 4. 复现
 
 ```bash
