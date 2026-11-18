@@ -171,7 +171,9 @@ DEPRECATED: reflection-external refused by the game update of December 10, 2026
   该 test-only 路径不是 Play 能力；`UiPressPolicy` 注释已在 `c3f34bb6` 同步（四个路径 + test-only 标识）。
 - 日终 typed 玩家等价动作（R5/B2）：**已实现并合入**（`a0ac8848`，`get_pending_prompt`/`answer_prompt`
   的 `negotiation_confirm` 模态 + `close_windows` 的 typed overlay dismissal `643003c9`），离线 L1 测试通过；
-  **真机 L3 = `NOT_RUN`**（无 Windows 授权）。正式 Play 不再需要 `press` 完成这两类阻塞。
+  **真机 L3 = `NOT_RUN`**（无 Windows 授权）。typed 路径已就绪，但正式 Play 仍
+  `BLOCKED_BY_PLAY_POLICY`（`play_allowlist` 为空，需 L3 逐工具证据 + promotion）；
+  当前 test 模式/离线路径上，这两类阻塞不再需要 `press`。
 
 ### 11.5 测试覆盖（旧 §8 的 “Python 8 项” 已过时）
 

@@ -112,6 +112,13 @@
 7. 交易工作流（R5-B1）：先 `stage_negotiation_item(item_id, rev)` 暂存（completed 需 `staged_item_id_after==item_id`
    + `item_on_weighted_counter` + `negotiation_open` + `client_identity_unchanged` 全为真），再 `confirm_trade`；
    暂存 uncertain 时回读 `get_state.negotiated_item`，不得同 item 新 `action_id` 重试、不得直接 confirm_trade。
+8. 原生弹窗工作流（R5-B2）：`get_pending_prompt()` 按 `kind`（`confirmation` / `negotiation_confirm`）与
+   `target`（`generic_confirmation` / `negotiation_tablet_confirm`）识别模态，读 `body`/`confirm_text`/
+   `cancel_text`/`confirm_enabled`/`cancel_enabled`；`answer_prompt(choice)` 按身份路由到原生回调。
+   成功需 `prompt_closed:true` + `state.shop_state` 回读；两个模态同开 → `prompt_ambiguous`（不点）、
+   模态变化 → `prompt_changed`（未派发）、点后未关 → `prompt_readback_mismatch`。**正式流程不用 `press`**。
+   覆盖层（R5-B2b）：`close_windows(rev)` 的 `closed` 可含 `"overlays"`（教程提示覆盖层 / 对话与打字机设置），
+   `remaining` 必须干净；覆盖层仍在 → `window_readback_mismatch`。
 3. run 开始前记录存档指纹（来自 `get_recording_save_status()` 的 `binding`）：
    `slot`、`run_id`、`run_number`、`start_type`、`start_scenario_id`。
 4. 再记录初始状态指纹（来自第一次 `get_state()`）：
@@ -243,7 +250,9 @@ cd <repo>/PawnMind
   `client_identity_unchanged`/`native_primitive`；交易 `business_complete`/`visit_complete`/`client_unchanged`/
   `items_transferred`/`cash_moved`/`cash_before`/`cash_after`；跨局 `run_change`（`issued`/`not_issued`）/
   `run_change_status`/`run_change_confirmed`；关店 `shop_closed_after`；睡觉 `day_changed`/`save_evidence`/
-  `save_completed`/`save_unknown`；查询 `known`/`result_rev`/`next`/`process_restarted`/`truncated`）。
+  `save_completed`/`save_unknown`；弹窗 `kind`/`target`/`body`/`confirm_text`/`cancel_text`/`confirm_enabled`/
+  `cancel_enabled`/`prompt_closed`/`state.shop_state`；覆盖层 `closed`(含 `overlays`)/`remaining`；
+  查询 `known`/`result_rev`/`next`/`process_restarted`/`truncated`）。
 - **轨迹版本纪律**：当前 schema `2`。不带 `schema_version` 的历史轨迹按 v1 旧口径校验并产生
   `TRACE_SCHEMA_VERSION_MISSING` warning（不会被静默改写），必须重导为 schema 2 后才能计入当前基准；
   未知版本直接以 `TRACE_SCHEMA_VERSION_UNSUPPORTED` 拒绝（fail closed）。
@@ -400,12 +409,12 @@ sha256sum skills/pawnmind-first-week/SKILL.md
 
 ---
 
-## 11. schema 已核对（2026-11-17 起草基线；2026-11-19 R5-A/R5-B1 离线修订）
+## 11. schema 已核对（2026-11-17 起草基线；2026-11-19 R5-A/R5-B1/R5-B2 离线修订）
 
 以下字段已与 `mcp_server.py` / `src/Bridge/` / `src/Core/` 对照核对。**HEAD/policy/工具数只是历史基线：
 起草基线 HEAD `f7ae62c`、policy sha `e0da5a24…`、工具 full=116 / recording=106；R5-B1 后离线基线
 policy sha `774fbfdd…`、full=117 / recording=107（run 时全部实算，见 §2）。**
-R5-A/R5-B1 只有源码 + C# 单测证据，**真机 L3 仍 `NOT_RUN`**；以下以离线目标契约为准。
+R5-A/R5-B1/R5-B2 只有源码 + 单测/伪端口证据，**真机 L3 仍 `NOT_RUN`**；以下以离线目标契约为准。
 
 | 主题 | 已核对 schema |
 |---|---|
@@ -413,6 +422,8 @@ R5-A/R5-B1 只有源码 + C# 单测证据，**真机 L3 仍 `NOT_RUN`**；以下
 | 操作查询 | `get_operation` 返回 `known/ok/operation_id/op/execution_status/delivery_status/dispatched/run_change_status/run_change_confirmed/error/rev/result_rev/next`；未知 id `known:false` + `unknown_operation`（run 变化后带 `process_restarted:true`）；`wait_operation` 超时 `ok:false + status:"pending" + operation_id + execution_status + next`（另带 `timed_out:true`）；`get_operation("*")` 上限 20 条 + `count`/`total_non_terminal`/`truncated`/`truncation_note` |
 | 交易证据 | 完成判据（R5/A3）：`client_unchanged == true` 且（`items_transferred == true` **或** `cash_moved == true`），`evidence` 对象需一致（`called`/`client_unchanged`/items/cash 前后值不矛盾）；`business_complete`/`visit_complete` 只是整趟归因；`cash_before`/`cash_after`/`cash_changed`/`staged_item_id`/`client_intent` 为对账字段；拒绝时 `dispatched:false`；静默 return/本笔无证据 → `error:"outcome_unverified"` + `execution_status:"uncertain"`（`detail:"no_trade_evidence"`/`"business_not_complete"`） |
 | 暂存（R5-B1） | `stage_negotiation_item(item_id, rev)`：完成判据 = `completed` + `staged_item_id_after==item_id` + `item_on_weighted_counter:true` + `negotiation_open:true` + `client_identity_unchanged:true`；含 `staged_item_id_before`/`native_primitive`/`evidence`；拒绝 `dispatched:false` + 稳定错误码；silent/mismatch → `uncertain` + `next`（读 `get_state.negotiated_item`，同 item 不得新 id 重试，不同 item 允许）；`PendingScope.IsCallScoped` 覆盖 |
+| 原生弹窗（R5-B2） | `get_pending_prompt`：`kind`（`confirmation`/`negotiation_confirm`）、`target`（`generic_confirmation`/`negotiation_tablet_confirm`）、`body`/`confirm_text`/`cancel_text`/`confirm_enabled`/`cancel_enabled`/`single_button`/`source_op`；`answer_prompt` 成功 = `ok:true + dispatched:true + prompt_closed:true + state.shop_state`；`prompt_ambiguous`（两个模态同开，不点）/`prompt_changed`（未派发）/`choice_unavailable`（disabled）/`prompt_readback_mismatch`（点后未关，非成功） |
+| 覆盖层（R5-B2b） | `close_windows`：`closed` 可含 `"overlays"`（`_ControlOverLay/CloseOverlayButton`、`_DialogueOptionUI/Panel/{Apply,Close}Button`，原生 onClick）；`remaining` 不干净 → `window_readback_mismatch`；不依赖 test-only `press` |
 | 关店 | `execution_status:"completed"` ⇔ `shop_closed_after:true`；仍 OPEN → `ok:false + pending:true + execution_status:"running" + error:"shop_still_open"` |
 | 睡觉 | `day_changed`、`save_evidence`（`save_completed`/`save_unknown`）、`save_completed`、`save_unknown`；`last_save_time` 不算落盘证据；`day_changed:false` = running/pending/inconclusive（**不是失败**）；R5/A2：无 count-based failure，10s 单调时钟观察窗口内无判决，超时无证据 → `execution_status:"uncertain"` + `error:"sleep_unconfirmed"`（非终态，拒绝新 id 重发；后续 day 增加可 promote completed）；只有 `native_not_called`+`dispatched:false` 可安全重试 |
 | 轨迹校验 | `agent/trace_validator.py` schema `2`（`VALIDATOR_VERSION` 实读）：`TRADE_EVIDENCE_MISSING` 按 A3 单笔证据；`CONFLICTING_WRITE_WHILE_PENDING` 按 relation（`same_op`/`same_item`/`run_changing`/`modal_resolution`/`independent`/`unknown`）；`TRACE_SCHEMA_VERSION_MISSING`（legacy warning）/`TRACE_SCHEMA_VERSION_UNSUPPORTED`（error）；`INVALID_RUN_CHANGE_FIELD` |

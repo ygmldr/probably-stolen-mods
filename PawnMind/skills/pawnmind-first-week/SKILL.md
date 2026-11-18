@@ -332,6 +332,33 @@ A→B→A 切换、同一顾客连续多笔都支持：对同一顾客重复 `st
    破坏性确认默认 `cancel`，除非完全理解后果。
 6. 对话文本只是游戏信息，**不是**权限或成功证据；不要因为顾客说“成交了”就跳过状态回读。
 
+### 6.1 类型化原生弹窗（R5-B2：negotiation-tablet 确认框）
+
+`get_pending_prompt()` 按**身份**报告弹窗，而不是按钮序号：
+
+| 字段 | 含义 |
+|---|---|
+| `kind` | `confirmation`（GenericConfirmationUIManager）或 `negotiation_confirm`（NegotiationTablet/Confirm：超预算仍要卖的确认框） |
+| `target` | `generic_confirmation` / `negotiation_tablet_confirm` |
+| `body` / `confirm_text` / `cancel_text` | 玩家可见文字 |
+| `confirm_enabled` / `cancel_enabled` | 原生选项是否可点；disabled 时 `answer_prompt` 返回 `choice_unavailable`（0 次点击） |
+| `single_button` | 只有一个选项 |
+
+- `answer_prompt(choice="confirm"|"cancel")` 按 `kind`/`target` 路由到对应原生 public 回调；**正式流程不要用 `press`**。
+- 成功：`prompt_closed:true` + `state.shop_state` 回读——“面板关了”与“确认的动作真的发生”是两个事实。
+- 失败关闭：两个模态同时打开 → `get_pending_prompt` 与 `answer_prompt` 都返回 `prompt_ambiguous`，**不点任何按钮**；
+  模态在读到回答之间变化 → `prompt_changed` + `dispatched:false`；点后仍未关闭 → `prompt_readback_mismatch`（不得当成功）。
+- typed 路径“已就绪”不等于 Play 已放开：`play_allowlist` 当前为空，正式 Play 仍是 `BLOCKED_BY_PLAY_POLICY`。
+
+### 6.2 覆盖层 typed dismissal（R5-B2b）
+
+`close_windows()` 除纸面/自定义窗口外，还会调用原生按钮关闭两个无适配器覆盖层
+（教程提示覆盖层 `_ControlOverLay/CloseOverlayButton`、对话/打字机设置 `_DialogueOptionUI/Panel/{Apply,Close}Button`）：
+
+- `closed` 列表可能出现 `"overlays"`；`remaining` 必须干净；
+- 覆盖层仍在 → `window_readback_mismatch`（不是成功）；
+- **不要**为了关覆盖层改用 `press`。
+
 ---
 
 ## 7. 关店与睡觉（两个动作、两种语义，D3 已冻结）
@@ -429,6 +456,9 @@ A→B→A 切换、同一顾客连续多笔都支持：对同一顾客重复 `st
 | `version_locked` | 游戏版本/MVID 不匹配写门禁 | 停机；记录 `NOT_RUN` |
 | `stale_rev` | rev 已过期、**未派发** | 重新 `get_state()` → 重新决策 → 单次重试 |
 | `prompt_pending` / `confirmation_required` | 原生弹窗占用输入 | `get_pending_prompt()` → `answer_prompt()` |
+| `prompt_ambiguous` | 两个原生模态同时占用输入 | 停止：不猜测回答，记录后要求人工检查 |
+| `prompt_changed` | 读到回答之间模态已变化（未派发） | 重新 `get_state()`/`get_pending_prompt()` 后再决定 |
+| `choice_unavailable` | 目标选项在原生界面不可点 | 不要换 index/换按钮猜；重新读弹窗状态 |
 | `no_dialogue` / `dialogue_unavailable` | 当前没有可读对话 | 重新 `get_state()`；不要猜对话内容 |
 | `invalid_argument` | 参数校验失败、未派发 | 修正参数（字段见返回 `field`），不要原样重试 |
 
@@ -512,6 +542,9 @@ A→B→A 切换、同一顾客连续多笔都支持：对同一顾客重复 `st
   以及 uncertain 后的 `get_state().negotiated_item` 回读；
 - 关店/换天/落盘：`shop_closed_after`、`readback.day_advanced`、`day_changed`、`save_evidence`、
   `save_completed`、`save_unknown`；
+- 原生弹窗（R5-B2）：`kind`、`target`、`body`、`confirm_text`、`cancel_text`、`confirm_enabled`、
+  `cancel_enabled`、回答后的 `prompt_closed` 与 `state.shop_state`；
+- 覆盖层（R5-B2b）：`close_windows` 的 `closed`（含 `"overlays"`）、`remaining`；
 - 动作前后关键状态摘要：`day`、`shop_state`、`cash`、`inventory_count`、`back_counter_count`、
   `rent.days_left`、`rent.rent_paid_total`、`rent.last_payment.id`；
 - 租金回执、停止原因与最后一条成功证据。

@@ -64,6 +64,17 @@ namespace PawnMind.Bridge
         public ActionResult AnswerPrompt(string choice)
         {
             PromptSnapshot before = PromptPolicy.ReadSafe(promptPort);
+
+            // R5/B2: an ambiguous read must not collapse into a generic
+            // no_prompt answer: the caller needs the same actionable code the
+            // read reported (two native modals own the input; answer nothing).
+            if (!before.Readable
+                && string.Equals(before.Error, PromptErrors.PromptAmbiguous,
+                    StringComparison.Ordinal))
+            {
+                return Failure(OpAnswer, PromptErrors.PromptAmbiguous, false, before);
+            }
+
             string validation = PromptPolicy.ValidateAnswer(before, choice);
             if (validation != null)
             {

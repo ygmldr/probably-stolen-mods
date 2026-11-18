@@ -124,6 +124,9 @@ namespace PawnMind.Tests
 
             JObject answer = Answer(harness, PromptChoices.Confirm);
             Assert.False((bool)answer["ok"], "an ambiguous modal is not answered");
+            Assert.Equal(PromptErrors.PromptAmbiguous, (string)answer["error"],
+                "the answer surfaces the same ambiguity the read reported");
+            Assert.False((bool)answer["dispatched"], "nothing was dispatched");
             Assert.Equal(0, harness.Prompt.AnswerCalls, "no native click on ambiguity");
         }
 
