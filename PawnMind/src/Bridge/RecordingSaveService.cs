@@ -605,6 +605,10 @@ namespace PawnMind.Bridge
             row["op"] = op;
             row["dispatched"] = true;
             row["load_requested"] = true;
+            // R5/A1 + W-A4-1: a real load is a run-changing request; the claim
+            // keeps the documented response contract and lets the router decide
+            // from the service fact instead of the op-name fallback.
+            row["run_change"] = ActionResult.ClaimIssued;
             row["state"] = StateText(status.State);
             row["bound"] = status.Bound;
             row["load_pending"] = status.LoadPending;

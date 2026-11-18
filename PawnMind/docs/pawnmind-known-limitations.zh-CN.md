@@ -167,7 +167,10 @@ DEPRECATED: reflection-external refused by the game update of December 10, 2026
 - `press` / `act` 是 **test-only** 通道（`run_mode=test` + `UiPressPolicy` 白名单），
   **正式 Play 永远不依赖、不放开通用按键**；若是某工作流“必须 press 才能过”，停止并报告，不要把它写成 Play 能力。
 - §10.1 历史文本写“只对三个覆盖层按钮放行”；R4 代码 `UiPressPolicy` 实际已有**第四个日终确认路径**（`/Confirm/Buttons/Button`）。
-  该 test-only 路径不是 Play 能力，源码注释漂移由 Lead 负责同步；日终 typed 玩家等价动作（R5/B2）**未实现/未验证**（`NOT_RUN`）。
+  该 test-only 路径不是 Play 能力；`UiPressPolicy` 注释已在 `c3f34bb6` 同步（四个路径 + test-only 标识）。
+- 日终 typed 玩家等价动作（R5/B2）：**已实现并合入**（`a0ac8848`，`get_pending_prompt`/`answer_prompt`
+  的 `negotiation_confirm` 模态 + `close_windows` 的 typed overlay dismissal `643003c9`），离线 L1 测试通过；
+  **真机 L3 = `NOT_RUN`**（无 Windows 授权）。正式 Play 不再需要 `press` 完成这两类阻塞。
 
 ### 11.5 测试覆盖（旧 §8 的 “Python 8 项” 已过时）
 

@@ -255,6 +255,27 @@ namespace PawnMind.Tests
         }
 
         /// <summary>
+        /// R5-RUN-07 (reviewer A W-A4-1): the real load is a run-changing
+        /// request, so its success response must carry the same explicit
+        /// `run_change:"issued"` claim the Skill/benchmark documents promise.
+        /// Without it the conservative op-name fallback applies, but the
+        /// documented field is missing.
+        /// </summary>
+        [Test]
+        public static void R5_RUN_07_A_Real_Load_Claims_Issued()
+        {
+            RecordingHarness harness = RecordingHarness.Create();
+            harness.Bind();
+            harness.StatePort.State = RecordingTestData.MainMenu();
+
+            ActionResult result = harness.Service.LoadRecordingGame();
+
+            Assert.True(result.Ok, "the load request is accepted: " + result.Error);
+            Assert.Equal(ActionResult.ClaimIssued, (string)Json(result)["run_change"],
+                "a real load requests a run-changing native action");
+        }
+
+        /// <summary>
         /// R5-RUN-05: the pre-existing real-load protection must not regress.
         /// </summary>
         [Test]
