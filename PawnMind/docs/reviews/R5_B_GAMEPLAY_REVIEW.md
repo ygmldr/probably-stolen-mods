@@ -1,12 +1,12 @@
 # R5_B_GAMEPLAY_REVIEW — R5-B（B1/B2/B2b）独立玩家等价审计
 
 > 审计者：`reviewer-b`（fresh context，未参与 R5-B 任何实现；本轮实现者另有其人）。
-> 审计时间：2026-11-18T20:47Z – 21:15Z（Linux CT101，**无 Windows、无游戏进程、无存档操作、无网络、无 DLL 安装、无 dev/scan、无 Workshop、未运行 build.sh/dist**）。
+> 审计时间：2026-11-18T20:47Z – 21:25Z（Linux CT101，**无 Windows、无游戏进程、无存档操作、无网络、无 DLL 安装、无 dev/scan、无 Workshop、未运行 build.sh/dist**）。
 > 分支：`r5/overnight`。审计目标快照：**`49a9f566`**（B1 docs sync；B1=`704b5b88`、B2=`a0ac8848`、B2b=`643003c9`）。
 > 说明：
-> 1. 审计期间 `r5/overnight` 已前移到 `5fd83cc4`（仅改 `known-limitations` 与 `R5_BASELINE` 两份文档，`git diff --stat 49a9f566..5fd83cc4` = 2 files / +17/-5）；**代码与测试与 49a9f566 完全相同**，因此本审计的构建/测试结论对分支尖端同样成立。所有测试都在独立 worktree `_internal/review-b-worktree@49a9f566` 上运行，不用主工作树。
-> 2. 本审计唯一写入的文件就是本 review 文档；未修改生产代码/测试，未 `git add`/`commit`，未构建 `dist/`。
-> 3. 证据分级：**VERIFIED** = 本次实际运行或实际读源码/反编译并给出文件行号；**REPORTED** = 提交信息/历史文档声明，本次未独立复现；**NOT_RUN** = 环境/授权不允许（Windows L3、真机、存档、扫描器）。
+> 1. 审计期间 `r5/overnight` 从 `49a9f566` 前移到 `6493a553`（中间为 C 阶段离线提交与本 review 文档本身；`git diff --name-only 49a9f566..6493a553` **不含 B1/B2/B2b 生产代码或测试**，含 `agent/fake_game.py`、C 报告/测试与 docs）。因此本审计对 B 代码的构建/测试结论对已提交分支尖端同样成立。所有测试都在独立 worktree `_internal/review-b-worktree@49a9f566` 上运行，不用主工作树。
+> 2. 本审计唯一写入的文件就是本 review 文档；未修改生产代码/测试，未 `git add`/`commit`，未构建 `dist/`。审计结束时共享工作树存在其他 teammate 的**未提交**改动（C4 fake 场景、以及针对本 review WARN 的文档/代码修复等）；那些改动不在本审计目标提交内，本审计未运行/未验证它们。
+> 3. 证据分级：**VERIFIED** = 本次实际运行或实际读源码/反编译并给出文件行号（行号均按 `49a9f566` 快照）；**REPORTED** = 提交信息/历史文档声明，本次未独立复现；**NOT_RUN** = 环境/授权不允许（Windows L3、真机、存档、扫描器）。
 
 ---
 
@@ -149,7 +149,7 @@ PYTHONPATH=$PWD /root/work/game_mods/PawnMind/.venv/bin/python -m unittest disco
 | 歧义/不可读/disabled/changed 模态在派发前拒绝 | **VERIFIED** | 歧义：adapter `52–62`；不可读：各 read 返回 `Unreadable(ReadFailed)`，`PromptPolicy.ValidateAnswer`（`PendingPrompt.cs:197–218`）→ 拒绝；disabled：`PromptPolicy` 先查 `ConfirmEnabled`，adapter 在点击前用实时 read 再查（`AnswerNegotiationConfirm` `320–351`）；changed：`AnswerNegotiationConfirm` 重新 `ReadNegotiationConfirm`，不 readable/open → `NotDispatched(PromptChanged)`（`320–326`）；generic 同样重读（`279–286`）。测试：`R5_MODAL_04/05/07`。 |
 | 回答后回读 `prompt_closed` + `shop_state`；mismatch 永不 ok | **VERIFIED** | `PromptService.AnswerPrompt`（`PromptService.cs:64–148`）：`!outcome.Dispatched` → `dispatched:false` + 错误码（`104–114`）；`outcome.Error` → `dispatched:true` + 错误（`116–124`）；之后 `ReadSafe` 必须 `IsClosed`，否则 `prompt_readback_mismatch` + `readback`（`126–136`）；成功行 `ok=true, prompt_closed=true, state=<day/cash/outside/location/shop_state>`（`138–147`），`PromptJson.StateSummary`（`PromptJson.cs:56–76`）。测试 `R5_MODAL_02/06`、既有 `Answer_Panel_Still_Open_Is_Readback_Mismatch`/`Answer_Unreadable_After_Click_Is_Readback_Mismatch`。 |
 | 旧 generic confirmation 行为未回归 | **VERIFIED** | 全量 864/0 含既有 `PromptServiceTests` 全部用例；diff 只加 target/enabled 字段与“点击前实时校验”，未删除旧断言（`a0ac8848 --numstat`：PromptService 43/2、PendingPrompt 121/8、PromptAdapter 327/18、PromptServiceTests 6/2、PromptTestFakes 45/4）。`Answer_State_Read_Failure_Still_Reports_Verified_Close` 等旧语义保留。 |
-| 原生面板来源与 yes/no 语义 | **VERIFIED（只读反编译）** | `_decomp/NegociationUIManager.cs:1510–1527`：`OpenConfirmPanel` 清空 `confirmButtonHost` 后 `BigButton(x=57,"yes",OnConfirmPanelYes)`、`BigButton(x=57+200+16,"no",OnConfirmPanelNo)` → **是/否 = 左/右**，与 adapter 的 x 排序一致；`TabletUI.cs:365–398` 的 `BigButton` 把 `onClick` 挂到 `Button.onClick`，即玩家点击触发同一回调。`PromptTargets` 的窗口身份来自 `NegotiationTabletFrame.confirmRoot`（`_decomp/NegotiationTabletFrame.cs:33–37`）。契约测试钉住这些成员（`PawnMind.AdapterTests/Program.cs:691–703`；`TabletButton.Interactable/label` 见 `339–341`，`NegociationUIManager.IsOpen` 见 `731`）。 |
+| 原生面板来源与 yes/no 语义 | **VERIFIED（只读反编译）** | `_decomp/NegociationUIManager.cs:1510–1527`：`OpenConfirmPanel` 清空 `confirmButtonHost` 后 `BigButton(x=57,"yes",OnConfirmPanelYes)`、`BigButton(x=57+200+16,"no",OnConfirmPanelNo)` → **是/否 = 左/右**，与 adapter 的 x 排序一致；`TabletUI.cs:365–398` 的 `BigButton` 把 `onClick` 挂到 `Button.onClick`，即玩家点击触发同一回调。`PromptTargets` 的窗口身份来自 `NegotiationTabletFrame.confirmRoot`（`_decomp/NegotiationTabletFrame.cs:33–37`）。契约测试钉住这些成员（`PawnMind.AdapterTests/Program.cs:684,691–698`；`TabletButton.Interactable/label` 见 `339–341`，`NegociationUIManager.IsOpen` 见 `731`）。 |
 | 面板语义核对（相对 handoff 的“日终确认框”） | **VERIFIED（反编译），见 W-B2-3** | `OpenConfirmPanel` 全仓只有两个调用点：`NegociationUIManager.OnSellAllClick`（客户端预算不够买完台上的货，`_decomp/NegociationUIManager.cs:821–838`）与 `PlayerStore.SellItemFromTable`（`CanSellItemFromTable()==false` 但 `ignoreBudget` 版为真，`_decomp/PlayerStore.cs:2793–2819`）——即**“超预算仍要卖”的确认框**，不是 `end_day` 直接弹出的框；`PlayerStore.EndDay`（`1682–1687`）不打开它。真正的“有顾客排队时关店”确认是 `StoreUIManager.closeShutterConfirmationPanel`（`_decomp/StoreShutterButton.cs:83–88,255–258`），那一个未被 B2 类型化；但桥的 `end_day` 路径不可达它：`dismiss_waiting=true` 直接走 `EndAndClose`（`GameState.cs:841–856`），`dismiss_waiting=false` 在 `client_still_present`/`customers_waiting` 前置即被拒（`FirstWeekService.cs:149–183`）。因此 B2 类型化的正是首周实机阻塞流程里被 `press` 点的那个面板，但“end_day 会 raise 它”的说法不准确（见 W-B2-3）。 |
 
 ### 2.2 审计发现（WARN）
@@ -232,15 +232,15 @@ PYTHONPATH=$PWD /root/work/game_mods/PawnMind/.venv/bin/python -m unittest disco
 | PLAYER_ENTRY_MATRIX | 新增 OP-063 `stage_negotiation_item`（write；player_entry/guard/business_effect/evidence_source/min_test 均填写；`_decomp/PlayerStore.cs:2873-2920` 与 `_decomp/EmporiumEntry.cs:318-327` 引用正确）。措辞精度见 W-B1-4。 |
 | validator / fixtures | `VALIDATOR_VERSION=1.3.0`（`trace_validator.py:169`）、schema 2；`CALL_SCOPED_OPS` 与 Core.PendingScope 一致（`:243`）；8 个 fixture 实测 5×exit0 + 3×exit1，code/relation 与 `EXPECTED_CODES`（`test_trace_validator.py:1617–1628`）一致；scoped 117 OK。 |
 | Skill / benchmark | B1 部分完整：工具数 117/107、policy sha 基线、staging 工作流、completed/uncertain 判据、稳定拒绝码（`SKILL.md:10,29,110,228–259,437–445,554,558–559`；`FIRST_WEEK_BENCHMARK_SPEC.md:10–11,78,112–113,141`）。**B2/B2b 部分缺失**，见 W-B2-4。 |
-| adapter contract | B1 +11 checks 覆盖 `PlayerStore.AddedItemToWeightedArea/RemovedItemToWeightedArea`、`GameGridInventory.Expel`、`GameInventory.MayHaveValidInventorySlot`、`NegociationUIManager.uiObject`、`CustomUIManager.GetWindow`、`CustomUIWindow.root/IsAlive`、`GenericConfirmationUIManager.panel`；B2 +13 checks 覆盖 `NegotiationTabletFrame.confirmRoot/confirmText/confirmButtonHost`、`NegociationUIManager.OnConfirmPanelYes/No/Instance`、`GenericConfirmationUIManager.confirmButton`。adapter 用到的 `TabletButton.Interactable/label`、`NegociationUIManager.IsOpen`、`EmporiumEntry.backInvinvElement`、`PlayerStore.GetCurrentlyNegociatedItem`、`GeneralHelper.IsItemOwned`、`CustomUIManager.GetLayerRoot` 等均有既有/新增 check（`Program.cs:96,138,140,151,166,170,177–196,339–341,691–703,731`）。整体 contract 526 OK。 |
+| adapter contract | B1 +11 checks 覆盖 `PlayerStore.AddedItemToWeightedArea/RemovedItemToWeightedArea`、`GameGridInventory.Expel`、`GameInventory.MayHaveValidInventorySlot`、`NegociationUIManager.uiObject`、`CustomUIManager.GetWindow`、`CustomUIWindow.root/IsAlive`、`GenericConfirmationUIManager.panel`；B2 +9 checks 覆盖 `NegotiationTabletFrame.confirmRoot/confirmText/confirmButtonHost`、`NegociationUIManager.OnConfirmPanelYes/No/Instance`、`GenericConfirmationUIManager.confirmButton`。adapter 用到的 `TabletButton.Interactable/label`、`NegociationUIManager.IsOpen`、`EmporiumEntry.backInvinvElement`、`PlayerStore.GetCurrentlyNegociatedItem`、`GeneralHelper.IsItemOwned`、`CustomUIManager.GetLayerRoot` 等均有既有/新增 check（`Program.cs:96,138,140,151,166,170,177–196,339–341,684,691–698,731`）。整体 contract 526 OK。 |
 | Play 面 | `play_allowlist=[]`（`tool_policy.play_allowlist` 要求 live evidence，全为空），`allowed_tools_for_mode("play")=[]`；B1/B2/B2b 均未进入 Play。**Play 仍 BLOCKED_BY_PLAY_POLICY（不是 PASS 也不是 FAIL）**。 |
 | 仓库卫生 | `git ls-files -s`：`test.sh`、`test/ContractGate.Tests/run.sh` 均 **100755**（`b07186e1` 修复生效），本次 C# 门禁因此实际执行了 53 项 gate（此前干净 worktree 会静默跳过）。 |
 
 **文档漂移（不阻塞 B 判据，建议收口）：**
 - `PawnMind/README.md:7,16` 与根 `README.md:101,135` 仍写“116 个工具 / recording 106”，B1 后应为 117/107；这两个文件不在 B1 声明的同步集（AGENTS/Skill/benchmark/validator/inventory/matrix/catalog）内，但属面向用户的过时事实（既有漂移，B1 使其多偏 1）。
-- `docs/audit/R5_NEXT_LIVE_SESSION.md:33` 仍写 “trace validator v1.2.0”，而 `49a9f566` 已升 1.3.0（该文件是 B 交付物，应随之更新；分支尖端 `5fd83cc4` 也未修）。
+- `docs/audit/R5_NEXT_LIVE_SESSION.md:33` 仍写 “trace validator v1.2.0”，而 `49a9f566` 已升 1.3.0（该文件是 B 交付物，应随之更新；截至 `6493a553` 也未修）。
 - `docs/audit/mcp-tools-{full,recording}.json` 是历史快照（114/104），并非当前清单；RFC 已标注其历史定位，不作同步要求。
-- `docs/pawnmind-known-limitations.zh-CN.md:11.5` 把“typed 日终弹窗”列在“仍未覆盖/未验证”中，而 §11.4 说“已实现并合入、L3 NOT_RUN”；语义应为“L3 未验证”，建议措辞统一（分支尖端已部分改写，但 49a9f566 快照存在该歧义）。
+- `docs/pawnmind-known-limitations.zh-CN.md:11.5` 把“typed 日终弹窗”列在“仍未覆盖/未验证”中，而 §11.4 说“已实现并合入、L3 NOT_RUN”；语义应为“L3 未验证”，建议措辞统一（`5fd83cc4` 已改为“typed 日终弹窗真机”，歧义基本消除；49a9f566 快照的该行仍为旧措辞）。
 
 ---
 
