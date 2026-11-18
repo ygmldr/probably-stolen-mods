@@ -1,8 +1,10 @@
 # MOD_SCANNER_ROUND4 — 官方 ModScanner 证据（Round 4 / F7）
 
-> **结论：`LIVE / Scanner = NOT_RUN`，`Workshop = BLOCKED`。**
-> 本文只包含**静态**（SRC）分析与供操作者执行的采集步骤。**没有任何一行是扫描器输出**，
-> 也没有把"按官方文档推断"写成"已扫描确认"。
+> **结论：`LIVE mod-scan = NOT_RUN`，`Workshop = BLOCKED`；但 `files` 已被
+> 游戏加载器自己的审计行 LIVE 确认。**
+> §1–§4 是静态（SRC）分析与采集步骤；§5 是 2026-11-18 实机采集到的
+> 加载器审计行与 `/health` 指纹。**仍没有 `mod-scan` 的逐条 finding 输出**，
+> 因此不把"预测"改写成"扫描确认"。
 
 ## 0. 为什么没有跑
 
@@ -122,3 +124,87 @@ git rev-parse HEAD
 | `R4-F7-05` 区分"当前可启动"与"2026-12-10 后可启动" | **DONE**（§3.2） |
 
 > **Gate C = BLOCKED。** 不得用静态分析或单元测试替代 LIVE 扫描结论。
+
+---
+
+## 5. LIVE 证据（2026-11-18 23:19–23:23，用户启动游戏）
+
+游戏侧文件全部是**只读采集**：用户自己启动游戏；Agent 未启动、未操作游戏，
+未读写任何存档。
+
+### 5.1 加载器审计行（决定性）
+
+`%LOCALAPPDATA%Low\Questing Goose Studio\Probably Stolen\mod-audit.log`
+（2026-11-18T15:21:41Z ≈ 本地 23:21）：
+
+```
+[ModLoader] audit: pawnmind v0.3.0 source=Local workshop=0 owner=0 running=True
+  trust=DeveloperMode caps=files, network, reflection-external hash=cb148a74…
+[ModLoader] Loading: PawnMind.dll
+[PawnMind] loaded PawnMind · AI Bridge v0.3.0
+```
+
+对照 `manifest.xml`（`<Capability>network</Capability>` + `reflection-external`）：
+
+| | 集合 |
+|---|---|
+| `declared` | `network`, `reflection-external` |
+| 加载器报告的 `caps` | **`files`**, `network`, `reflection-external` |
+| 差异 | **`files` 被检测到但未声明** |
+
+**这直接证实了 §3 的预测 C1/C2。** 该 Mod 当前之所以能运行，是因为
+`trust=DeveloperMode`（开发者模式跳过"未声明的能力"检查，见官方指南
+*Developer mode*）。在一台普通玩家机器上，`detected ⊄ declared` 会**拒绝激活**。
+
+> 因此 F7 的发布结论不需要再等 `mod-scan` 才能定性：**`files` 必须处理**。
+> 仍需要 `mod-scan` 的是：逐条 finding 的 `Type.Method -> 引用`、
+> `DEPRECATED` 行、`from December 10, 2026` 列表与 `fingerprint:`。
+
+### 5.2 `/health` 指纹（LIVE）
+
+```json
+{"ok":true,"name":"pawnmind","version":"0.3.0","mod_version":"0.3.0",
+ "game_version":"VERSION 100-Rev13",
+ "game_assembly_mvid":"911508a6-e0eb-4cc0-91e8-e14b16ea28d7",
+ "expected_game_version":"VERSION 100-Rev13",
+ "expected_assembly_mvid":"911508a6-e0eb-4cc0-91e8-e14b16ea28d7",
+ "write_gate":"open","write_gate_reason":null,
+ "latest":"UNVERIFIED","latest_verified":false,
+ "run_mode":"locked","run_mode_error":"run_mode_missing",
+ "policy_schema":"2",
+ "policy_sha256":"e0da5a24a0c21014db57ee842413ef4d6d10ac0e1dca3545dea417490f22d1cc",
+ "play_ready":false}
+```
+
+- 运行中的 MVID = 仓库记录的 0.46D MVID = 我用 `dll_fingerprint.py` 从
+  `Assembly-CSharp.dll` 读出的 MVID → **三方一致**；
+- `policy_sha256` 与仓库 `tool_policy.json` / `PolicyCatalog.g.cs` 一致
+  → 已安装 DLL 确实由本仓库策略构建（与 §1 的 SHA 一致互为佐证）；
+- `run_mode:"locked"` + `run_mode_error:"run_mode_missing"`：
+  `ModData/pawnmind/bridge.conf` 里没有 `run_mode`，因此除 `/health` 外全部拒绝。
+  **这是设计内的 fail-closed**，不是故障；也意味着此刻 MCP 会解析成 `locked`
+  （F5b 的行为在实机上一致）。
+- `play_ready:false`、`latest:"UNVERIFIED"`：未做任何玩法验证。
+
+### 5.3 为什么还没有 `mod-scan`
+
+用户按了 F8，但 `Player.log` 记录：
+
+```
+[DevTools] Developer tools disabled: no dev.txt next to the executable
+  (D:\Program Files\steam\steamapps\common\Probably Stolen\dev.txt).
+```
+
+官方指南要求游戏根目录存在 `dev.txt`，且**只在启动时检查一次**。
+2026-11-18 23:23 已创建空 `dev.txt`；需要**重启游戏**后 F8 才会响应。
+采集完成后请删除 `dev.txt`（它会同时打开 F9 开发菜单，那个菜单能直接改存档）。
+
+### 5.4 更新后的 Gate C
+
+| 门槛 | 状态 |
+|---|---|
+| `R4-F7-01` 原始 scanner 日志 + 指纹 | 指纹 **LIVE 完成**（§5.2）；`mod-scan` 原始输出 **NOT_RUN** |
+| `R4-F7-02` 每项 finding 有定位与 disposition | `files` **LIVE 确认**（§5.1）；逐条定位仍待 `mod-scan` |
+| `R4-F7-03` 复扫无硬拒绝 | **BLOCKED**（`files` 未声明 → 普通玩家激活会被拒） |
+| `R4-F7-04` 已安装 DLL 与本轮构建匹配 | **PASS**（§1） |
+| `R4-F7-05` 区分"当前可启动"与"2026-12-10 后" | **DONE**；注意 §5.1 表明"当前可启动"依赖开发者模式 |

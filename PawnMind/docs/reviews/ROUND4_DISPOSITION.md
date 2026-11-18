@@ -162,10 +162,12 @@ C# 仍是最终门禁。
 
 ## 5. F7 — 官方 ModScanner
 
-- **LIVE = NOT_RUN**（Agent 不得启动游戏）。
-- 静态预测与 disposition：`docs/audit/MOD_SCANNER_ROUND4.md`。
-- 关键预测：`files` **未声明**但被 `ScreenCapture`（`ScreenshotService.cs:157`）
-  与 `System.IO.Directory/FileInfo`（196–207）触发 → **激活会被拒**。
+- `mod-scan` 原始输出：**NOT_RUN**（Agent 不启动游戏；用户按 F8 时 `dev.txt` 缺失，
+  已补建，待重启后采集）。
+- **`files` 预测已被 LIVE 确认**：游戏加载器的审计行在 2026-11-18 23:21 报告
+  `caps=files, network, reflection-external`，而 `manifest.xml` 只声明后两者；
+  当前能运行仅因 `trust=DeveloperMode`。普通玩家机器上 `detected ⊄ declared` → 拒绝激活。
+- 静态预测与完整 disposition：`docs/audit/MOD_SCANNER_ROUND4.md`（§3 预测、§5 LIVE）。
 - `reflection-external` 已声明，但 `NewGameMenuAdapter.cs:400` 的
   `view.GetType()` 是 computed type，属于官方**计划于 2026-12-10 拒绝**的能力。
   `SlotView` 是私有嵌套类（`_decomp/NewGamePerksUI.cs:7`），没有 `typeof()` 替代。

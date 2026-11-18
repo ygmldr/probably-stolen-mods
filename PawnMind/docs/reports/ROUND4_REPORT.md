@@ -131,7 +131,7 @@ REQUIRE_GAME=1 ./test.sh
 
 | # | 风险 / 缺口 | 级别 | 下一步 |
 |---|---|---|---|
-| 1 | F7 无官方 `mod-scan` 输出；静态预测 `files` **未声明**（`ScreenCapture` + `System.IO`） | **发布阻塞** | 操作者按 `MOD_SCANNER_ROUND4.md` §4 采集 |
+| 1 | F7：**LIVE 已确认**加载器检测到 `files` 而清单未声明（仅靠 `DeveloperMode` 才能运行）；`mod-scan` 逐条输出仍缺 | **发布阻塞** | 重启游戏（已补 `dev.txt`）→ F8 → `mod-scan pawnmind` |
 | 2 | ~~已安装 DLL ≠ 本轮构建~~ | **已解决** | 2026-11-18 覆盖安装 `6adef8ac…`，与 `dist` 逐字节一致；旧版备份在 `_internal/install-backup-2026-11-18/` |
 | 3 | `reflection-external`（`NewGameMenuAdapter.cs:400` computed type）2026-12-10 起被拒 | 高 | 向作者申请公开访问器，或放弃逐行 perk 读取 |
 | 4 | 跨局未确认期间的**普通写**未被阻止 | 中 | L3 前由 Skill 流程覆盖；如需硬保证要设计"切换窗口"锁 |
