@@ -255,8 +255,9 @@ namespace PawnMind.Tests
         {
             var port = new FakeTradePort();
             port.Evidence.BusinessComplete = false;
-            // A silent return moved nothing: that is the fact under test.
+            // A silent return moved nothing and charged nothing.
             port.Evidence.ItemsTransferred = false;
+            port.Evidence.CashAfter = port.Evidence.CashBefore;
 
             JObject json = Run(new TradeService(port));
 
@@ -334,12 +335,56 @@ namespace PawnMind.Tests
             port.Guard.StagedItemOwned = true;
             port.Evidence.BusinessComplete = false;
             port.Evidence.ItemsTransferred = false;
+            port.Evidence.CashAfter = port.Evidence.CashBefore;
 
             JObject json = Run(new TradeService(port), "sell");
 
             Assert.False((bool)json["ok"], "nothing moved is not a sale");
             Assert.Equal("uncertain", (string)json["execution_status"], "uncertain");
             Assert.Equal("business_not_complete", (string)json["detail"], "stable detail");
+        }
+
+        /// <summary>
+        /// R4-TRADE-04: buying from a customer keeps currentNegociatedItem on the
+        /// bought item, so the staged-id pointer does not move. The cash delta is
+        /// the evidence that the trade happened.
+        /// </summary>
+        [Test]
+        public static void R4_TRADE_04_Purchase_Is_Proven_By_The_Cash_Delta()
+        {
+            var port = new FakeTradePort();
+            port.Guard.StagedItemOwned = false;      // buying the customer's item
+            port.Evidence.BusinessComplete = false;
+            port.Evidence.ItemsTransferred = false;  // pointer stays on the item
+            port.Evidence.CashBefore = 700;
+            port.Evidence.CashAfter = 675;
+
+            JObject json = Run(new TradeService(port), "buy");
+
+            Assert.True((bool)json["ok"], "money moved, so the purchase completed");
+            Assert.Equal("completed", (string)json["execution_status"], "completed");
+            Assert.False((bool)json["visit_complete"], "the visit may continue");
+            Assert.True((bool)json["cash_moved"], "the cash delta is the evidence");
+            Assert.False((bool)json["items_transferred"], "the pointer did not move");
+        }
+
+        /// <summary>
+        /// R4-TRADE-05: neither the item nor money moved -> still uncertain.
+        /// </summary>
+        [Test]
+        public static void R4_TRADE_05_Nothing_Moved_No_Cash_Is_Uncertain()
+        {
+            var port = new FakeTradePort();
+            port.Guard.StagedItemOwned = false;
+            port.Evidence.BusinessComplete = false;
+            port.Evidence.ItemsTransferred = false;
+            port.Evidence.CashBefore = 700;
+            port.Evidence.CashAfter = 700;
+
+            JObject json = Run(new TradeService(port), "buy");
+
+            Assert.False((bool)json["ok"], "nothing moved is not a purchase");
+            Assert.Equal("uncertain", (string)json["execution_status"], "uncertain");
         }
 
         /// <summary>
@@ -448,6 +493,7 @@ namespace PawnMind.Tests
             var port = new FakeTradePort();
             port.Evidence.BusinessComplete = false;
             port.Evidence.ItemsTransferred = false;
+            port.Evidence.CashAfter = port.Evidence.CashBefore;
             ActionRouter router = Router(port);
 
             string response = router.Handle(

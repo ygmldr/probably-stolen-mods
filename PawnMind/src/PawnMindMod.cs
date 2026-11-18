@@ -809,6 +809,11 @@ public sealed class PawnMindMod : IMod
             case "get_ui_snapshot":
                 return ActionResult.SuccessRaw("get_ui_snapshot", UiSnapshot.BuildJson());
 
+            case "press":
+                // Only reachable when the recording guard released it (test mode);
+                // UiSnapshot.Press applies the overlay-only allowlist.
+                return UiSnapshot.Press((string)request["control_id"]);
+
             case "confirm_trade":
                 return GameActions.ConfirmTrade(
                     ReadInt(request, "item_id", -1),

@@ -106,11 +106,17 @@ namespace PawnMind.Bridge
 
             // R4: two different facts.
             //   business_complete = the customer finished their whole visit;
-            //   items_transferred = THIS item left the negotiation table.
+            //   this-trade evidence  = the item left the table OR money moved.
             // A customer buying several items is "visit open" after each sale, so
             // requiring business_complete made a real sale look unproven (and, being
             // non-terminal, it then blocked every later confirm_trade).
-            bool tradeProven = evidence.ItemsTransferred && evidence.ClientUnchanged;
+            //
+            // A purchase keeps `currentNegociatedItem` on the bought item, so the
+            // staged-id pointer alone is not enough for the buy direction: the cash
+            // delta is the other half of the same fact.
+            bool cashMoved = evidence.CashBefore != evidence.CashAfter;
+            bool tradeProven = (evidence.ItemsTransferred || cashMoved)
+                && evidence.ClientUnchanged;
             if (!evidence.BusinessComplete && !tradeProven)
             {
                 // PP-TRADE-06: the native button returned without completing the
@@ -137,9 +143,9 @@ namespace PawnMind.Bridge
             row["business_complete"] = evidence.BusinessComplete;
             row["visit_complete"] = evidence.BusinessComplete;
             row["items_transferred"] = evidence.ItemsTransferred;
+            row["cash_moved"] = evidence.CashBefore != evidence.CashAfter;
             row["client_unchanged"] = true;
             row["staged_item_id"] = guard.StagedItemId;
-            row["items_transferred"] = evidence.ItemsTransferred;
             row["cash_before"] = evidence.CashBefore;
             row["cash_after"] = evidence.CashAfter;
             // Barter can complete with zero cash movement: the cash delta is
@@ -201,6 +207,7 @@ namespace PawnMind.Bridge
             row["business_complete"] = evidence.BusinessComplete;
             row["client_unchanged"] = evidence.ClientUnchanged;
             row["items_transferred"] = evidence.ItemsTransferred;
+            row["cash_moved"] = evidence.CashBefore != evidence.CashAfter;
             row["cash_before"] = evidence.CashBefore;
             row["cash_after"] = evidence.CashAfter;
             row["staged_item_id_after"] = evidence.StagedItemIdAfter;
