@@ -41,6 +41,7 @@ namespace PawnMind.Game
 
                 snapshot.TabletOpen = AnyTabletOpen();
                 snapshot.MovableVisible = CountVisibleMovable();
+                snapshot.CustomWindowOpen = HasCustomWindow();
                 return snapshot;
             }
             catch (Exception)
@@ -86,6 +87,52 @@ namespace PawnMind.Game
         public void HideMovableWindows()
         {
             WindowsHandler.HideAllMovable();
+        }
+
+        /// <summary>
+        /// Counts the CustomUIWindows that are actually visible.
+        ///
+        /// Deliberately NOT CustomUIManager.HasEscapeTarget(): that only reports
+        /// windows with closeOnEscape, and the wild-network window — the one that
+        /// blocked day 7 of the first week — does not set it. Ask the objects
+        /// themselves instead of trusting a convenient accessor.
+        /// </summary>
+        public bool HasCustomWindow()
+        {
+            CustomUIManager manager = CustomUIManager.Instance;
+            if (manager == null) return false;
+
+            string[] layers =
+            {
+                CustomUIManager.LAYER_FRONT,
+                CustomUIManager.LAYER_PAPER,
+                CustomUIManager.LAYER_REAR,
+                CustomUIManager.LAYER_META,
+                CustomUIManager.LAYER_MENU,
+                CustomUIManager.LAYER_OVERLAY
+            };
+
+            for (int l = 0; l < layers.Length; l++)
+            {
+                Transform root = manager.GetLayerRoot(layers[l]);
+                if (root == null) continue;
+
+                for (int i = 0; i < root.childCount; i++)
+                {
+                    Transform child = root.GetChild(i);
+                    if (child == null || !child.gameObject.activeSelf) continue;
+                    if (child.name.StartsWith("custom_window_", StringComparison.Ordinal))
+                        return true;
+                }
+            }
+
+            return false;
+        }
+
+        public void CloseCustomWindows()
+        {
+            CustomUIManager manager = CustomUIManager.Instance;
+            if (manager != null) manager.CloseAllWindows();
         }
 
         /// <summary>

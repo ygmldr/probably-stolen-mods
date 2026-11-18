@@ -30,6 +30,17 @@ namespace PawnMind.Tests
             if (ThrowOnClose) throw new InvalidOperationException("native_error");
             Closed.Add(WindowKinds.Movable);
         }
+
+        public bool HasCustomWindow()
+        {
+            return Snapshot != null && Snapshot.CustomWindowOpen;
+        }
+
+        public void CloseCustomWindows()
+        {
+            if (ThrowOnClose) throw new InvalidOperationException("native_error");
+            Closed.Add(WindowKinds.Custom);
+        }
     }
 
     internal sealed class WindowHarness
@@ -96,6 +107,25 @@ namespace PawnMind.Tests
             Assert.Equal(2, harness.Port.Closed.Count, "book then movable");
             Assert.Equal(WindowKinds.Book, harness.Port.Closed[0], "book first");
             Assert.Equal(WindowKinds.Movable, harness.Port.Closed[1], "movable last");
+        }
+
+        /// <summary>
+        /// R4-WIN-01: a CustomUIManager window (wild network, appraisal, ...) keeps
+        /// blocking customers even after the shop panels are closed. close_windows
+        /// must close it the way the player's ESC does.
+        /// </summary>
+        [Test]
+        public static void Custom_Windows_Are_Closed_With_CloseAllWindows()
+        {
+            var harness = new WindowHarness();
+            harness.Port.Snapshot = new WindowSnapshot { CustomWindowOpen = true };
+            harness.Port.AfterOverride = new WindowSnapshot();
+
+            JObject json = harness.Json(harness.Service.Close());
+
+            Assert.Equal(1, harness.Port.Closed.Count, "one native close");
+            Assert.Equal(WindowKinds.Custom, harness.Port.Closed[0], "custom kind");
+            Assert.True((bool)json["changed"], "it reports the change");
         }
 
         [Test]

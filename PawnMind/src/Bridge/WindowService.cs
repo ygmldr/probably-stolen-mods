@@ -65,6 +65,10 @@ namespace PawnMind.Bridge
                     {
                         port.HideMovableWindows();
                     }
+                    else if (kind == WindowKinds.Custom)
+                    {
+                        port.CloseCustomWindows();
+                    }
                     else
                     {
                         port.CloseWindow(kind);

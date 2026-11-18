@@ -145,6 +145,11 @@ namespace PawnMind.AdapterTests
             CheckMethod(assembly, "PlayerStore", "CanSellItemFromTable");
             CheckMethod(assembly, "PlayerStore", "SellItemFromTable");
 
+            // R4-WIN: close_windows also closes CustomUIManager windows (ESC parity).
+            CheckType(assembly, "CustomUIManager");
+            CheckMethod(assembly, "CustomUIManager", "CloseAllWindows");
+            CheckMethod(assembly, "CustomUIManager", "GetLayerRoot");
+
             CheckType(assembly, "EndOfDayUIManager");
             CheckMethod(assembly, "EndOfDayUIManager", "OnEndDayButtonClick");
 

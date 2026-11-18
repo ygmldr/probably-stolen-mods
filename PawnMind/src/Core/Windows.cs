@@ -22,6 +22,7 @@ namespace PawnMind.Core
         public const string Deed = "deed";
         public const string Tablet = "tablet";
         public const string Movable = "movable";
+        public const string Custom = "custom";
     }
 
     /// <summary>
@@ -41,6 +42,14 @@ namespace PawnMind.Core
 
         /// <summary>Any tablet panel is open (calendar, clientele, notebook, reputation).</summary>
         public bool TabletOpen;
+
+        /// <summary>
+        /// A CustomUIManager window is open (the wild network, appraisal, ...). These
+        /// are the windows the player closes with ESC; without this the shop UI
+        /// closes but a custom window keeps blocking customers (live session,
+        /// 2026-11-19: day 7 of the first week).
+        /// </summary>
+        public bool CustomWindowOpen;
 
         /// <summary>True when nothing this op can close is on screen.</summary>
         public bool Clean
@@ -63,6 +72,12 @@ namespace PawnMind.Core
 
         /// <summary>Hide every movable window (WindowsHandler.HideAllMovable).</summary>
         void HideMovableWindows();
+
+        /// <summary>True when a CustomUIManager window would close on ESC.</summary>
+        bool HasCustomWindow();
+
+        /// <summary>CustomUIManager.CloseAllWindows: what the player's ESC does.</summary>
+        void CloseCustomWindows();
     }
 
     public static class WindowRules
@@ -83,6 +98,7 @@ namespace PawnMind.Core
             if (snapshot.DeedOpen) plan.Add(WindowKinds.Deed);
             if (snapshot.TabletOpen) plan.Add(WindowKinds.Tablet);
             if (snapshot.MovableVisible > 0) plan.Add(WindowKinds.Movable);
+            if (snapshot.CustomWindowOpen) plan.Add(WindowKinds.Custom);
             return plan;
         }
 

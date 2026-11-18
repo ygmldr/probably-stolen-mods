@@ -183,6 +183,31 @@ public bool IsOpen { get { if (UI != null) return UI.activeSelf; return false; }
 实现：`ActionGate.ListNonTerminal` + `ActionRouter.ListOperationsJson`。
 测试：`R4_F1_14_Non_Terminal_Operations_Are_Listable`。
 
+## 3.4 首周完成（2026-11-19 02:52，槽 53）
+
+**第一次由桥独立跑完 7 天并付掉租金。**
+
+| 项 | 值 |
+|---|---|
+| 槽 / 局 | 53 |
+| Day 1 起始现金 | 700 |
+| Day 8 现金 | 88 |
+| 租金 | **已付 200**，`rent_paid_total: 200`、`rent_weeks_paid: 1`、`rent_weeks_missed: 0` |
+| 支付凭据 | `last_payment.id = rent_1_200`，293 → 93，`source: "dialogue_choice"`，`detection_complete: true`，`paid_at_rev: 417` |
+| 下周租金 | 209（涨了），`days_left: 6` |
+| 总成交 | 约 45 笔（买/卖各半），逐日 8/16/8/0/0/0/0 |
+
+第 7 天的支付走的是房东对话：桥在 `choose_dialogue` 里选了付钱那一项，
+现金扣 200、`rent_days_left` 从 0 变成 7（下一周），并落了一条完整凭据。
+
+### 还剩下的交易质量问题
+
+Day 4 之后几乎每笔都 `no_negotiation` / `item_not_staged`：脚本的"把商品拖到
+议价台"两步法在**同一顾客连续多笔**时不可靠——`staged item` 不会因为
+`move main → back` 而切换。这是脚本层问题，不是桥的判定问题（拒绝是正确且安全的）。
+下一步建议做一等公民 `open_negotiation(item_id)`，或让脚本在每次交易前先读
+`negotiated_item` 的名称做校验。
+
 ## 4. 复现
 
 ```bash
