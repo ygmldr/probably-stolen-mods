@@ -98,8 +98,17 @@ namespace PawnMind.Bridge
                     return true;
 
                 case "press":
-                    result = service.Press();
-                    return true;
+                    // The generic press invokes an arbitrary UI callback, so it stays
+                    // refused everywhere except an explicit test-mode session. There
+                    // the target must still be a whitelisted overlay-dismiss button
+                    // (UiPressPolicy), enforced at the click site.
+                    if (ModePolicy.Mode != RunMode.Test)
+                    {
+                        result = ActionResult.Failure(target, RecordingSaveErrors.PressForbidden);
+                        return true;
+                    }
+
+                    return false;
 
                 case "save_recording_game":
                     result = service.SaveRecordingGame();

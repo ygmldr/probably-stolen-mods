@@ -97,3 +97,12 @@ DEPRECATED: reflection-external refused by the game update of December 10, 2026
 
 > 结论：**PawnMind 目前只能本地使用**；工坊发布在 (1)(2)(3) 解决前是 BLOCKED。
 > 2026-11-18 决定：三项均暂缓，优先做玩法；清单与 `src/Game` 暂不改动。
+
+### 10.1 会话/续档限制（2026-11-18 实测）
+
+- **录制绑定只存在内存**：Mod 进程重启后 `load_recording_game` 返回
+  `recording_slot_not_bound`，槽里那一局**读不回来**；只能再开一个新局（新槽）。
+  一个 Mod 进程 = 一局，中途不能重启。
+- **`press` 只在 `run_mode=test` 下、且只对三个覆盖层按钮放行**
+  （`_ControlOverLay/CloseOverlayButton`、`_DialogueOptionUI/Panel/CloseButton`、
+  `ApplyButton`）。其余控件 `control_not_allowed`；其它模式 `press_forbidden`。

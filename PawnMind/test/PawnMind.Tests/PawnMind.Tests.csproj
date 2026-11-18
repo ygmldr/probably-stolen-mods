@@ -60,6 +60,7 @@
     <Compile Include="SnapshotPurityTests.cs" />
     <Compile Include="OperationTests.cs" />
     <Compile Include="Round4OperationTests.cs" />
+    <Compile Include="UiPressPolicyTests.cs" />
     <Compile Include="OperationSemanticsTests.cs" />
     <Compile Include="TradeServiceTests.cs" />
     <Compile Include="OperationEndpointTests.cs" />

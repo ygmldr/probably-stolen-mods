@@ -67,6 +67,23 @@ move_item(item, "back")   # 放回 → 触发原生 OpenUI()
 **OPEN**：建议后续加一等公民 `open_negotiation(item_id)`；本轮不加，因为会让公开工具面
 从 116/106 变成 117/107，并改动 policy 哈希，需要单独一轮审计。当前把上述两步写进 Skill。
 
+### 2.2b 覆盖层关不掉（已修，范围极窄）
+
+教程覆盖层（`CanvasScreenLayer2/_ControlOverLay`）和「对话与打字机设置」
+（`_DialogueOptionUI`）没有对应的类型化工具，而 `press` 被录制策略**在所有状态下**
+拒绝（`recording_press_forbidden`）。`dismiss_tutorial_hints` 只能关掉"以后是否提示"
+这个开关，关不掉屏幕上已有的覆盖物。
+
+**修法**（`src/Core/UiPressPolicy.cs`）：
+
+- `press` 只在 `run_mode=test` 下放行，其余模式仍然一律 `press_forbidden`；
+- 放行后还必须通过**三条路径的白名单**：`_ControlOverLay/CloseOverlayButton`、
+  `_DialogueOptionUI/Panel/CloseButton`、`_DialogueOptionUI/Panel/ApplyButton`
+  （Unity 的重名后缀 ` (1)` 会被忽略）；其他任何控件返回 `control_not_allowed`。
+- 白名单是纯函数（Core），有独立单测；守卫侧另有"仅 test 放行"的回归测试。
+
+**测试**：`UiPressPolicyTests`（4）、`RecordingDispatchGuardTests.Guard_Press_Is_Released_Only_In_Test_Mode`。
+
 ### 2.3 新开局无法确认"跨局"（已修，F1b 回归）
 
 **现象**：`confirm_new_game` 返回 `run_change_status:"unknown"` 且永不改变。

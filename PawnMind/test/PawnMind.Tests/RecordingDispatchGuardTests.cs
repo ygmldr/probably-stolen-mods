@@ -257,5 +257,36 @@ namespace PawnMind.Tests
                 RecordingSaveErrors.PressForbidden);
             Assert.Equal(0, h.NativePort.PromptCalls, "no native UI callback");
         }
+
+        /// <summary>
+        /// R4-PRESS-01: only an explicit test-mode session lets press through, and
+        /// only so the click site can apply the overlay allowlist. Play and bootstrap
+        /// keep the blanket refusal.
+        /// </summary>
+        [Test]
+        public static void Guard_Press_Is_Released_Only_In_Test_Mode()
+        {
+            RecordingHarness h = RecordingHarness.Create();
+            h.Bind();
+            RecordingDispatchGuard guard = new RecordingDispatchGuard(h.Service);
+            JObject request = JObject.Parse("{\"control_id\":\"b123:0\"}");
+
+            try
+            {
+                ModePolicy.Configure(RunMode.Play, null);
+                AssertDenied(guard, "press", request, RecordingSaveErrors.PressForbidden);
+
+                ModePolicy.Configure(RunMode.Test, null);
+                ActionResult result;
+                bool handled = guard.TryHandle("press", request, out result);
+                Assert.False(handled,
+                    "test mode must leave the decision to the UiPressPolicy whitelist");
+                Assert.Null(result, "an unhandled press produces no refusal here");
+            }
+            finally
+            {
+                ModePolicy.Reset();
+            }
+        }
     }
 }

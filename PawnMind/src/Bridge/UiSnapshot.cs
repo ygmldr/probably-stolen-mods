@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Newtonsoft.Json;
+using PawnMind.Core;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -88,6 +89,8 @@ namespace PawnMind.Bridge
                         return ActionResult.Failure("press", "no_button");
                     if (!tablet.Interactable)
                         return ActionResult.Failure("press", "disabled");
+                    if (!UiPressPolicy.IsAllowedControl(Path(tablet.button.transform)))
+                        return ActionResult.Failure("press", UiPressPolicy.ControlNotAllowed);
 
                     tablet.button.onClick.Invoke();
                     return ActionResult.Success("press");
@@ -103,6 +106,8 @@ namespace PawnMind.Bridge
                     Button button = PlainButtons[index];
                     if (button == null) return ActionResult.Failure("press", "no_button");
                     if (!button.interactable) return ActionResult.Failure("press", "disabled");
+                    if (!UiPressPolicy.IsAllowedControl(Path(button.transform)))
+                        return ActionResult.Failure("press", UiPressPolicy.ControlNotAllowed);
 
                     button.onClick.Invoke();
                     return ActionResult.Success("press");
