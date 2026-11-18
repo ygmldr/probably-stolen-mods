@@ -1,0 +1,85 @@
+{
+  "schema_version": 2,
+  "description": "R5-B1: stage_negotiation_item is call-scoped (Core/PendingScope). While staging item 101 is still running, retrying the SAME item+args with a new action id is refused as operation_pending and must be flagged as a conflicting blind retry. A different item is a different native call.",
+  "steps": [
+    {
+      "tool": "get_state",
+      "args": {},
+      "result": {
+        "ok": true,
+        "in_game": true,
+        "day": 1,
+        "shop_state": "OPEN",
+        "cash": 500,
+        "client": null,
+        "legal_actions": [],
+        "candidate_actions": [],
+        "negotiation_open": false,
+        "negotiated_item": null
+      }
+    },
+    {
+      "tool": "stage_negotiation_item",
+      "args": {
+        "rev": 5,
+        "action_id": "act-stage-1",
+        "item_id": 101
+      },
+      "rev": 5,
+      "result": {
+        "ok": false,
+        "op": "stage_negotiation_item",
+        "operation_id": "op-stage-1",
+        "execution_status": "running",
+        "delivery_status": "delivered",
+        "dispatch_status": "dispatched",
+        "dispatched": true,
+        "pending": true,
+        "item_id": 101,
+        "staged_item_id_before": null,
+        "staged_item_id_after": null,
+        "negotiation_open": null,
+        "client_identity_unchanged": null,
+        "next": "the staging attempt is still running: query get_operation/wait_operation; do not retry the same item with a new action_id"
+      }
+    },
+    {
+      "tool": "stage_negotiation_item",
+      "args": {
+        "rev": 6,
+        "action_id": "act-stage-2",
+        "item_id": 101
+      },
+      "rev": 6,
+      "result": {
+        "ok": false,
+        "op": "stage_negotiation_item",
+        "error": "operation_pending",
+        "blocking_operation_id": "op-stage-1",
+        "blocking_same_call": true,
+        "execution_status": "running",
+        "delivery_status": "delivered",
+        "dispatch_status": "dispatched",
+        "dispatched": true,
+        "next": "call get_operation/wait_operation for the blocking id; do not start a new action id for the same item"
+      }
+    },
+    {
+      "tool": "get_operation",
+      "args": {
+        "operation_id": "op-stage-1"
+      },
+      "result": {
+        "ok": true,
+        "known": true,
+        "operation_id": "op-stage-1",
+        "op": "stage_negotiation_item",
+        "execution_status": "completed",
+        "delivery_status": "delivered",
+        "dispatch_status": "dispatched",
+        "dispatched": true,
+        "action_id": "act-stage-1"
+      }
+    }
+  ]
+}

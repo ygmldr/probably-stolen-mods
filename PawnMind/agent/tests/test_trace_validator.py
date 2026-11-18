@@ -1287,6 +1287,25 @@ class ConflictRelationUnitTests(unittest.TestCase):
         self.assertEqual("unknown", relation)
         self.assertTrue(conflicting)
 
+    def test_call_scoped_staging_different_item_is_independent(self):
+        # R5-B1: Core/PendingScope now covers stage_negotiation_item, so the
+        # validator must allow a different-item staging call while one is
+        # pending instead of treating it as the same native call.
+        relation, conflicting, _ = self._relation(
+            self._op("stage_negotiation_item", {"item_id": 101}),
+            self._op("stage_negotiation_item", {"item_id": 202},
+                     rev=6, action_id="act-2"))
+        self.assertEqual("independent", relation)
+        self.assertFalse(conflicting)
+
+    def test_call_scoped_staging_same_item_is_a_conflict(self):
+        relation, conflicting, _ = self._relation(
+            self._op("stage_negotiation_item", {"item_id": 101}),
+            self._op("stage_negotiation_item", {"item_id": 101},
+                     rev=6, action_id="act-2"))
+        self.assertEqual("same_item", relation)
+        self.assertTrue(conflicting)
+
     def test_run_change_in_flight_is_run_changing(self):
         relation, conflicting, _ = self._relation(
             self._op("load_game", {}),
@@ -1604,6 +1623,9 @@ class TraceFixtureTests(unittest.TestCase):
         "pending_different_item_ok.json": [],
         "prompt_confirm_then_real_start_ok.json": [],
         "sleep_async_converges_ok.json": [],
+        "pending_stage_same_item_retry_conflict.json": [
+            "CONFLICTING_WRITE_WHILE_PENDING"],
+        "pending_stage_different_item_ok.json": [],
     }
 
     def test_fixtures_are_schema_version_2(self):

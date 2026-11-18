@@ -5,12 +5,15 @@
 > 真机（L3）证据：`NOT_RUN`（无游戏进程、未读写存档、未安装 DLL）。
 > 通关率 / 效率收益：`NOT_MEASURED`，本文件不给出任何跑分。
 > R5-A 离线修订范围：A1 first-run prompt vs run-change、A2 sleep 异步收敛、A3 单笔成交证据（源码级 + C#/Python 单测），
-> **均未获真机验证**；L3 一律 `NOT_RUN`。轨迹校验：`agent/trace_validator.py` `VALIDATOR_VERSION = "1.2.0"`，
+> **均未获真机验证**；L3 一律 `NOT_RUN`。轨迹校验：`agent/trace_validator.py` `VALIDATOR_VERSION = "1.3.0"`，
 > 当前 trace `schema_version: 2`；不带版本的历史 trace 按 v1 旧口径校验并给 `TRACE_SCHEMA_VERSION_MISSING` warning，不能被静默改写。
+> R5-B1 离线同步（2026-11-19）：新增 `stage_negotiation_item`（玩家等价暂存，**在 recording 面**），
+> 工具面 full=117 / recording=107；该工具只有源码 + C#/Python 单测证据，**真机 L3 仍 `NOT_RUN`**。
 
 - 适用游戏：*Probably Stolen* **0.46D**（`VERSION 100-Rev13`；以 `get_state` 的版本字段与 bridge 的 MVID 门禁为准）。
-- 适用工具面：`mcp_server.py --tools full`（**116** 个工具）或 `--tools recording`（**106** 个玩家等价工具）；
-  版本以 `tool_policy.json` 的 `policy_sha256`（R5 基线 **`e0da5a24…`**，2026-11-18 实测；run 时必须实算复核）
+- 适用工具面：`mcp_server.py --tools full`（**117** 个工具）或 `--tools recording`（**107** 个玩家等价工具，
+  含 R5-B1 的 `stage_negotiation_item`）；版本以 `tool_policy.json` 的 `policy_sha256`
+  （R5-B1 后 **`774fbfdd7b44ef5c6c7b616f885f1b624758b862b3e750497f8a39cc26763277`**；离线实测，run 时必须实算复核）
   与 `docs/audit/tools-inventory.json` 为准。工具数只作旁证，**哈希变化才算换基准**。
   本 Skill **只用首周最小闭环里已注册的工具**，未注册的工具名一律不要调用。
 - 适用模式：`run_mode=play`（进入游戏后）或显式 `test`。`bootstrap` 只用于主菜单只读探测。
@@ -23,7 +26,8 @@
 1. `get_state()` 观察：`in_game`、`day`、`shop_state`、`cash`、`rent`、`can_end_day`、`dialogue`、`prompt`。
 2. 有原生弹窗 → `get_pending_prompt()` → 读懂文字后再 `answer_prompt()`。
 3. `shop_state == "MORNING"` → `open_shop()`。
-4. 顾客/议价 → `list_goods()` / `confirm_trade()`；对话 → `advance_dialogue()` / `choose_dialogue()`。
+4. 顾客/议价 → `list_goods()` → `stage_negotiation_item()` → `confirm_trade()`；
+   对话 → `advance_dialogue()` / `choose_dialogue()`。
 5. 顾客处理完、没有待接待 → `end_day()`；**只有 `shop_closed_after == true` 才算关店完成**（关店≠换天）。
 6. `sleep()`（必须在 `end_day` 之后）→ 用 `wait_for_events()` / `get_state()` / `get_operation()` 等**可观测证据**：
    `day` 不变只是**尚未观测到完成（inconclusive）**，不是失败；`day_changed` 与 `save_evidence` 分开判断；
@@ -103,6 +107,8 @@
 | `legal_actions` | **已证实可做**的动作（`availability="available"`） |
 | `candidate_actions` | **候选**动作：`availability="unknown"`、`requires="native_guard"`，需要实际调用时由原生守卫确认；**不是**合法证明 |
 | `client` | 当前顾客：`name`、`intent`（如 `RENT`、`BARTER`）、`is_wanted`、`reported`、`budget` |
+| `negotiation_open` | 谈判面板是否真的打开（`stage_negotiation_item` completed 的必要条件之一） |
+| `negotiated_item` | 当前谈判桌上被接受的物品（id/identifier/name/value…）；`staging` uncertain 后用它判定真实落点，**不要**靠猜 |
 | `prompt` | 非 `null` = 原生确认框占用输入；先 `get_pending_prompt()` |
 | `dialogue` | `available/choice/ended/typing/choices[]`；`choices[i].enabled` 决定可选项 |
 | `dialogue.readable == false` | 读不到对话：**不要**假设内容，停机或等下一拍 |
@@ -182,7 +188,8 @@
    即使 `ok:false` 也**不能**当成"安全拒绝"重试；响应会带 `next` 说明。
    只有 `dispatch_status:"not_dispatched"` + `execution_status:"rejected"` 才是"世界无变化"。
 8. `pending` 操作存在时，写动作按**冲突关系**判断（validator `CONFLICTING_WRITE_WHILE_PENDING` 同口径）：
-   - `same_op`：同一个原生调用（call-scoped op，如 `confirm_trade` 的 op+参数相同；其它 op 按 op 名）→ 冲突；
+   - `same_op`：同一个原生调用（call-scoped op 为 `confirm_trade` / `stage_negotiation_item`：
+     op+参数相同 → 冲突；其它 op 按 op 名）→ 冲突；
    - `same_item`：两个写动作命中同一个 `item_id` → 冲突；
    - `run_changing`：有跨局请求在飞行或已请求未 confirmed → 冲突（见规则 11）；
    - `modal_resolution`：`answer_prompt` / `choose_dialogue` / `advance_dialogue` / `close_windows`
@@ -215,27 +222,48 @@
 
 ## 5. 普通交易（首周核心收入，C 模块已冻结证据协议）
 
-### 5.1 流程
+### 5.1 流程（R5-B1：先暂存、再成交）
 
-**先开谈判面板。** 面板不会自己开：它由"把商品放上称重台"这个原生动作触发。
-若 `confirm_trade` 返回 `error:"no_negotiation"`（`execution_status:"rejected"`、
-`dispatch_status:"not_dispatched"`），说明面板没开，**世界没有任何变化**，可以安全地：
+**先暂存商品，再确认成交。** 谈判面板不会自己开：用
+`stage_negotiation_item(item_id=<id>, rev=<state.rev>)` 把商品放到称重/后柜台——它与玩家拖拽走**同一原生路径**
+（不直接改 `currentNegociatedItem`、归属、顾客意图或价格），**在 recording 面**（recording=107 包含它）。
 
-```
-move_item(item_id=<该商品>, target="main")     # 从货架取下
-move_item(item_id=<该商品>, target="back")     # 放回称重台 → 原生 OpenUI()
-confirm_trade(item_id=<该商品>, side=...)      # 用新的 action_id 重试
-```
+暂存 `completed` 的必要条件（全部为真，缺一不能当成功）：
 
-买顾客（`client.intent=="SELL"`）的商品还在 `front`：先 `move_item(item, "back")` 再按上面走。
+- `execution_status:"completed"`；
+- `staged_item_id_after == item_id`（桌上的就是请求的那件）；
+- `item_on_weighted_counter == true`（物品真的在称重台上）；
+- `negotiation_open == true`（谈判面板真的打开）；
+- `client_identity_unchanged == true`（同一顾客；不能拿别的顾客状态背书）。
+
+A→B→A 切换、同一顾客连续多笔都支持：对同一顾客重复 `stage_negotiation_item` 换成另一件商品即可。
+旧的 `move_item(item,"main") → move_item(item,"back")` 两步“开面板”写法**不再是推荐路径**（历史兼容才保留）。
+
+**暂存被拒（派发前，`dispatched:false` + `execution_status:"rejected"`，世界无副作用）** 稳定错误码：
+`not_in_game`、`no_client`、`client_unreadable`、`staging_read_failed`、`negotiation_unreadable`、
+`modal_open`、`item_not_found`、`item_sold`、`item_unreadable`、`item_unreachable`、`not_owned`、
+`already_owned`、`intent_undefined`、`back_counter_unreadable`、`back_counter_full`。
+处理：接受拒绝，按错误语义重新读状态（换商品/先处理弹窗/等顾客），**不要**重复发同一请求“确认一下”。
+
+**暂存 uncertain（最危险）**：`error:"outcome_unverified"`（静默原生返回、readback 不匹配、
+`negotiation_not_open` 等）或 `error:"client_changed"`，`execution_status:"uncertain"`、`dispatched:true`：
+
+- 只能查 `get_operation()` / `wait_operation()`，并回读 `get_state().negotiated_item` 与 `negotiation_open`；
+- **禁止**用新 `action_id` 重试**同一 item**：`stage_negotiation_item` 与 `confirm_trade` 一样是 call-scoped，
+  同 item+args 重试会被 `operation_pending` 拒绝，且可能重复原生动作；
+- 换**不同 item** 是允许的（不同原生调用，新 `action_id`）；
+- uncertain 期间**不要**直接 `confirm_trade()`（先查询/回读收敛，确认面板状态与桌上到底是哪件商品）；
+- 只有 `dispatch_status:"not_dispatched"` + `execution_status:"rejected"` 才是“世界无变化”。
 
 1. **看货**：`list_goods(scope="all")` → 每项 `id/identifier/name/value/owned/sellable`。
-2. **对账基线**：`get_state()` 记 `cash`、`inventory_count`、`back_counter_count`。
-3. **买**：`confirm_trade(item_id=<id>, side="buy", rev=<state.rev>)`。
-4. **卖**：先 `list_inventory(container="main")` 拿 `item_id`，再
+2. **暂存**：`stage_negotiation_item(item_id=<id>, rev=<state.rev>)`，按上面的 completed/uncertain 规则判定；
+   面板没开时 `confirm_trade` 会返回 `error:"no_negotiation"`（rejected、未派发、世界无变化），此时先暂存。
+3. **对账基线**：`get_state()` 记 `cash`、`inventory_count`、`back_counter_count`、`negotiated_item`。
+4. **买**：`confirm_trade(item_id=<id>, side="buy", rev=<state.rev>)`（暂存 completed 之后）。
+5. **卖**：先 `list_inventory(container="main")` 拿 `item_id`，暂存后再
    `confirm_trade(item_id=<id>, side="sell", rev=<新 rev>)`。
-5. **回读验证**：再 `get_state()`，核对现金/库存/柜面变化；以物易物可能**零现金变化**。
-6. 只有 `execution_status:"completed"` **且满足 §5.2 单笔证据**才算成交；**成交完成 ≠ 顾客工作流完成**，
+6. **回读验证**：再 `get_state()`，核对现金/库存/柜面变化；以物易物可能**零现金变化**。
+7. 只有 `execution_status:"completed"` **且满足 §5.2 单笔证据**才算成交；**成交完成 ≠ 顾客工作流完成**，
    后续对话用 `advance_dialogue()` / `choose_dialogue()` 继续，交易 completed/uncertain 都不阻塞对话。
 
 ### 5.2 `confirm_trade` 成功证据（唯一可信来源，R5/A3 口径）
@@ -412,7 +440,11 @@ confirm_trade(item_id=<该商品>, side=...)      # 用新的 action_id 重试
 `recording_locked`、`recording_slot_mismatch`、`recording_run_mismatch`；
 交易专用：`trade_locked`、`intent_undefined`、`business_complete`、`item_not_staged`、
 `barter_not_acceptable`、`not_introduced`、`gun_order_not_accepted`、`cannot_buy_from_table`、
-`client_refuses_item`、`bad_side`、`no_negotiation`、`trade_read_failed`。
+`client_refuses_item`、`bad_side`、`no_negotiation`、`trade_read_failed`；
+暂存专用（R5-B1，全部 `dispatched:false`）：`not_in_game`、`no_client`、`client_unreadable`、
+`staging_read_failed`、`negotiation_unreadable`、`modal_open`、`item_not_found`、`item_sold`、
+`item_unreadable`、`item_unreachable`、`not_owned`、`already_owned`、`intent_undefined`、
+`back_counter_unreadable`、`back_counter_full`。
 
 处理：**接受拒绝**，按错误语义重新读状态、重新规划；不要重复发送同一请求来“确认一下”。
 其中 `*_readback_mismatch` 明确要求停机，不重试。
@@ -475,6 +507,9 @@ confirm_trade(item_id=<该商品>, side=...)      # 用新的 action_id 重试
 - 交易证据：`business_complete`、`visit_complete`（整趟，辅助归因）、`client_unchanged`、
   `items_transferred`、`cash_moved`、`cash_changed`、`cash_before`、`cash_after`、`staged_item_id`、`client_intent`、
   `evidence.{called,error,business_complete,client_unchanged,items_transferred,cash_moved,cash_before,cash_after,staged_item_id_after}`；
+- 暂存证据（R5-B1）：`item_id`、`staged_item_id_before`、`staged_item_id_after`、`negotiation_open`、
+  `client_identity_unchanged`、`item_on_weighted_counter`、`native_primitive`、`evidence`，
+  以及 uncertain 后的 `get_state().negotiated_item` 回读；
 - 关店/换天/落盘：`shop_closed_after`、`readback.day_advanced`、`day_changed`、`save_evidence`、
   `save_completed`、`save_unknown`；
 - 动作前后关键状态摘要：`day`、`shop_state`、`cash`、`inventory_count`、`back_counter_count`、
@@ -490,7 +525,7 @@ confirm_trade(item_id=<该商品>, side=...)      # 用新的 action_id 重试
 
 - 观察：`ping()`、`get_state()`、`get_run_summary()`、`get_legal_actions()`、
   `list_goods()`、`list_inventory()`、`get_item()`、`get_calendar()`、`get_day_report()`。
-- 操作：`open_shop()`、`call_next_customer()`、`confirm_trade()`、
+- 操作：`open_shop()`、`call_next_customer()`、`stage_negotiation_item()`、`confirm_trade()`、
   `advance_dialogue()`、`choose_dialogue()`、`dismiss_current_client()`、
   `get_pending_prompt()`、`answer_prompt()`、`close_windows()`。
 - 日终：`end_day()`、`sleep()`、`wait_for_events()`。
@@ -503,23 +538,25 @@ confirm_trade(item_id=<该商品>, side=...)      # 用新的 action_id 重试
 
 ---
 
-## 13. schema 已核对（2026-11-18 Round 4；2026-11-19 R5-A 离线修订）
+## 13. schema 已核对（2026-11-18 Round 4；2026-11-19 R5-A/R5-B1 离线修订）
 
 以下字段已与 `mcp_server.py` / `src/Bridge/` / `src/Core/` 实际实现核对
-（Round 4 / `docs/reviews/ROUND4_DISPOSITION.md`；R5-A 的 A1/A2/A3 只做源码 + C# 单测核对，
-**真机 L3 仍 `NOT_RUN`**；policy sha 以 R5 基线 `e0da5a24…` 为参照、run 时实算：
-工具 full=116 / recording=106）：
+（Round 4 / `docs/reviews/ROUND4_DISPOSITION.md`；R5-A 的 A1/A2/A3 与 R5-B1 的 staging 只做源码 + 单测核对，
+**真机 L3 仍 `NOT_RUN`**；policy sha 以 R5-B1 离线实测
+`774fbfdd7b44ef5c6c7b616f885f1b624758b862b3e750497f8a39cc26763277` 为参照、run 时实算：
+工具 full=117 / recording=107）：
 
 | 主题 | 已核对 schema |
 |---|---|
 | 写响应 | `operation_id`、`execution_status`、`delivery_status`、`dispatch_status`、`dispatched`（true/false/**null**）、跨局时 `run_change_status`/`run_change_confirmed`/`run_change`（`"issued"`/`"not_issued"`；R5/A1）、晋升后 `completion_evidence`/`initial_result`；`ok:true` 仅 completed；重复 ID → 原证据 + `delivery_status:"undelivered"` + `redelivered:true`；重复调用被挡 → `operation_pending`/`run_change_pending` + `blocking_operation_id`（**未派发，不产生新 operation**） |
 | 操作查询 | `get_operation` 返回 `known/ok/operation_id/op/execution_status/delivery_status/dispatch_status/dispatched/run_change_status/run_change_confirmed/completion_evidence/error/rev/result_rev/next`；未知 id `known:false` + `unknown_operation`（run 变化后带 `process_restarted:true`）；`wait_operation` 超时 `ok:false + status:"pending" + operation_id + execution_status + next`；`get_operation("*")` 上限 20 条 + `count`/`total_non_terminal`/`truncated`/`truncation_note`（旧构建可能无 truncated 字段） |
 | 交易证据 | `business_complete`、`visit_complete`（整趟，辅助归因）、`client_unchanged`、`items_transferred`、`cash_moved`、`cash_before`、`cash_after`（整数）、`cash_changed`、`staged_item_id`、`client_intent`、`evidence.{called,error,business_complete,client_unchanged,items_transferred,cash_moved,cash_before,cash_after,staged_item_id_after}`；完成判据 = `client_unchanged` + (items 或 cash)；拒绝时 `dispatched:false`；静默 return/无本笔证据 → `error:"outcome_unverified"` + `execution_status:"uncertain"`（`detail:"no_trade_evidence"`/`"business_not_complete"`） |
+| 暂存（R5-B1） | `stage_negotiation_item(item_id, rev)`：完成判据 = `execution_status:"completed"` + `staged_item_id_after == item_id` + `item_on_weighted_counter:true` + `negotiation_open:true` + `client_identity_unchanged:true`；另有 `staged_item_id_before`、`client_intent`、`native_primitive`、`evidence.{called,error,staged_item_id_before,staged_item_id_after_readable,staged_item_id_after,item_on_weighted_counter,negotiation_readable_after,negotiation_open_after,client_identity_unchanged,native_primitive}`；拒绝 `dispatched:false` + 稳定错误码；silent/mismatch → `uncertain` + `next`（read `get_state.negotiated_item`，不要同 item 新 id 重试，不同 item 允许）。`Core.PendingScope.IsCallScoped` 覆盖它 |
 | 关店 | `execution_status:"completed"` ⇔ `shop_closed_after:true`；仍 OPEN → `ok:false + pending:true + execution_status:"running" + error:"shop_still_open"` |
 | 睡觉 | `day_changed`、`save_evidence`（`save_completed`/`save_unknown`）、`save_completed`、`save_unknown`；`last_save_time` 不算落盘证据；`day_changed:false` = running/pending/inconclusive（**不是失败**）；**日终面板没开时 `error:"end_of_day_panel_closed"` + `not_dispatched"`（世界没动，可换新 id 重试）**；R5/A2：无 count-based failure，窗口（10s 单调时钟）内无判决，超时无证据 → `uncertain` + `error:"sleep_unconfirmed"`（非终态、拒绝新 id 重发；后续 day 增加可 promote `completed`）；只有 `native_not_called`+`dispatched:false` 可安全重试 |
 | 快照 | `legal_actions`（`availability="available"`）与 `candidate_actions`（`availability="unknown"`、`requires="native_guard"`）；举报用纯字段 `reported`/`is_wanted` |
-| 工具面 | full = 116，recording = 106；`get_operation` / `wait_operation` 已注册且均在 recording 面；工具数只作旁证，以 `policy_sha256` 为准 |
-| 轨迹校验 | `agent/trace_validator.py` `VALIDATOR_VERSION = "1.2.0"`；trace `schema_version: 2` 为当前口径；无版本历史 trace 按 v1 旧口径校验并给 `TRACE_SCHEMA_VERSION_MISSING` warning；未知版本 `TRACE_SCHEMA_VERSION_UNSUPPORTED` 直接拒绝 |
+| 工具面 | full = 117，recording = 107；`get_operation` / `wait_operation` / `stage_negotiation_item` 均已注册，且三者都在 recording 面；工具数只作旁证，以 `policy_sha256` 为准（R5-B1 后 `774fbfdd…`） |
+| 轨迹校验 | `agent/trace_validator.py` `VALIDATOR_VERSION = "1.3.0"`；trace `schema_version: 2` 为当前口径；无版本历史 trace 按 v1 旧口径校验并给 `TRACE_SCHEMA_VERSION_MISSING` warning；未知版本 `TRACE_SCHEMA_VERSION_UNSUPPORTED` 直接拒绝；call-scoped op 集合 = `confirm_trade` + `stage_negotiation_item`（同 item+args pending 重试 = `CONFLICTING_WRITE_WHILE_PENDING`，不同 item 允许） |
 | MCP 模式 | 注册面 = bridge 报告的 `run_mode`；`auto` 在 bridge 不可达/未知时 **locked**（只留本地 memory 工具），显式 `--mode test` 也必须 bridge 报告 `test`；运行中模式漂移 → `error:"mode_changed"`，需重启 MCP |
 
 若后续再改冻结协议：本表随 Lead 的协议变更同步；**不要再引入“待核对”字段**。

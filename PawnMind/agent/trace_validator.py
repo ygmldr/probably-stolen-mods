@@ -7,8 +7,9 @@ their exact arguments, the exact bridge result, and optional annotations from
 the caller (claims, model text, dependencies). This module checks one trace
 against the Operation protocol invariants agreed on 2026-11-17 and revised in
 R5/A4 (2026-11-19: per-trade evidence, calibrated pending conflict relation,
-run-change field) and reports *structured* violations (``code`` /
-``message`` / ``step_index``).
+run-change field) and R5/B1 (2026-11-19: ``stage_negotiation_item`` joins
+``confirm_trade`` as a call-scoped operation) and reports *structured*
+violations (``code`` / ``message`` / ``step_index``).
 
 It is deliberately offline and self-contained:
 
@@ -63,8 +64,11 @@ Rules enforced (error unless stated otherwise)
 3. ``CONFLICTING_WRITE_WHILE_PENDING`` -- a write issued while an operation
    is ``prepared``/``running`` (or ``wait_operation`` timed out as pending) is
    classified by an explicit conflict relation: ``same_op`` (the same native
-   call, or the same non-call-scoped op with any arguments), ``same_item``
-   (both writes name the same item), ``run_changing`` (a run switch is in
+   call, or the same non-call-scoped op with any arguments; the call-scoped
+   ops are ``confirm_trade`` and ``stage_negotiation_item``, mirroring
+   ``Core.PendingScope`` -- same item+args retry is a conflict, a different
+   item is independent), ``same_item`` (both writes name the same item),
+   ``run_changing`` (a run switch is in
    flight, or one was requested but not confirmed), ``modal_resolution`` (a
    dialogue/prompt write that resolves the blocking modal; allowed when the
    pending op is not itself a dialogue/prompt op), ``independent`` (a
@@ -162,7 +166,7 @@ import json
 import re
 from dataclasses import dataclass, field
 
-VALIDATOR_VERSION = "1.2.0"
+VALIDATOR_VERSION = "1.3.0"
 
 #: Current trace schema. v2 = R5/A4 per-trade evidence + calibrated pending
 #: conflict relation. No ``schema_version`` (bare list / object) means legacy v1.
@@ -233,8 +237,10 @@ VALID_RUN_CHANGE_FIELDS = frozenset({RUN_CHANGE_ISSUED, RUN_CHANGE_NOT_ISSUED})
 
 #: Ops the bridge scopes by arguments when blocking a duplicate native call
 #: (mirrors Core/PendingScope): a second call with different arguments is a
-#: different native call, everything else is blocked by op name.
-CALL_SCOPED_OPS = frozenset({"confirm_trade"})
+#: different native call, everything else is blocked by op name. R5/B1 added
+#: ``stage_negotiation_item`` (same item+args retry conflicts, a different item
+#: is a different native call and therefore independent).
+CALL_SCOPED_OPS = frozenset({"confirm_trade", "stage_negotiation_item"})
 
 #: Writes that consume/resolve a native dialogue, prompt or modal input. They
 #: are allowed while an unrelated operation is pending (that is what unblocks a
