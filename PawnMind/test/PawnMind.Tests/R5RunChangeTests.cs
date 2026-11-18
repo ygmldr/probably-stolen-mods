@@ -189,6 +189,72 @@ namespace PawnMind.Tests
         }
 
         /// <summary>
+        /// R5-RUN-06 (reviewer A finding): the claim must also be applied when the
+        /// post-dispatch revision refresh fails. Otherwise a first-run prompt
+        /// confirmation keeps an unconfirmed run-change request behind an
+        /// uncertain operation and the next, real confirm_new_game is refused
+        /// until the Mod restarts.
+        /// </summary>
+        [Test]
+        public static void R5_RUN_06_Prompt_Confirmation_Does_Not_Block_After_A_Refresh_Failure()
+        {
+            string runId = RunChangePolicy.NoRun;
+            int confirmCalls = 0;
+            int starts = 0;
+            int refreshes = 0;
+
+            ActionRouter router = Round4OperationTests.Router(
+                Rev,
+                delegate(string op, JObject request)
+                {
+                    if (op != "confirm_new_game") return ActionResult.Success(op);
+                    confirmCalls++;
+                    if (confirmCalls == 1)
+                    {
+                        return ActionResult.SuccessRaw(op,
+                            "{\"ok\":true,\"dispatched\":true,\"prompt_confirmed\":true,"
+                            + "\"run_change\":\"not_issued\"}");
+                    }
+
+                    starts++;
+                    runId = "run-new";
+                    return ActionResult.SuccessRaw(op,
+                        "{\"ok\":true,\"dispatched\":true,\"start_requested\":true,"
+                        + "\"run_change\":\"issued\"}");
+                },
+                null,
+                delegate { return runId; },
+                null,
+                delegate
+                {
+                    refreshes++;
+                    // Pre-dispatch refresh of the first action succeeds; its
+                    // post-dispatch refresh fails (state unavailable), which is
+                    // the branch that used to keep the run-change request.
+                    if (refreshes == 2) throw new InvalidOperationException("state unavailable");
+                    return 3L;
+                });
+
+            JObject prompt = JObject.Parse(router.Handle(Write("confirm_new_game", "prompt-refresh-fail")));
+            Assert.False((bool)prompt["ok"], "the refresh failure is not a success");
+            Assert.Equal("uncertain", (string)prompt["execution_status"],
+                "the unknown revision leaves the execution uncertain");
+            Assert.Null(prompt["run_change_status"],
+                "a prompt confirmation still never registers a run change");
+
+            string startResponse = router.Handle(Write("confirm_new_game", "start-after-refresh-fail"));
+            Assert.False(startResponse.Contains(OperationErrors.OperationPending),
+                "the uncertain prompt op must not block the real start");
+            Assert.False(startResponse.Contains(OperationErrors.RunChangePending),
+                "the prompt op must not own an unconfirmed run-change request");
+
+            JObject start = JObject.Parse(startResponse);
+            Assert.Equal(RunChangeStatus.Confirmed, (string)start["run_change_status"],
+                "the real start was dispatched and confirmed");
+            Assert.Equal(1, starts, "exactly one real start");
+        }
+
+        /// <summary>
         /// R5-RUN-05: the pre-existing real-load protection must not regress.
         /// </summary>
         [Test]

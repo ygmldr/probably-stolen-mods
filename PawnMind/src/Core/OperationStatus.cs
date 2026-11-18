@@ -175,6 +175,15 @@ namespace PawnMind.Core
         public bool RunChangeApplied { get; set; }
 
         /// <summary>
+        /// R5/A1: the service explicitly claimed this action did not request a
+        /// run-changing native start (for example a first-run prompt
+        /// confirmation). Such an operation can never be a duplicate native
+        /// run call, so it must not block a later confirm_new_game even when its
+        /// own outcome stays uncertain (for example a lost revision readback).
+        /// </summary>
+        public bool ClaimedNotIssued { get; set; }
+
+        /// <summary>
         /// R4/F3b: what the verifier actually observed when it promoted the
         /// operation. Null when the promotion has no readback evidence.
         /// </summary>
@@ -210,6 +219,7 @@ namespace PawnMind.Core
                 RunChange = RunChange,
                 RunIdBefore = RunIdBefore,
                 RunChangeApplied = RunChangeApplied,
+                ClaimedNotIssued = ClaimedNotIssued,
                 CompletionEvidence = CompletionEvidence
             };
         }

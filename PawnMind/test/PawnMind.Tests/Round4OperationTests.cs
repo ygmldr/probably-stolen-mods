@@ -37,14 +37,16 @@ namespace PawnMind.Tests
             Func<string, JObject, ActionResult> dispatch,
             Func<OperationRecord, OperationRecord> verifier = null,
             Func<string> readRunId = null,
-            Action onRunChangeConfirmed = null)
+            Action onRunChangeConfirmed = null,
+            Func<long> refreshRevision = null)
         {
+            if (refreshRevision == null) refreshRevision = delegate { return revision; };
             return new ActionRouter(
                 new ActionGate(),
                 delegate { return revision; },
                 dispatch,
                 new ActionHistory(),
-                delegate { return revision; },
+                refreshRevision,
                 Token,
                 delegate { return OpenGate(); },
                 null,

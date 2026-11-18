@@ -261,6 +261,12 @@ namespace PawnMind.Core
                 {
                     continue;
                 }
+                // R5/A1: an action the service proved did not request a run
+                // change (first-run prompt confirmation) is not a duplicate
+                // native run call. Retrying it re-reads the menu, and the real
+                // start/load protection is enforced separately by
+                // FindUnconfirmedRunChange, so it must not deadlock the menu.
+                if (operation.ClaimedNotIssued) continue;
                 // unknown may have run: it blocks a second native call just like a
                 // confirmed dispatch. Only "nothing ran" is safe to ignore.
                 if (!DispatchStatus.MayHaveRun(operation.Dispatch)) continue;

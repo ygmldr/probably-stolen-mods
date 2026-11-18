@@ -285,6 +285,7 @@ namespace PawnMind.Bridge
                 // not report success/failure: cache an explicit uncertain outcome
                 // so a retry with the same id returns the same answer without a
                 // second dispatch.
+                ApplyRunChangeClaim(operation, result, runChange);
                 string unknown = OutcomeUnknown(op, currentRevision);
                 _gate.Complete(actionId, unknown, ExecutionStatus.Uncertain,
                     DeliveryStatus.Delivered, currentRevision, "outcome_unknown",
@@ -312,15 +313,7 @@ namespace PawnMind.Bridge
             // request behind: that request used to refuse the next, real
             // confirm_new_game forever (NoRun -> NoRun). Results without a claim
             // keep the conservative op-name behavior.
-            if (runChange
-                && string.Equals(result.RunChangeClaim, ActionResult.ClaimNotIssued,
-                    StringComparison.Ordinal))
-            {
-                operation.RunChangeRequested = false;
-                operation.RunChange = RunChangeStatus.NotRequested;
-                operation.RunIdBefore = null;
-                _gate.Update(operation);
-            }
+            ApplyRunChangeClaim(operation, result, runChange);
 
             string decorated = DecorateResponse(actionId, response, _gate.Find(actionId));
             _gate.Replace(actionId, response, decorated);
@@ -577,6 +570,31 @@ namespace PawnMind.Bridge
 
             record.RunChange = status;
             return record;
+        }
+
+        /// <summary>
+        /// R5/A1: applies the service's explicit run-change claim to this
+        /// operation. A "not_issued" claim proves no native run switch was
+        /// requested, so the unconfirmed-run-change gate is cleared and the
+        /// operation is marked safe to retry even if its own outcome later stays
+        /// uncertain (for example a lost revision readback). Results without a
+        /// claim keep the conservative op-name behavior.
+        /// </summary>
+        private void ApplyRunChangeClaim(OperationRecord operation, ActionResult result,
+            bool runChange)
+        {
+            if (!runChange || operation == null || result == null) return;
+            if (!string.Equals(result.RunChangeClaim, ActionResult.ClaimNotIssued,
+                    StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            operation.RunChangeRequested = false;
+            operation.RunChange = RunChangeStatus.NotRequested;
+            operation.RunIdBefore = null;
+            operation.ClaimedNotIssued = true;
+            _gate.Update(operation);
         }
 
         /// <summary>
