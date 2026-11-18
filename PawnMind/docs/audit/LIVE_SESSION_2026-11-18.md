@@ -1,5 +1,7 @@
 # LIVE_SESSION_2026-11-18 — 第一次真实开局与首笔成交
 
+> 本次会话的完整总结见 [reports/SESSION_2026-11-18_FIRST_WEEK.md](../reports/SESSION_2026-11-18_FIRST_WEEK.md)。
+
 > 执行者：用户授权后，由 Agent 通过本地 HTTP 桥驱动（`run_mode=test`）。
 > 游戏：*Probably Stolen* 0.46D，`VERSION 100-Rev13` / MVID `911508a6-…`。
 > 安装：`6adef8ac…`（Round 4 构建）。
