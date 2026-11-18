@@ -551,5 +551,220 @@ namespace PawnMind.Tests
                 "{\"op\":\"advance_dialogue\",\"action_id\":\"dlg-2\",\"rev\":42}");
             Assert.Contains(dialogue, "\"ok\":true,", "dialogue not deadlocked");
         }
+
+        // ---------------------------------------- R5/A3: per-trade completion evidence
+
+        /// <summary>
+        /// R5-TRADE-01: a whole-visit completion is attribution context, not proof
+        /// that this specific trade happened. Business complete with zero per-trade
+        /// item/cash movement must stay uncertain, never ok:true.
+        /// </summary>
+        [Test]
+        public static void R5_TRADE_01_Visit_Complete_Without_Per_Trade_Evidence_Is_Uncertain()
+        {
+            var port = new FakeTradePort();
+            port.Evidence.BusinessComplete = true;   // the whole visit finished...
+            port.Evidence.ItemsTransferred = false;  // ...but this trade moved nothing
+            port.Evidence.CashAfter = port.Evidence.CashBefore;
+
+            JObject json = Run(new TradeService(port));
+
+            Assert.False((bool)json["ok"], "visit completion alone cannot prove this trade");
+            Assert.Equal("uncertain", (string)json["execution_status"], "uncertain, never completed");
+            Assert.Equal("outcome_unverified", (string)json["error"], "stable error code");
+            Assert.Equal("no_trade_evidence", (string)json["detail"], "specific detail");
+            Assert.True((bool)json["business_complete"],
+                "the finished visit is still reported as attribution context");
+            Assert.True((bool)json["visit_complete"], "visit_complete is the same attribution fact");
+            Assert.False((bool)json["items_transferred"], "no item moved");
+            Assert.False((bool)json["cash_moved"], "no cash moved");
+            Assert.True((bool)json["client_unchanged"], "the same client is still there");
+            Assert.True((bool)json["unknown"], "the outcome is explicitly unknown");
+            Assert.Equal(1, port.AcceptCalls, "the native click was dispatched exactly once");
+        }
+
+        /// <summary>
+        /// R5-TRADE-02: the same client can buy several items in one visit. Each
+        /// partial sale is completed on its own per-trade evidence even though the
+        /// visit stays open after every one of them.
+        /// </summary>
+        [Test]
+        public static void R5_TRADE_02_Repeated_Partial_Sales_To_The_Same_Client_Each_Complete()
+        {
+            var port = new FakeTradePort();
+            port.Guard.StagedItemOwned = true;
+            port.Evidence.BusinessComplete = false;   // the visit continues after each sale
+            port.Evidence.ItemsTransferred = true;    // each sale moves its own item
+            ActionRouter router = Router(port);
+
+            string first = router.Handle(
+                "{\"op\":\"confirm_trade\",\"action_id\":\"r5-sale-a\","
+                + "\"rev\":42,\"item_id\":56,\"side\":\"sell\"}");
+            JObject firstJson = JObject.Parse(first);
+            Assert.True((bool)firstJson["ok"], "the first partial sale completed: " + first);
+            Assert.Equal("completed", (string)firstJson["execution_status"], "completed");
+            Assert.False((bool)firstJson["business_complete"], "the visit is still open");
+            Assert.False((bool)firstJson["visit_complete"], "the visit is still open");
+            Assert.True((bool)firstJson["items_transferred"], "the item moved");
+
+            port.Guard.StagedItemId = 57;
+            port.Evidence.StagedItemIdAfter = 58;
+            string second = router.Handle(
+                "{\"op\":\"confirm_trade\",\"action_id\":\"r5-sale-b\","
+                + "\"rev\":42,\"item_id\":57,\"side\":\"sell\"}");
+            JObject secondJson = JObject.Parse(second);
+            Assert.True((bool)secondJson["ok"], "the second partial sale completed too: " + second);
+            Assert.Equal("completed", (string)secondJson["execution_status"], "completed");
+            Assert.False((bool)secondJson["business_complete"], "the visit is still open");
+            Assert.False((bool)secondJson["visit_complete"], "the visit is still open");
+            Assert.Equal(2, port.AcceptCalls, "each sale dispatched exactly one native click");
+        }
+
+        /// <summary>
+        /// R5-TRADE-03: buying from the client keeps the staged pointer on the bought
+        /// item, so the cash delta is the per-trade evidence for the buy direction.
+        /// </summary>
+        [Test]
+        public static void R5_TRADE_03_Buy_Is_Proven_By_Cash_When_The_Staged_Pointer_Stays()
+        {
+            var port = new FakeTradePort();
+            port.Guard.StagedItemOwned = false;       // buying the client's item
+            port.Evidence.BusinessComplete = false;
+            port.Evidence.ItemsTransferred = false;   // the bought item stays staged
+            port.Evidence.StagedItemIdAfter = 56;     // staged pointer unchanged
+            port.Evidence.CashBefore = 700;
+            port.Evidence.CashAfter = 675;
+
+            JObject json = Run(new TradeService(port), "buy");
+
+            Assert.True((bool)json["ok"], "the cash delta proves the purchase");
+            Assert.Equal("completed", (string)json["execution_status"], "completed");
+            Assert.Equal("buy", (string)json["side"], "buy direction");
+            Assert.True((bool)json["cash_moved"], "cash moved");
+            Assert.False((bool)json["items_transferred"], "the staged pointer did not move");
+            Assert.True((bool)json["client_unchanged"], "same client instance");
+            Assert.Equal(56, (int)json["evidence"]["staged_item_id_after"],
+                "the staged pointer still names the bought item");
+        }
+
+        /// <summary>
+        /// R5-TRADE-04: a barter moves items with zero cash movement. Items carry the
+        /// evidence; cash is not required.
+        /// </summary>
+        [Test]
+        public static void R5_TRADE_04_Barter_Completes_On_Items_With_Zero_Cash()
+        {
+            var port = new FakeTradePort();
+            port.Guard.ClientIntent = "BARTER";
+            port.Guard.StagedItemOwned = false;
+            port.Guard.BarterOfferPresent = true;
+            port.Guard.BarterAcceptable = true;
+            port.Evidence.BusinessComplete = false;
+            port.Evidence.ItemsTransferred = true;
+            port.Evidence.CashBefore = 600;
+            port.Evidence.CashAfter = 600;
+
+            JObject json = Run(new TradeService(port));
+
+            Assert.True((bool)json["ok"], "the bartered items prove the trade");
+            Assert.Equal("completed", (string)json["execution_status"], "completed");
+            Assert.False((bool)json["cash_moved"], "no cash moved");
+            Assert.False((bool)json["cash_changed"], "cash_changed agrees with cash_moved");
+            Assert.True((bool)json["items_transferred"], "the items moved");
+            Assert.True((bool)json["client_unchanged"], "same client instance");
+            Assert.Equal(1, port.AcceptCalls, "one native click");
+        }
+
+        /// <summary>
+        /// R5-TRADE-05: a different client cannot back this trade, even when the visit
+        /// completion and item movement were observed.
+        /// </summary>
+        [Test]
+        public static void R5_TRADE_05_A_Different_Client_Cannot_Back_The_Trade()
+        {
+            var port = new FakeTradePort();
+            port.Evidence.BusinessComplete = true;
+            port.Evidence.ItemsTransferred = true;
+            port.Evidence.ClientUnchanged = false; // a different client is at the counter
+
+            JObject json = Run(new TradeService(port));
+
+            Assert.False((bool)json["ok"], "another client's completion cannot back this trade");
+            Assert.Equal("uncertain", (string)json["execution_status"], "uncertain");
+            Assert.Equal("client_changed", (string)json["error"], "stable error code");
+            Assert.True((bool)json["dispatched"], "the click ran, so the outcome is unverified");
+            Assert.Equal(1, port.AcceptCalls, "one native click");
+        }
+
+        /// <summary>
+        /// R5-TRADE-06: the client's player-visible budget cannot cover the
+        /// player-visible negotiation price. The native SellItemFromTable path then
+        /// ignores the click silently; the guard refuses before dispatch instead.
+        /// The check must not gate the buy direction, where the player pays.
+        /// </summary>
+        [Test]
+        public static void R5_TRADE_06_Insufficient_Client_Budget_Refuses_Before_The_Accept()
+        {
+            JObject json = On(g =>
+            {
+                g.StagedItemOwned = true;   // the player sells to the client
+                g.ClientUsesBudget = true;
+                g.ClientBudget = 100;
+                g.StagedItemValue = 250;    // GetNegociatedValue() > GetBudget()
+            }, "sell");
+
+            Assert.Equal("client_budget_insufficient", (string)json["error"], "stable error code");
+            Assert.False((bool)json["dispatched"], "no native accept was dispatched");
+
+            // Exactly enough budget is still affordable: the native gate is "value > budget".
+            var affordablePort = new FakeTradePort();
+            affordablePort.Guard.StagedItemOwned = true;
+            affordablePort.Guard.ClientUsesBudget = true;
+            affordablePort.Guard.ClientBudget = 250;
+            affordablePort.Guard.StagedItemValue = 250;
+            affordablePort.Evidence.BusinessComplete = false;
+            affordablePort.Evidence.ItemsTransferred = true;
+            JObject affordable = Run(new TradeService(affordablePort), "sell");
+            Assert.True((bool)affordable["ok"], "value == budget is affordable: " + affordable);
+            Assert.Equal(1, affordablePort.AcceptCalls, "the affordable sale reached the click");
+
+            // A purchase is paid by the player; the client's budget must not gate it.
+            var buyPort = new FakeTradePort();
+            buyPort.Guard.ClientUsesBudget = true;
+            buyPort.Guard.ClientBudget = 0;
+            buyPort.Guard.StagedItemValue = 250;
+            JObject bought = Run(new TradeService(buyPort), "buy");
+            Assert.True((bool)bought["ok"], "a purchase is not client-budget gated: " + bought);
+            Assert.Equal(1, buyPort.AcceptCalls, "the purchase reached the click");
+        }
+
+        /// <summary>
+        /// R5-TRADE-07: an uncertain trade with the same item and arguments must not
+        /// be blind-retried under a new action id. The pending fingerprint blocks a
+        /// second native click; the caller has to read state instead.
+        /// </summary>
+        [Test]
+        public static void R5_TRADE_07_Uncertain_Trade_Cannot_Be_Blind_Retried_With_A_New_Id()
+        {
+            var port = new FakeTradePort();
+            port.Evidence.BusinessComplete = true;
+            port.Evidence.ItemsTransferred = false;
+            port.Evidence.CashAfter = port.Evidence.CashBefore;
+            ActionRouter router = Router(port);
+
+            string first = router.Handle(
+                "{\"op\":\"confirm_trade\",\"action_id\":\"r5-blind-1\","
+                + "\"rev\":42,\"item_id\":56,\"side\":\"buy\"}");
+            JObject firstJson = JObject.Parse(first);
+            Assert.False((bool)firstJson["ok"], "the first trade is uncertain: " + first);
+            Assert.Equal("uncertain", (string)firstJson["execution_status"], "uncertain");
+
+            string retry = router.Handle(
+                "{\"op\":\"confirm_trade\",\"action_id\":\"r5-blind-2\","
+                + "\"rev\":42,\"item_id\":56,\"side\":\"buy\"}");
+            Assert.Contains(retry, "operation_pending",
+                "same item+args under a new id is a blind retry: " + retry);
+            Assert.Equal(1, port.AcceptCalls, "the retry never reached the native click");
+        }
     }
 }

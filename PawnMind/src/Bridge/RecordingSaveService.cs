@@ -25,6 +25,11 @@ namespace PawnMind.Bridge
         // Optional read-only intel: a missing service never affects sleep.
         private readonly ReportService reportService;
 
+        // R5/A2: injectable monotonic clock. Sleep completion depends on an
+        // asynchronous blackscreen, so a verdict needs a real observation window,
+        // never a count of back-to-back readbacks. Tests inject a fake clock.
+        private readonly Func<long> clockMs;
+
         public RecordingSaveService(
             RecordingSlotPolicy policy,
             IRecordingGameStatePort gamePort,
@@ -32,7 +37,8 @@ namespace PawnMind.Bridge
             IRecordingNativeSavePort nativePort,
             INewGameMenuPort menuPort,
             IRecordingSaveMetadataPort metadataPort = null,
-            ReportService reportService = null)
+            ReportService reportService = null,
+            Func<long> clockMs = null)
         {
             this.policy = policy;
             this.gamePort = gamePort;
@@ -41,6 +47,15 @@ namespace PawnMind.Bridge
             this.menuPort = menuPort;
             this.metadataPort = metadataPort;
             this.reportService = reportService;
+            this.clockMs = clockMs ?? DefaultMonotonicClock();
+        }
+
+        /// <summary>Monotonic milliseconds; the wall clock may jump, this must not.</summary>
+        private static Func<long> DefaultMonotonicClock()
+        {
+            System.Diagnostics.Stopwatch stopwatch =
+                System.Diagnostics.Stopwatch.StartNew();
+            return delegate { return stopwatch.ElapsedMilliseconds; };
         }
 
         /// <summary>
@@ -116,15 +131,15 @@ namespace PawnMind.Bridge
         public ActionResult ConfirmNewGame()
         {
             const string op = "confirm_new_game";
-            if (policy == null) return Failure(op, RecordingSaveErrors.ServiceUnavailable);
-            if (nativePort == null) return Failure(op, RecordingSaveErrors.ServiceUnavailable);
+            if (policy == null) return MenuFailure(op, RecordingSaveErrors.ServiceUnavailable);
+            if (nativePort == null) return MenuFailure(op, RecordingSaveErrors.ServiceUnavailable);
 
             RecordingGameState game = Refresh();
             RecordingDecision decision = policy.Check(RecordingOperation.ConfirmNewGame);
-            if (!decision.Allowed) return Failure(op, decision.Error);
+            if (!decision.Allowed) return MenuFailure(op, decision.Error);
 
             NewGameMenuSnapshot menu = ReadMenu();
-            if (menu == null) return Failure(op, RecordingSaveErrors.MenuUnavailable);
+            if (menu == null) return MenuFailure(op, RecordingSaveErrors.MenuUnavailable);
 
             if (menu.Prompt != null)
             {
@@ -133,15 +148,15 @@ namespace PawnMind.Bridge
 
             if (!string.IsNullOrEmpty(menu.PhaseError))
             {
-                return Failure(op, RecordingSaveErrors.MenuUnavailable);
+                return MenuFailure(op, RecordingSaveErrors.MenuUnavailable);
             }
             if (menu.Phase != NewGameMenuPhase.Difficulty)
             {
-                return Failure(op, RecordingSaveErrors.WrongMenuPhase);
+                return MenuFailure(op, RecordingSaveErrors.WrongMenuPhase);
             }
             if (menu.StartingGame)
             {
-                return Failure(op, RecordingSaveErrors.MenuTransitioning);
+                return MenuFailure(op, RecordingSaveErrors.MenuTransitioning);
             }
             if (menu.Continue == null
                 || !menu.Continue.Visible
@@ -149,12 +164,12 @@ namespace PawnMind.Bridge
                 || !menu.HasSelection
                 || string.IsNullOrEmpty(menu.SelectedId))
             {
-                return Failure(op, RecordingSaveErrors.StartUnavailable);
+                return MenuFailure(op, RecordingSaveErrors.StartUnavailable);
             }
 
             RecordingSlotInventory inventory = InspectInventory();
             decision = policy.AuthorizeStart(game, inventory);
-            if (!decision.Allowed) return Failure(op, decision.Error);
+            if (!decision.Allowed) return MenuFailure(op, decision.Error);
 
             RecordingNativeResult call;
             try
@@ -165,15 +180,17 @@ namespace PawnMind.Bridge
             {
                 // The callback may have run before the exception surfaced. Never
                 // retry a possible native new game; lock for manual verification.
+                // This is a real (possible) run-changing dispatch.
                 policy.MarkStartIssued();
                 policy.LockOutcomeUnknown();
                 Refresh();
-                return Failure(op, RecordingSaveErrors.OutcomeUnknown, true, true);
+                return Failure(op, RecordingSaveErrors.OutcomeUnknown, true, true,
+                    null, ActionResult.ClaimIssued);
             }
 
             if (call == null || !call.Called)
             {
-                return Failure(op, call == null || string.IsNullOrEmpty(call.Error)
+                return MenuFailure(op, call == null || string.IsNullOrEmpty(call.Error)
                     ? RecordingSaveErrors.NativeNotCalled
                     : call.Error);
             }
@@ -184,17 +201,19 @@ namespace PawnMind.Bridge
                 Refresh();
                 if (policy.State == RecordingSlotState.Locked)
                 {
-                    return Failure(op, policy.Snapshot().Error, true, true);
+                    return Failure(op, policy.Snapshot().Error, true, true, null,
+                        ActionResult.ClaimIssued);
                 }
                 policy.LockOutcomeUnknown();
-                return Failure(op, RecordingSaveErrors.OutcomeUnknown, true, true);
+                return Failure(op, RecordingSaveErrors.OutcomeUnknown, true, true, null,
+                    ActionResult.ClaimIssued);
             }
 
             Refresh();
             RecordingStatus status = policy.Snapshot();
             if (status.State == RecordingSlotState.Locked)
             {
-                return Failure(op, status.Error, true, true);
+                return Failure(op, status.Error, true, true, null, ActionResult.ClaimIssued);
             }
             return StartSuccess(op, status);
         }
@@ -233,40 +252,69 @@ namespace PawnMind.Bridge
         // non-terminal sleep blocks every later sleep until the Mod restarts.
         private int sleepDayBefore = -1;
         private bool sleepIssued;
-        private int sleepPolls;
+        private bool sleepTimedOut;
+        private long sleepIssuedAtMs;
 
         /// <summary>
-        /// True when the pending sleep can now be decided: the day moved (completed)
-        /// or repeated readbacks show it did not (failed). Never guesses while the
-        /// save/day transition may still be running.
+        /// True when the pending sleep can now be decided: the day really moved
+        /// (completed), or the observation window elapsed without any proof that
+        /// the native action did nothing (uncertain). Never infers failure from
+        /// back-to-back readbacks: the day transition is asynchronous, so "not
+        /// observed yet" is not "proved no effect".
         /// </summary>
         public bool TryResolveSleep(out string execution, out string error)
         {
             execution = null;
             error = null;
-            if (!sleepIssued) return false;
+            if (!sleepIssued && !sleepTimedOut) return false;
 
             RecordingGameState now = Refresh();
             if (now == null || !now.Readable || !now.InGame) return false;
 
+            // A real day advance is trusted evidence, including after a timeout:
+            // observing the day move is safe recovery evidence, never a re-dispatch.
             if (now.Day > sleepDayBefore)
             {
                 execution = ExecutionStatus.Completed;
                 sleepIssued = false;
+                sleepTimedOut = false;
                 return true;
             }
 
-            sleepPolls++;
-            if (sleepPolls < SleepVerifierPolls) return false;
+            // Already reported uncertain: only a day advance may recover it.
+            if (sleepTimedOut) return false;
 
-            execution = ExecutionStatus.Failed;
-            error = "day_not_changed";
+            if (clockMs() - sleepIssuedAtMs < SleepObservationWindowMs) return false;
+
+            // Past the window with no trusted evidence that the native click did
+            // nothing. That is uncertainty, not a failure, and it must not release
+            // the anti-duplicate block: a second sleep could advance the day twice.
+            execution = ExecutionStatus.Uncertain;
+            error = "sleep_unconfirmed";
             sleepIssued = false;
+            sleepTimedOut = true;
             return true;
         }
 
-        /// <summary>How many readbacks a sleep may stay inconclusive before it fails.</summary>
-        public const int SleepVerifierPolls = 3;
+        /// <summary>
+        /// How long a sleep may stay inconclusive before it becomes uncertain.
+        /// There is no count-based shortcut: three immediate reads prove nothing
+        /// about an asynchronous day transition.
+        /// </summary>
+        public const long SleepObservationWindowMs = 10000;
+
+        /// <summary>
+        /// R5/A2: forget any tracked sleep. Called when the run switches or the
+        /// Mod restarts, so an old sleep can never be completed by the next run's
+        /// day number.
+        /// </summary>
+        public void ResetSleepTracking()
+        {
+            sleepIssued = false;
+            sleepTimedOut = false;
+            sleepDayBefore = -1;
+            sleepIssuedAtMs = 0;
+        }
 
         public ActionResult Sleep(bool dismissWaiting = false)
         {
@@ -277,7 +325,8 @@ namespace PawnMind.Bridge
             RecordingGameState game = Refresh();
             sleepDayBefore = game == null ? -1 : game.Day;
             sleepIssued = false;
-            sleepPolls = 0;
+            sleepTimedOut = false;
+            sleepIssuedAtMs = 0;
             RecordingDecision decision = policy.Check(RecordingOperation.Sleep);
             if (!decision.Allowed) return Failure(op, decision.Error);
             if (game == null || !game.InGame)
@@ -323,6 +372,8 @@ namespace PawnMind.Bridge
 
             // The click was issued: from here on the operation must stay resolvable.
             sleepIssued = true;
+            sleepIssuedAtMs = clockMs();
+            sleepTimedOut = false;
             RecordingGameState afterSleep = Refresh();
             RecordingStatus status = policy.Snapshot();
             if (status.State == RecordingSlotState.Locked)
@@ -373,11 +424,11 @@ namespace PawnMind.Bridge
         public ActionResult NewGame()
         {
             const string op = "new_game";
-            if (policy == null) return Failure(op, RecordingSaveErrors.ServiceUnavailable);
+            if (policy == null) return MenuFailure(op, RecordingSaveErrors.ServiceUnavailable);
 
             Refresh();
             RecordingDecision decision = policy.Check(RecordingOperation.NewGame);
-            return Failure(op, decision.Error);
+            return MenuFailure(op, decision.Error);
         }
 
         public ActionResult Press()
@@ -394,15 +445,15 @@ namespace PawnMind.Bridge
         {
             if (!prompt.FirstRun || string.IsNullOrEmpty(prompt.Id))
             {
-                return Failure(op, RecordingSaveErrors.PromptNotAllowed);
+                return MenuFailure(op, RecordingSaveErrors.PromptNotAllowed);
             }
             if (policy.IsPromptConfirmed(prompt.Id))
             {
-                return Failure(op, RecordingSaveErrors.PromptAlreadyConfirmed);
+                return MenuFailure(op, RecordingSaveErrors.PromptAlreadyConfirmed);
             }
             if (nativePort == null)
             {
-                return Failure(op, RecordingSaveErrors.ServiceUnavailable);
+                return MenuFailure(op, RecordingSaveErrors.ServiceUnavailable);
             }
 
             RecordingNativeResult call;
@@ -413,12 +464,12 @@ namespace PawnMind.Bridge
             catch (Exception)
             {
                 policy.MarkPromptConfirmed(prompt.Id);
-                return Failure(op, RecordingSaveErrors.OutcomeUnknown, true, true);
+                return MenuFailure(op, RecordingSaveErrors.OutcomeUnknown, true, true);
             }
 
             if (call == null || !call.Called)
             {
-                return Failure(op, call == null || string.IsNullOrEmpty(call.Error)
+                return MenuFailure(op, call == null || string.IsNullOrEmpty(call.Error)
                     ? RecordingSaveErrors.NativeNotCalled
                     : call.Error);
             }
@@ -426,18 +477,18 @@ namespace PawnMind.Bridge
             policy.MarkPromptConfirmed(prompt.Id);
             if (!string.IsNullOrEmpty(call.Error))
             {
-                return Failure(op, RecordingSaveErrors.NativeError, true, true);
+                return MenuFailure(op, RecordingSaveErrors.NativeError, true, true);
             }
 
             NewGameMenuSnapshot after = ReadMenu();
             if (after == null)
             {
-                return Failure(op, RecordingSaveErrors.PromptReadbackMismatch, true);
+                return MenuFailure(op, RecordingSaveErrors.PromptReadbackMismatch, true);
             }
             if (after.Prompt != null
                 && string.Equals(after.Prompt.Id, prompt.Id, StringComparison.Ordinal))
             {
-                return Failure(op, RecordingSaveErrors.PromptReadbackMismatch, true);
+                return MenuFailure(op, RecordingSaveErrors.PromptReadbackMismatch, true);
             }
 
             RecordingStatus status = policy.Snapshot();
@@ -446,6 +497,7 @@ namespace PawnMind.Bridge
             row["op"] = op;
             row["dispatched"] = true;
             row["prompt_confirmed"] = true;
+            row["run_change"] = ActionResult.ClaimNotIssued;
             row["prompt_id"] = prompt.Id;
             row["state"] = StateText(status.State);
             row["pending_error"] = status.Error == null
@@ -569,6 +621,7 @@ namespace PawnMind.Bridge
             row["op"] = op;
             row["dispatched"] = true;
             row["start_requested"] = true;
+            row["run_change"] = ActionResult.ClaimIssued;
             row["state"] = StateText(status.State);
             row["bound"] = status.Bound;
             row["start_pending"] = status.StartPending;
@@ -800,6 +853,23 @@ namespace PawnMind.Bridge
             }
         }
 
+        /// <summary>
+        /// R5/A1: every refusal raised by the new-game menu path provably did not
+        /// request a run-changing native action. Keeping this claim explicit is
+        /// what stops a first-run prompt confirmation from blocking the next,
+        /// real confirm_new_game.
+        /// </summary>
+        private static ActionResult MenuFailure(
+            string op,
+            string error,
+            bool dispatched = false,
+            bool unknown = false,
+            DayCycleReadback readback = null)
+        {
+            return Failure(op, error, dispatched, unknown, readback,
+                ActionResult.ClaimNotIssued);
+        }
+
         private static RecordingGameState UnavailableGameState()
         {
             return new RecordingGameState
@@ -814,7 +884,8 @@ namespace PawnMind.Bridge
             string error,
             bool dispatched = false,
             bool unknown = false,
-            DayCycleReadback readback = null)
+            DayCycleReadback readback = null,
+            string runChangeClaim = null)
         {
             JObject row = new JObject();
             row["ok"] = false;
@@ -824,6 +895,7 @@ namespace PawnMind.Bridge
                 : error;
             row["dispatched"] = dispatched;
             if (unknown) row["unknown"] = true;
+            if (runChangeClaim != null) row["run_change"] = runChangeClaim;
             if (readback != null) row["readback"] = JObject.FromObject(FirstWeekJson.Readback(readback));
             return ActionResult.SuccessRaw(op, row.ToString(Formatting.None));
         }

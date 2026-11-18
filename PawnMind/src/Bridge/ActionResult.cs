@@ -22,6 +22,32 @@ namespace PawnMind.Bridge
         public bool RunChangeRequested { get; private set; }
 
         /// <summary>
+        /// R5/A1: the service's explicit claim about the run identity. A first-run
+        /// prompt confirmation is an independent UI operation, so it claims
+        /// <see cref="ClaimNotIssued"/> and must never leave an unconfirmed
+        /// run-change request behind. <c>null</c> means "no claim": the router then
+        /// keeps the conservative op-name behavior.
+        /// </summary>
+        public string RunChangeClaim { get; private set; }
+
+        /// <summary>The native start/load was (or may have been) issued.</summary>
+        public const string ClaimIssued = "issued";
+
+        /// <summary>This result provably did not request a run-changing action.</summary>
+        public const string ClaimNotIssued = "not_issued";
+
+        public ActionResult WithRunChangeClaim(string claim)
+        {
+            if (string.Equals(claim, ClaimIssued, StringComparison.Ordinal)
+                || string.Equals(claim, ClaimNotIssued, StringComparison.Ordinal))
+            {
+                RunChangeClaim = claim;
+            }
+
+            return this;
+        }
+
+        /// <summary>
         /// R4/F4b: whether the native call ran, as claimed by the service that
         /// produced this result. A RawJson write response declares it explicitly;
         /// a response that says nothing is <see cref="DispatchStatus.Unknown"/> and
@@ -111,6 +137,7 @@ namespace PawnMind.Bridge
                 }
 
                 result.Dispatch = ReadDispatch(raw);
+                result.RunChangeClaim = ReadRunChangeClaim(raw);
                 result.Ok = (bool)ok;
                 if (!result.Ok)
                 {
@@ -140,6 +167,26 @@ namespace PawnMind.Bridge
                 return DispatchStatus.Unknown;
 
             return (bool)value ? DispatchStatus.Dispatched : DispatchStatus.NotDispatched;
+        }
+
+        /// <summary>
+        /// Reads the service's run-change claim. Only the two known claims count;
+        /// anything else (missing, wrong type, invented value) means "no claim" and
+        /// the router falls back to the conservative op-name rule.
+        /// </summary>
+        private static string ReadRunChangeClaim(JObject raw)
+        {
+            JToken value = raw["run_change"];
+            if (value == null || value.Type != JTokenType.String) return null;
+
+            string claim = (string)value;
+            if (string.Equals(claim, ClaimIssued, StringComparison.Ordinal)
+                || string.Equals(claim, ClaimNotIssued, StringComparison.Ordinal))
+            {
+                return claim;
+            }
+
+            return null;
         }
 
         public string ToJson(long revision)

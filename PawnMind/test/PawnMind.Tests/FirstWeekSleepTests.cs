@@ -74,15 +74,16 @@ namespace PawnMind.Tests
         }
 
         /// <summary>
-        /// R4-SLEEP-02: a sleep whose click did nothing must become terminal, not stay
-        /// pending forever: one stuck sleep used to block every later sleep until the
-        /// Mod restarted (live session, 2026-11-19).
+        /// R5-SLEEP: supersedes R4-SLEEP-02. Repeated zero-interval readbacks can
+        /// never prove the native sleep failed (the day transition is async). Only
+        /// the elapsed observation window turns it into an explicit uncertainty.
         /// </summary>
         [Test]
-        public static void Sleep_Verifier_Gives_Up_After_Repeated_No_Op_Readbacks()
+        public static void Sleep_Verifier_Timeout_Is_Uncertain_Not_Failed()
         {
             RecordingHarness harness = Bound(3, 4, 600);
             harness.NativePort.SleepEffect = delegate { };
+            harness.ClockMs = 0;
 
             harness.Service.Sleep();
 
@@ -92,10 +93,15 @@ namespace PawnMind.Tests
                 "first readback is inconclusive");
             Assert.False(harness.Service.TryResolveSleep(out execution, out error),
                 "second readback is inconclusive");
+            Assert.False(harness.Service.TryResolveSleep(out execution, out error),
+                "a third immediate readback is still inconclusive");
+
+            harness.ClockMs = 60000;
             Assert.True(harness.Service.TryResolveSleep(out execution, out error),
-                "the third readback stops pretending it is still running");
-            Assert.Equal("failed", execution, "day did not move -> failed");
-            Assert.Equal("day_not_changed", error, "stable code");
+                "past the observation window the verifier produces a verdict");
+            Assert.Equal("uncertain", execution,
+                "no proof of a no-op -> uncertain, never failed");
+            Assert.Equal("sleep_unconfirmed", error, "stable code");
         }
 
         [Test]

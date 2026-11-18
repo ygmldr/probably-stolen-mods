@@ -74,9 +74,11 @@ namespace PawnMind.Tests
             {
                 if (op == "confirm_new_game")
                 {
+                    // R5/A1: the service claims that a prompt confirmation is not
+                    // a run-changing native start.
                     return ActionResult.SuccessRaw(op,
-                            "{\"ok\":true,\"dispatched\":true,\"prompt_confirmed\":true}")
-                        .WithRunChangeRequested();
+                            "{\"ok\":true,\"dispatched\":true,\"prompt_confirmed\":true,"
+                            + "\"run_change\":\"not_issued\"}");
                 }
 
                 return ActionResult.Success(op);
@@ -87,9 +89,9 @@ namespace PawnMind.Tests
             router.Handle(Write("open_shop", "old-prompt", 3));
             JObject json = JObject.Parse(router.Handle(Write("confirm_new_game", "f1b-prompt", 3)));
 
-            Assert.Equal("requested", (string)json["run_change_status"],
-                "a confirmed prompt is a request, not a completed run switch");
-            Assert.False((bool)json["run_change_confirmed"], "not confirmed");
+            Assert.Null(json["run_change_status"],
+                "R5/A1: a confirmed prompt is not a run-changing request at all");
+            Assert.Null(json["run_change_confirmed"], "nothing to confirm");
             Assert.True((bool)router.GetOperationJson("old-prompt")["known"],
                 "the run has not changed, so the old operation evidence must survive");
         }
@@ -824,16 +826,18 @@ namespace PawnMind.Tests
                 3,
                 delegate(string op, JObject request)
                 {
+                    // R5/A1: this is a real start request (not a prompt), so the
+                    // service claims "issued"; the identity has not changed yet.
                     return ActionResult.SuccessRaw(op,
-                            "{\"ok\":true,\"dispatched\":true,\"prompt_confirmed\":true}")
-                        .WithRunChangeRequested();
+                            "{\"ok\":true,\"dispatched\":true,\"start_requested\":true,"
+                            + "\"run_change\":\"issued\"}");
                 },
                 null,
                 delegate { return RunChangePolicy.NoRun; });
 
             JObject json = JObject.Parse(router.Handle(Write("confirm_new_game", "f1b-none", 3)));
             Assert.Equal(RunChangeStatus.Requested, (string)json["run_change_status"],
-                "no run before and after is still only a request");
+                "a dispatched start with no run before and after is still only a request");
         }
 
         /// <summary>

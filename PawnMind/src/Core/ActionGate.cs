@@ -312,6 +312,25 @@ namespace PawnMind.Core
             return found;
         }
 
+        /// <summary>
+        /// R5/A2: how many non-terminal operations exist in total. The read-only
+        /// listing is bounded, so this is what lets the caller see a truncation
+        /// instead of silently losing an operation that affects recovery.
+        /// </summary>
+        public int CountNonTerminal()
+        {
+            int count = 0;
+            foreach (KeyValuePair<string, Entry> pair in _results)
+            {
+                OperationRecord operation = pair.Value.Operation;
+                if (operation == null) continue;
+                if (ExecutionStatus.IsTerminal(operation.Execution)) continue;
+                count++;
+            }
+
+            return count;
+        }
+
         /// <summary>Stores an updated record (the operation verifier).</summary>
         public bool Update(OperationRecord record)
         {

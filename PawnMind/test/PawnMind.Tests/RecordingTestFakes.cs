@@ -291,6 +291,9 @@ namespace PawnMind.Tests
         public readonly RecordingSlotPolicy Policy;
         public readonly RecordingSaveService Service;
 
+        /// <summary>R5/A2: fake monotonic clock read by the injected sleep verifier.</summary>
+        public long ClockMs;
+
         public RecordingHarness(RecordingSettings settings, NewGameMenuSnapshot menu)
         {
             MenuPort = new FakeNewGameMenuPort(menu ?? RecordingTestData.DifficultyMenu());
@@ -302,7 +305,8 @@ namespace PawnMind.Tests
                 NativePort,
                 MenuPort,
                 MetadataPort,
-                new ReportService(ReportPort));
+                new ReportService(ReportPort),
+                delegate { return ClockMs; });
         }
 
         public static RecordingHarness Create(

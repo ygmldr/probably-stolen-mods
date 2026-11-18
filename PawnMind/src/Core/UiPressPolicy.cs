@@ -7,12 +7,19 @@ namespace PawnMind.Core
     ///
     /// <c>press</c> exists for windows without a typed adapter, but it invokes an
     /// arbitrary UI callback, so the recording policy refuses it outright. A few
-    /// overlay panels (the control-hint overlay and the dialogue/text settings
-    /// dialog) have no typed op and would otherwise block the player's view with
-    /// no way to close them.
+    /// panels have no typed op and would otherwise block the player's view or the
+    /// day transition with no way to dismiss them:
+    ///   * the control-hint overlay (CloseOverlayButton),
+    ///   * the dialogue/text settings dialog (CloseButton / ApplyButton),
+    ///   * the day-end shutter confirmation (<c>NegotiationTablet/Confirm/Buttons/Button</c>),
+    /// which is the fourth path and the one R5/B2 is migrating to a typed action.
     ///
-    /// This allowlist is deliberately tiny and name-based: only the dismiss
-    /// buttons of those two overlays. Everything else stays refused.
+    /// This allowlist is deliberately tiny and name-based.
+    ///
+    /// Test-mode only: every path here is reachable only when
+    /// <c>run_mode=test</c> (see <see cref="ModePolicy"/> and the dispatch guard).
+    /// None of these is a Play capability; a formal Play benchmark may not depend
+    /// on <c>press</c>.
     /// </summary>
     public static class UiPressPolicy
     {

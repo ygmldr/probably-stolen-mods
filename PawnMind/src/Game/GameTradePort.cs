@@ -45,7 +45,37 @@ namespace PawnMind.Game
             input.CanBuyFromTable = SafeCanBuyFromTable();
             GameItem item = GameState.FindItem(itemId);
             input.CanSellItem = item != null && GameState.CanSellItem(item);
+
+            // R5/A3: mirror the native sell budget gate with player-visible values
+            // only — StoreClient.useClientBudget plus GetBudget() (the client.budget
+            // snapshot field) and the negotiation price GetNegociatedValue() shown
+            // on the tablet. The trade-time enforcement happens in
+            // PlayerStore.SellItemFromTable -> CanSellThisItem -> HasBudgetLeftToBuy,
+            // which ignores the accept click without reporting anything.
+            input.ClientUsesBudget = client.useClientBudget;
+            input.ClientBudget = GameState.GetClientBudget(client);
+            input.StagedItemValue = SafeNegociatedValue(staged);
             return input;
+        }
+
+        /// <summary>
+        /// Player-visible negotiation price of the staged item. This is the same
+        /// value the native sell budget gate compares with StoreClient.GetBudget();
+        /// the state snapshot already reads it for every item. An unreadable price
+        /// fails closed (long.MaxValue) so the sale is refused instead of silently
+        /// ignored by the game.
+        /// </summary>
+        private static long SafeNegociatedValue(GameItem item)
+        {
+            if (item == null) return 0L;
+            try
+            {
+                return item.GetNegociatedValue();
+            }
+            catch (Exception)
+            {
+                return long.MaxValue;
+            }
         }
 
         public TradeEvidence Accept()

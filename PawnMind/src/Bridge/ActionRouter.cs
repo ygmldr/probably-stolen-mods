@@ -305,6 +305,23 @@ namespace PawnMind.Bridge
             string execution = Classify(result, response, out string error);
             _gate.Complete(actionId, response, execution, DeliveryStatus.Delivered,
                 responseRevision, error, operation.Dispatch);
+
+            // R5/A1: the service is the only side that knows whether a native
+            // run switch was actually requested. A first-run prompt confirmation
+            // claims "not issued" and must not leave an unconfirmed run-change
+            // request behind: that request used to refuse the next, real
+            // confirm_new_game forever (NoRun -> NoRun). Results without a claim
+            // keep the conservative op-name behavior.
+            if (runChange
+                && string.Equals(result.RunChangeClaim, ActionResult.ClaimNotIssued,
+                    StringComparison.Ordinal))
+            {
+                operation.RunChangeRequested = false;
+                operation.RunChange = RunChangeStatus.NotRequested;
+                operation.RunIdBefore = null;
+                _gate.Update(operation);
+            }
+
             string decorated = DecorateResponse(actionId, response, _gate.Find(actionId));
             _gate.Replace(actionId, response, decorated);
             ApplyRunChange(actionId);
@@ -479,7 +496,19 @@ namespace PawnMind.Bridge
                 rows.Add(row);
             }
 
+            // R5/A2: a bounded list must never hide the fact that it is bounded.
+            // The caller has to know a stuck operation may be outside this window.
+            int total = _gate.CountNonTerminal();
+            bool truncated = total > rows.Count;
             payload["count"] = rows.Count;
+            payload["total_non_terminal"] = total;
+            payload["truncated"] = truncated;
+            if (truncated)
+            {
+                payload["truncation_note"] = "only the newest " + rows.Count
+                    + " non-terminal operations are listed; older ones can still be"
+                    + " resolved by get_operation with their known id";
+            }
             payload["next"] = "call get_operation with one of these ids; a sleep or"
                 + " save that never finished must be resolved before retrying it";
             return payload;

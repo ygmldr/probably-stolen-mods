@@ -37,6 +37,13 @@ namespace PawnMind.Core
         public const string CannotBuyFromTable = "cannot_buy_from_table";
         public const string ClientRefusesItem = "client_refuses_item";
 
+        /// <summary>
+        /// R5: the client's player-visible budget cannot cover the player-visible
+        /// negotiation price. The native sell path silently ignores the click, so
+        /// refuse before dispatch instead.
+        /// </summary>
+        public const string ClientBudgetInsufficient = "client_budget_insufficient";
+
         /// <summary>Dispatched but no trusted completion evidence (silent native return).</summary>
         public const string OutcomeUnverified = "outcome_unverified";
 
@@ -70,6 +77,15 @@ namespace PawnMind.Core
         public bool GunOrderAccepted;
         public bool CanBuyFromTable;
         public bool CanSellItem;
+
+        // R5/A3 budget precheck inputs. Both sides are player-visible: the
+        // client.budget snapshot field and the negotiation price shown on the
+        // native tablet. The policy only compares them; the adapter reads them.
+        // StagedItemValue is the native GetNegociatedValue() return type (long) so
+        // the comparison is exactly the native useClientBudget predicate.
+        public bool ClientUsesBudget;
+        public int ClientBudget;
+        public long StagedItemValue;
     }
 
     /// <summary>
@@ -79,6 +95,10 @@ namespace PawnMind.Core
     /// the game silently ignored. Branches whose native predicate cannot be read
     /// safely are represented by a pre-computed bool; the adapter fails closed
     /// (false) when it cannot read them.
+    ///
+    /// R5 adds one more silent-refusal mirror: the sell-direction client budget
+    /// gate of PlayerStore.SellItemFromTable -> CanSellThisItem (see
+    /// <see cref="TradeErrors.ClientBudgetInsufficient"/>).
     /// </summary>
     public static class TradeGuardPolicy
     {
@@ -136,6 +156,19 @@ namespace PawnMind.Core
             else if (!input.CanBuyFromTable)
             {
                 return TradeErrors.CannotBuyFromTable;
+            }
+
+            // R5: the native sell path (PlayerStore.SellItemFromTable ->
+            // CanSellThisItem) also silently refuses a sale the client cannot
+            // afford: StoreClient.useClientBudget && GetNegociatedValue() >
+            // GetBudget(). Both values are player-visible (client.budget in the
+            // snapshot, the negotiation price on the tablet). Refusing here beats
+            // dispatching a click that the game will ignore. The buy direction is
+            // paid by the player and is covered by CanBuyFromTable instead.
+            if (selling && input.ClientUsesBudget
+                && input.StagedItemValue > input.ClientBudget)
+            {
+                return TradeErrors.ClientBudgetInsufficient;
             }
 
             return null;

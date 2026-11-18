@@ -260,7 +260,13 @@ public sealed class PawnMindMod : IMod
     private static ActionResult DispatchAction(string op, JObject request)
     {
         ActionResult result = DispatchActionCore(op, request);
-        if (result != null && result.Ok && RunChangeOps.IsRunChangeOp(op))
+        // R5/A1: the service's explicit run-change claim wins over the op name.
+        // A first-run prompt confirmation is a menu UI action, not a native run
+        // start, so it must not leave a run-change request behind.
+        bool mayChangeRun = result != null
+            && result.RunChangeClaim != ActionResult.ClaimNotIssued
+            && RunChangeOps.IsRunChangeOp(op);
+        if (mayChangeRun && result.Ok)
         {
             // D2/PP-RECOVERY-01 + R4/F1b: a new game or a loaded save *requests* a
             // run switch. Nothing is evicted and no rent receipt is dropped here:
@@ -276,11 +282,16 @@ public sealed class PawnMindMod : IMod
     /// R4/F1b: runs once, after a run switch is confirmed by a native identity
     /// readback. Old-run evidence that is not an <see cref="OperationRecord"/>
     /// (the first-rent receipts) is dropped here instead of at request time.
+    /// R5/A2: the pending-sleep tracking is reset too, so an old sleep can never
+    /// be completed by the new run's day number.
     /// </summary>
     private static void ResetRunBoundEvidence()
     {
         FirstWeekService service = FirstWeekService.Current;
         if (service != null) service.ResetRentReceipts();
+
+        RecordingSaveService recording = RecordingService;
+        if (recording != null) recording.ResetSleepTracking();
     }
 
     private static ActionResult DispatchActionCore(string op, JObject request)
