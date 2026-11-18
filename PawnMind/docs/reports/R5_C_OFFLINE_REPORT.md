@@ -35,9 +35,9 @@
 
 | 模块 | 命令 | 结果 |
 |---|---|---|
-| 记录器 | `python -m unittest agent.tests.test_trace_recorder` | **41 OK** |
+| 记录器 | `python -m unittest agent.tests.test_trace_recorder` | **44 OK**（含 W-C2-1 dispatch 轴） |
 | MCP 集成 | `… test_mcp_entrypoint`（含 5 个新集成测试） | **8 OK** |
-| 决策接口 | `… test_decision_interface` | **19 OK** |
+| 决策接口 | `… test_decision_interface` | **23 OK**（含 W-C3-1 空面 deny-all、W-C3-2 二次参数校验） |
 | fake 六情景 | `… test_fake_scenarios` | **11 OK** |
 | fake 契约（R5 面） | `… test_fake_game_contract` | **23 OK** |
 | validator（1.3.0） | `… test_trace_validator` | **117 OK** |
@@ -111,8 +111,11 @@ inject_native_fault`（无 wall-clock sleep）。`agent/tests/test_fake_scenario
 | 5 | 异步 sleep | **PASS** | `sleep` → pending/running；立即 `get_operation` inconclusive（全程无 `failed`/`day_not_changed`）；宿主 `finish_sleep()` 后 → `completed` + completion_evidence；**模拟 10s 窗**：5s running、11s → `sleep_unconfirmed` uncertain 非终态、新 sleep id → `operation_pending`、之后 day 前进恢复 completed；`get_operation("*")` 20 条/总数 21/`truncated:true`/`truncation_note` |
 | 6 | 首周租金 | **PASS** | `end_day+sleep`×7 到房东；`choose_dialogue(0)` → 回执 `rent_1_100`：amount 100、cash 200→100（`cash_delta:-100`）、`weeks_paid_delta:1`、`paid_at_rev` = 派发 rev、`detection_complete:true`；后续 +30 交易不改变回执字节，现金 130 |
 
-fake 与桥一致性：字段名/拒绝码/uncertain 语义逐项照已提交 C# 契约实现；fake 不会输出桥不会
-输出的成功形状（注入静默 native 时返回 uncertain 而非 ok）。TDD red 证据：动手前 9 个测试
+fake 与桥一致性：R5 路径（staging / typed modal / R5 交易证据 / 异步 sleep 模型 / 租金回执）的
+字段名/拒绝码/uncertain 语义逐项照已提交 C# 契约实现；注入静默 native 时返回 uncertain 而非 ok。
+**范围说明（Reviewer C W-C4-1）**：fake 的旧版默认 sleep 路径（`async_sleep=False`，预 R5 S6B 遗留）
+仍返回即时 `ok:true/completed`；R5 异步模型是显式开启（情景 5 使用），因此上面的“不会输出桥不会
+输出的成功形状”只对 R5 契约面成立，旧默认 sleep 属于历史 fake 行为，不是本轮 R5 证据。TDD red 证据：动手前 9 个测试
 失败（缺 `async_sleep`/host 夹具、`get_pending_prompt` 未注册、旧 `rent-0001` 回执、
 静默 native 交易伪造 `ok:true`），确认“fake 缺行为”后才扩展。
 

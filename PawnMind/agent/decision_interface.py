@@ -290,7 +290,10 @@ class Executor(object):
     def __init__(self, client, allowed_tools, budget=None, mode="test",
                  clock=None):
         self.client = client
-        self.allowed_tools = set(allowed_tools or ())
+        # None is the explicit "unrestricted, the host declares the surface"
+        # opt-in. An empty iterable means deny-all: an empty declared surface
+        # must never silently become a fail-open executor (W-C3-1).
+        self.allowed_tools = None if allowed_tools is None else set(allowed_tools)
         self.budget = budget or Budget()
         self.mode = mode
         self.clock = clock or time.time
@@ -330,7 +333,9 @@ class Executor(object):
                     "tool %r has no live evidence and is not on the play allowlist"
                     % decision.tool,
                 )
-        if self.allowed_tools and decision.tool not in self.allowed_tools:
+        if decision.tool not in known_tools():
+            return ("tool_not_allowed", "tool %r is not a PawnMind tool" % decision.tool)
+        if self.allowed_tools is not None and decision.tool not in self.allowed_tools:
             return ("tool_not_allowed", "tool %r is not in the declared pilot surface" % decision.tool)
         return None
 
@@ -344,6 +349,17 @@ class Executor(object):
 
         if self.stopped:
             return StepResult(StepStatus.STOPPED, decision=decision, stop=True,
+                              stop_reason=self.stop_reason)
+
+        # W-C3-2: a host may construct Decision directly, so validate its
+        # arguments at execution time too (escaped quotes in one field must not
+        # let a model set rev/action_id or probe hidden fields).
+        try:
+            decision.args = _check_args(decision.args)
+        except DecisionError as error:
+            self.stopped = True
+            self.stop_reason = "invalid_decision: %s" % error
+            return StepResult(StepStatus.REJECTED, decision=decision, stop=True,
                               stop_reason=self.stop_reason)
 
         refusal = self._surface_refusal(decision)

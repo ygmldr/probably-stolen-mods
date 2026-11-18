@@ -273,5 +273,44 @@ class ExecutorTests(unittest.TestCase):
         self.assertEqual(12, result.observation.get("rev"), "the executor re-reads the real state")
 
 
+class ExecutorSurfaceGuardTests(unittest.TestCase):
+    """W-C3-1/W-C3-2: the executor's own surface guard must fail closed."""
+
+    def setUp(self):
+        self.client = FakeClient()
+
+    def test_empty_allowed_tools_denies_every_tool(self):
+        # An empty declared surface means "nothing allowed", not "no restriction".
+        executor = Executor(self.client, allowed_tools=[],
+                            budget=Budget(max_actions=5))
+        result = executor.execute(decision(tool="open_shop"))
+        self.assertEqual(StepStatus.BLOCKED, result.status)
+        self.assertEqual(0, len(self.client.calls), "a deny-all surface dispatches nothing")
+
+    def test_none_allowed_tools_is_the_explicit_unrestricted_declaration(self):
+        executor = Executor(self.client, allowed_tools=None,
+                            budget=Budget(max_actions=5))
+        result = executor.execute(decision(tool="open_shop"))
+        self.assertEqual(StepStatus.COMPLETED, result.status)
+
+    def test_hand_built_decision_cannot_bypass_argument_checks(self):
+        # A host could construct Decision directly; the executor must still
+        # reject executor-owned args instead of trusting the object.
+        executor = Executor(self.client, ALLOWED, Budget(max_actions=5))
+        bad = Decision(goal="x", tool="open_shop", args={"rev": 9}, reason="x")
+        result = executor.execute(bad)
+        self.assertEqual(StepStatus.REJECTED, result.status)
+        self.assertEqual(0, len(self.client.calls))
+
+    def test_hand_built_decision_with_unknown_tool_is_blocked(self):
+        executor = Executor(self.client, None, Budget(max_actions=5))
+        bad = Decision(goal="x", tool="run_arbitrary_code", args={}, reason="x")
+        result = executor.execute(bad)
+        self.assertEqual(StepStatus.BLOCKED, result.status,
+                         "an unknown tool is a surface refusal, not an execution attempt")
+        self.assertIn("not a PawnMind tool", result.stop_reason)
+        self.assertEqual(0, len(self.client.calls))
+
+
 if __name__ == "__main__":
     unittest.main()

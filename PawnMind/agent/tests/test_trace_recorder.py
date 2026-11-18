@@ -956,6 +956,49 @@ def record_clean_run(test, path):
     return recorder
 
 
+class DispatchAxisTests(RecorderTestBase):
+    """W-C2-1: the recorded dispatch axis is the response's own claim.
+
+    The recorder must never present a received response as proof that a native
+    call was dispatched: a pre-dispatch refusal (stale_rev etc.) carries
+    ``dispatched: false`` and a response without a claim is unknown.
+    """
+
+    def test_pre_dispatch_refusal_is_not_recorded_as_dispatched(self):
+        recorder = self.make()
+        self.bridge.action_responses["confirm_trade"] = [{
+            "ok": False, "op": "confirm_trade", "error": "stale_rev",
+            "execution_status": "rejected", "dispatched": False,
+        }]
+        recorder.action("confirm_trade", rev=10, action_id="a-refuse",
+                        item_id=101, side="sell")
+        result = [row for row in self.events() if row["phase"] == "result"][-1]
+        self.assertEqual("not_dispatched", result["dispatch_status"],
+                         "a pre-dispatch refusal must not be recorded as dispatched")
+        self.assertEqual("rejected", result["execution_status"])
+
+    def test_missing_dispatch_claim_is_recorded_as_unknown(self):
+        recorder = self.make()
+        self.bridge.action_responses["confirm_trade"] = [{
+            "ok": False, "op": "confirm_trade", "error": "unverified",
+        }]
+        recorder.action("confirm_trade", rev=10, action_id="a-unknown",
+                        item_id=101, side="sell")
+        result = [row for row in self.events() if row["phase"] == "result"][-1]
+        self.assertEqual("unknown", result["dispatch_status"],
+                         "no claim is unknown, never a safe-looking not_dispatched/dispatched")
+
+    def test_response_dispatch_claim_is_recorded_verbatim(self):
+        recorder = self.make()
+        self.bridge.action_responses["confirm_trade"] = [trade_result()]
+        recorder.action("confirm_trade", rev=10, action_id="a-ok",
+                        item_id=101, side="sell")
+        result = [row for row in self.events() if row["phase"] == "result"][-1]
+        self.assertEqual("dispatched", result["dispatch_status"],
+                         "a real dispatch claim is preserved")
+        self.assertEqual("completed", result["execution_status"])
+
+
 class ExportTests(RecorderTestBase):
     def test_clean_run_export_is_rebuilt_from_recorded_bytes_and_validates(self):
         recorder = record_clean_run(self, self.path)

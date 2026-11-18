@@ -134,6 +134,25 @@ DISPATCH_DISPATCHED = "dispatched"
 DISPATCH_NOT_DISPATCHED = "not_dispatched"
 DISPATCH_UNKNOWN = "unknown"
 
+
+def _dispatch_claim(payload):
+    """The response's own dispatch fact (RFC-in-spirit: never inferred).
+
+    ``dispatched: true`` -> dispatched, ``false`` -> not_dispatched, anything
+    else (missing / wrong type) -> unknown. A received HTTP response is not
+    proof that a native call ran: a pre-dispatch refusal is received too.
+    For a read (no native write) the axis is not meaningful; the received
+    response is recorded as dispatched like the pre-R5 behaviour.
+    """
+    if not isinstance(payload, dict):
+        return DISPATCH_UNKNOWN
+    value = payload.get("dispatched")
+    if value is True:
+        return DISPATCH_DISPATCHED
+    if value is False:
+        return DISPATCH_NOT_DISPATCHED
+    return DISPATCH_UNKNOWN
+
 #: Frozen D2 operation axes (mirrors src/Core/OperationStatus + the validator).
 EXECUTION_STATUSES = frozenset({
     "prepared", "running", "completed", "rejected", "failed", "uncertain",
@@ -1163,7 +1182,8 @@ class TraceRecorder:
             request_status=REQUEST_ISSUED,
             response_status=(RESPONSE_RECEIVED if payload is not None
                              else RESPONSE_INVALID),
-            dispatch_status=DISPATCH_DISPATCHED,
+            dispatch_status=(_dispatch_claim(payload) if call["is_write"]
+                             else DISPATCH_DISPATCHED),
             execution_status=execution_status,
             delivery_status=delivery_status, evidence=evidence,
             result=payload, error=error, duration_ms=duration,

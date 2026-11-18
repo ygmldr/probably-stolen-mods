@@ -6,7 +6,7 @@
 > 关联：[`../../skills/pawnmind-first-week/SKILL.md`](../../skills/pawnmind-first-week/SKILL.md)、
 > [`R5_HANDOFF_2026-11-19.md`](../reviews/R5_HANDOFF_2026-11-19.md)、
 > [`FIRST_WEEK_BENCHMARK_SPEC.md`](FIRST_WEEK_BENCHMARK_SPEC.md)、
-> `agent/trace_validator.py`（v1.2.0 / schema v2）、`agent/trace_recorder.py`（C2）。
+> `agent/trace_validator.py`（v1.3.0 / schema v2）、`agent/trace_recorder.py`（C2）。
 
 ## 0. 目的与边界
 
@@ -38,9 +38,15 @@
 | `skill_sha256` | `SKILL.md` 文件哈希 |
 | `policy_sha256` | `/health.policy_sha256` 与 MCP 侧一致 |
 | `tool_surface` | `full` / `recording` + 工具数（B1 后 full=117 / recording=107；以实际注册为准） |
-| `trace_schema_version` | 当前 `2`（validator v1.2.0） |
+| `trace_schema_version` | 当前 `2`（validator v1.3.0） |
 | `recording_slot` | 专用槽绑定（只允许用户批准的槽） |
-| `run_id` | 开局后由桥的真实 run identity 确认 |
+| `run_id` | 开局后由桥的真实 run identity 确认（记录器自身的 `run_id` 只是会话 id，不能替代桥 run identity） |
+
+**记录器已自动填写的字段**（`mcp_server --trace-recording`）：`model_id`（宿主 env）、
+`policy_sha256`、`tool_surface`、`host_version`，以及可选的 `recording_slot`（annotation）。
+`prompt_sha256` / `skill_sha256` / 桥 `run_id` 目前**不由记录器自动获得**：pilot 运行前必须由宿主
+显式提供并作为 run 元数据单独存档（或按 L3 前置要求扩大 MCP 集成）。这是 **L3 前待办**，
+不是“已记录”。
 
 > 任何一项无法核对 → **不开始**。这是 D0 前置。
 
