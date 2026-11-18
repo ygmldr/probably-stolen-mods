@@ -48,6 +48,56 @@ namespace PawnMind.Tests
             Assert.True((bool)readback["readable"], "readable");
         }
 
+        /// <summary>
+        /// R4-SLEEP-01: a sleep that advanced the day resolves as completed on the
+        /// next readback. This is what keeps a pending sleep from blocking the
+        /// operation class forever.
+        /// </summary>
+        [Test]
+        public static void Sleep_Verifier_Sees_The_Day_Advance()
+        {
+            RecordingHarness harness = Bound(3, 4, 600);
+            harness.NativePort.SleepEffect = delegate { };   // nothing changes yet
+
+            ActionResult result = harness.Service.Sleep();
+            Assert.False(result.Ok, "a no-op sleep is still pending");
+
+            harness.StatePort.State = RecordingTestData.InGame(
+                day: 4, rentDaysLeft: 3, cash: 590);
+
+            string execution;
+            string error;
+            Assert.True(harness.Service.TryResolveSleep(out execution, out error),
+                "the verifier resolves once the day moved");
+            Assert.Equal("completed", execution, "day advanced -> completed");
+            Assert.Null(error, "no error");
+        }
+
+        /// <summary>
+        /// R4-SLEEP-02: a sleep whose click did nothing must become terminal, not stay
+        /// pending forever: one stuck sleep used to block every later sleep until the
+        /// Mod restarted (live session, 2026-11-19).
+        /// </summary>
+        [Test]
+        public static void Sleep_Verifier_Gives_Up_After_Repeated_No_Op_Readbacks()
+        {
+            RecordingHarness harness = Bound(3, 4, 600);
+            harness.NativePort.SleepEffect = delegate { };
+
+            harness.Service.Sleep();
+
+            string execution;
+            string error;
+            Assert.False(harness.Service.TryResolveSleep(out execution, out error),
+                "first readback is inconclusive");
+            Assert.False(harness.Service.TryResolveSleep(out execution, out error),
+                "second readback is inconclusive");
+            Assert.True(harness.Service.TryResolveSleep(out execution, out error),
+                "the third readback stops pretending it is still running");
+            Assert.Equal("failed", execution, "day did not move -> failed");
+            Assert.Equal("day_not_changed", error, "stable code");
+        }
+
         [Test]
         public static void Sleep_Unreadable_Before_Does_Not_Call_Native()
         {

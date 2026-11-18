@@ -247,7 +247,9 @@ namespace PawnMind.Bridge
             // async save), a second action id for that op would issue a duplicate
             // native call. Refuse it; unrelated writes (for example a dialogue
             // continuation) stay available so the workflow cannot deadlock.
-            OperationRecord pending = _gate.FindPendingFor(op);
+            bool callScoped = PendingScope.IsCallScoped(op);
+            OperationRecord pending = _gate.FindPendingFor(
+                op, callScoped ? fingerprint : null);
             if (pending != null) return Scrub(OperationPending(op, pending));
 
             // R4/F1b: a run-changing write whose switch is not yet confirmed must
@@ -698,6 +700,7 @@ namespace PawnMind.Bridge
             payload["op"] = op;
             payload["rev"] = CurrentRevision();
             payload["blocking_operation_id"] = pending.OperationId;
+            payload["blocking_same_call"] = true;
             payload["execution_status"] = pending.Execution;
             payload["delivery_status"] = pending.Delivery;
             payload["dispatch_status"] = DispatchStatus.Normalize(pending.Dispatch);

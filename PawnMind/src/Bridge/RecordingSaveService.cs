@@ -228,6 +228,46 @@ namespace PawnMind.Bridge
             return Load("load_recording_game", slot);
         }
 
+        // R4: the readback that decides whether a sleep ever happened. A sleep that
+        // clicked a blocked button stays "running" forever otherwise, and a
+        // non-terminal sleep blocks every later sleep until the Mod restarts.
+        private int sleepDayBefore = -1;
+        private bool sleepIssued;
+        private int sleepPolls;
+
+        /// <summary>
+        /// True when the pending sleep can now be decided: the day moved (completed)
+        /// or repeated readbacks show it did not (failed). Never guesses while the
+        /// save/day transition may still be running.
+        /// </summary>
+        public bool TryResolveSleep(out string execution, out string error)
+        {
+            execution = null;
+            error = null;
+            if (!sleepIssued) return false;
+
+            RecordingGameState now = Refresh();
+            if (now == null || !now.Readable || !now.InGame) return false;
+
+            if (now.Day > sleepDayBefore)
+            {
+                execution = ExecutionStatus.Completed;
+                sleepIssued = false;
+                return true;
+            }
+
+            sleepPolls++;
+            if (sleepPolls < SleepVerifierPolls) return false;
+
+            execution = ExecutionStatus.Failed;
+            error = "day_not_changed";
+            sleepIssued = false;
+            return true;
+        }
+
+        /// <summary>How many readbacks a sleep may stay inconclusive before it fails.</summary>
+        public const int SleepVerifierPolls = 3;
+
         public ActionResult Sleep(bool dismissWaiting = false)
         {
             const string op = "sleep";
@@ -235,6 +275,9 @@ namespace PawnMind.Bridge
             if (nativePort == null) return Failure(op, RecordingSaveErrors.ServiceUnavailable);
 
             RecordingGameState game = Refresh();
+            sleepDayBefore = game == null ? -1 : game.Day;
+            sleepIssued = false;
+            sleepPolls = 0;
             RecordingDecision decision = policy.Check(RecordingOperation.Sleep);
             if (!decision.Allowed) return Failure(op, decision.Error);
             if (game == null || !game.InGame)
@@ -278,6 +321,8 @@ namespace PawnMind.Bridge
                     : call.Error);
             }
 
+            // The click was issued: from here on the operation must stay resolvable.
+            sleepIssued = true;
             RecordingGameState afterSleep = Refresh();
             RecordingStatus status = policy.Snapshot();
             if (status.State == RecordingSlotState.Locked)

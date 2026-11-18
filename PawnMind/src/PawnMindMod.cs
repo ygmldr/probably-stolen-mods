@@ -897,6 +897,7 @@ public sealed class PawnMindMod : IMod
     private static OperationRecord VerifyOperation(OperationRecord record)
     {
         if (record == null) return null;
+        if (string.Equals(record.Op, "sleep", StringComparison.Ordinal)) return VerifySleep(record);
         if (!string.Equals(record.Op, "end_day", StringComparison.Ordinal)) return record;
 
         ShopDaySnapshot after = GameState.ReadShopDaySnapshot();
@@ -919,6 +920,34 @@ public sealed class PawnMindMod : IMod
         evidence["in_game"] = true;
         evidence["observed_rev"] = record.ResultRevision;
         record.CompletionEvidence = evidence.ToString(Newtonsoft.Json.Formatting.None);
+        return record;
+    }
+
+    /// <summary>
+    /// R4/F1b-adjacent: a sleep is "did the day move", and only the day readback can
+    /// say. Without this a sleep whose click hit a blocked button stayed running
+    /// forever, and a non-terminal sleep blocks every later sleep.
+    /// </summary>
+    private static OperationRecord VerifySleep(OperationRecord record)
+    {
+        RecordingSaveService service = RecordingService;
+        if (service == null) return record;
+
+        string execution;
+        string error;
+        if (!service.TryResolveSleep(out execution, out error)) return record;
+
+        record.Execution = execution;
+        record.Error = error;
+        record.ResultRevision = StateSnapshot.CurrentRevision;
+        if (string.Equals(execution, ExecutionStatus.Completed, StringComparison.Ordinal))
+        {
+            JObject evidence = new JObject();
+            evidence["source"] = "day_readback";
+            evidence["observed_rev"] = record.ResultRevision;
+            record.CompletionEvidence = evidence.ToString(Newtonsoft.Json.Formatting.None);
+        }
+
         return record;
     }
 

@@ -235,8 +235,20 @@ namespace PawnMind.Core
             return entry.Response;
         }
 
-        /// <summary>Finds a non-terminal operation for the same op name.</summary>
-        public OperationRecord FindPendingFor(string op)
+        /// <summary>
+        /// Finds a non-terminal operation that would repeat the same native call.
+        ///
+        /// The point of the block is to avoid repeating a call that may still be
+        /// running or whose outcome is unknown. Whether "the same call" means the
+        /// same op name or the same op *and* args depends on the op: `end_day` with
+        /// different flags is still one shutter click, while a different trade item
+        /// is a different call. The caller decides; a null fingerprint keeps the
+        /// conservative op-name match.
+        ///
+        /// Why this exists: one uncertain trade used to block every later trade until
+        /// the Mod restarted (live session, 2026-11-18).
+        /// </summary>
+        public OperationRecord FindPendingFor(string op, string fingerprint)
         {
             if (string.IsNullOrEmpty(op)) return null;
             foreach (KeyValuePair<string, Entry> pair in _results)
@@ -244,6 +256,11 @@ namespace PawnMind.Core
                 OperationRecord operation = pair.Value.Operation;
                 if (operation == null) continue;
                 if (!string.Equals(operation.Op, op, StringComparison.Ordinal)) continue;
+                if (fingerprint != null
+                    && !string.Equals(operation.Fingerprint, fingerprint, StringComparison.Ordinal))
+                {
+                    continue;
+                }
                 // unknown may have run: it blocks a second native call just like a
                 // confirmed dispatch. Only "nothing ran" is safe to ignore.
                 if (!DispatchStatus.MayHaveRun(operation.Dispatch)) continue;

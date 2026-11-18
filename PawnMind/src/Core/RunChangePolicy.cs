@@ -99,3 +99,20 @@ namespace PawnMind.Core
         }
     }
 }
+
+/// <summary>
+/// Which ops are identified by their arguments when deciding whether a second
+/// action id would repeat the same native call.
+///
+/// Only ops where the arguments name the target belong here, and only because a
+/// live session proved the coarse rule is actively harmful there: one uncertain
+/// `confirm_trade` on an item the customer could not afford disabled every other
+/// trade. Everything else keeps the conservative op-name match.
+/// </summary>
+public static class PendingScope
+{
+    public static bool IsCallScoped(string op)
+    {
+        return op == "confirm_trade";
+    }
+}

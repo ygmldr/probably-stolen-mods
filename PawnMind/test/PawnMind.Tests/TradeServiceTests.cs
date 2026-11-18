@@ -416,6 +416,43 @@ namespace PawnMind.Tests
             Assert.Equal(2, port.AcceptCalls, "the second sale reached the native click");
         }
 
+        /// <summary>
+        /// R4-TRADE-06: one uncertain trade blocks only *that* call. A different
+        /// item is a different native call and must stay tradable; the same item with
+        /// a new action id is still refused.
+        /// </summary>
+        [Test]
+        public static void R4_TRADE_06_Uncertain_Trade_Blocks_Only_That_Item()
+        {
+            var port = new FakeTradePort();
+            port.Guard.StagedItemOwned = true;
+            port.Evidence.BusinessComplete = false;
+            port.Evidence.ItemsTransferred = false;
+            port.Evidence.CashAfter = port.Evidence.CashBefore;
+            ActionRouter router = Router(port);
+
+            string first = router.Handle(
+                "{\"op\":\"confirm_trade\",\"action_id\":\"trade-x\","
+                + "\"rev\":42,\"item_id\":56,\"side\":\"sell\"}");
+            Assert.Contains(first, "uncertain", "nothing moved, so the first trade is uncertain");
+
+            port.Guard.StagedItemId = 57;
+            string other = router.Handle(
+                "{\"op\":\"confirm_trade\",\"action_id\":\"trade-y\","
+                + "\"rev\":42,\"item_id\":57,\"side\":\"sell\"}");
+            Assert.False(other.Contains("operation_pending"),
+                "a different item must not inherit the block: " + other);
+            Assert.Equal(2, port.AcceptCalls, "the second item reached the native click");
+
+            port.Guard.StagedItemId = 56;
+            string same = router.Handle(
+                "{\"op\":\"confirm_trade\",\"action_id\":\"trade-z\","
+                + "\"rev\":42,\"item_id\":56,\"side\":\"sell\"}");
+            Assert.Contains(same, "operation_pending",
+                "the same call with a new action id is still refused");
+            Assert.Equal(2, port.AcceptCalls, "no third native click");
+        }
+
         // ---------------------------------------------- operation / dialogue split
 
         private const string GameVersion = "VERSION 1-Rev1";

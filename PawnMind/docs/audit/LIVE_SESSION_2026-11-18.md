@@ -110,6 +110,32 @@ move_item(item, "back")   # 放回 → 触发原生 OpenUI()
 | 面板没开就想成交 | `error:"no_negotiation"`, `rejected`, `not_dispatched` | ✅ 未派发不是失败 |
 | 槽位配置 42 但游戏下一个自动槽是 43 | `recording_slot_not_next_free` 前先由 `get_recording_save_status` 暴露 `next_free_slot` | ✅ 预检可用 |
 
+## 3.2 第 2–3 次会话：剩下两个结构性缺陷（已修）
+
+### A. 一次 uncertain 会锁死整个 op 类（已修，收窄到"同一个调用"）
+
+`ActionGate.FindPendingFor(op)` 只按 op 名匹配，所以一笔 `confirm_trade` 变 `uncertain`
+之后，**换一件商品也不允许再交易**。真机复现：顾客预算用完后每点一次都静默拒绝，
+一次连锁产生 5 个死操作，把 5 件商品锁在本会话里。
+
+修法：`FindPendingFor(op, fingerprint)`，只有 `PendingScope.IsCallScoped(op)`（当前仅
+`confirm_trade`）才按参数指纹匹配；`end_day`/`sleep` 等仍按 op 名保守阻塞
+（`end_day` 带不同 flag 仍是同一次快门点击，已有回归测试钉住）。
+
+### B. sleep 永远不会收敛（已修）
+
+`sleep` 点击的是 `EndOfDayUIManager.OnEndDayButtonClick`。当"对话与打字机设置"
+模态面板开着时，点击被吞掉 → 原生返回 `Called` 但什么都没发生 → `running` →
+之后所有 `sleep` 都被 `operation_pending` 挡住，**会话彻底死掉**（复现两次）。
+
+修法：`RecordingSaveService.TryResolveSleep`：
+- 派发时记住 `day`；
+- 回读 `day` 增长 → `completed`；
+- 连续 3 次回读都没增长 → `failed("day_not_changed")`；
+- `PawnMindMod.VerifyOperation` 对 `op=="sleep"` 调用它，`get_operation` 因此能把
+  挂起的 sleep 判终态，解除阻塞。
+测试：`Sleep_Verifier_Sees_The_Day_Advance`、`Sleep_Verifier_Gives_Up_After_Repeated_No_Op_Readbacks`。
+
 ## 4. 复现
 
 ```bash
