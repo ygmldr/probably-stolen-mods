@@ -37,7 +37,13 @@ namespace PawnMind.Bridge
             PromptSnapshot snapshot = PromptPolicy.ReadSafe(promptPort);
             if (!snapshot.Readable)
             {
-                return Failure(OpGetPending, PromptErrors.ReadFailed, false, null);
+                return Failure(
+                    OpGetPending,
+                    string.IsNullOrEmpty(snapshot.Error)
+                        ? PromptErrors.ReadFailed
+                        : snapshot.Error,
+                    false,
+                    null);
             }
 
             if (snapshot.Open && snapshot.Prompt == null)
@@ -67,16 +73,51 @@ namespace PawnMind.Bridge
             string normalized;
             PromptChoices.TryNormalize(choice, out normalized);
 
+            PromptAnswerOutcome outcome;
             try
             {
                 // Exactly one native callback. A throw is never retried.
-                promptPort.Answer(normalized);
+                outcome = promptPort.Answer(before.Prompt, normalized);
             }
             catch (Exception)
             {
                 PromptSnapshot afterError = PromptPolicy.ReadSafe(promptPort);
                 JObject failure = FailureRow(
                     OpAnswer, PromptErrors.AnswerFailed, true, afterError);
+                failure["detail"] = "native_error";
+                return ActionResult.SuccessRaw(
+                    OpAnswer, failure.ToString(Formatting.None));
+            }
+
+            if (outcome == null)
+            {
+                // A port that cannot say what happened must not be read as a
+                // safe refusal: the answer may have reached the native callback.
+                PromptSnapshot afterNull = PromptPolicy.ReadSafe(promptPort);
+                JObject failure = FailureRow(
+                    OpAnswer, PromptErrors.AnswerFailed, true, afterNull);
+                failure["detail"] = "no_outcome";
+                return ActionResult.SuccessRaw(
+                    OpAnswer, failure.ToString(Formatting.None));
+            }
+
+            if (!outcome.Dispatched)
+            {
+                // R5/B2: the native modal changed between read and answer, so
+                // nothing was clicked. This is a safe refusal, not a failure.
+                PromptSnapshot afterRefuse = PromptPolicy.ReadSafe(promptPort);
+                JObject refused = FailureRow(
+                    OpAnswer, outcome.Error, false, afterRefuse);
+                refused["detail"] = "modal_changed_before_dispatch";
+                return ActionResult.SuccessRaw(
+                    OpAnswer, refused.ToString(Formatting.None));
+            }
+
+            if (!string.IsNullOrEmpty(outcome.Error))
+            {
+                PromptSnapshot afterError = PromptPolicy.ReadSafe(promptPort);
+                JObject failure = FailureRow(
+                    OpAnswer, outcome.Error, true, afterError);
                 failure["detail"] = "native_error";
                 return ActionResult.SuccessRaw(
                     OpAnswer, failure.ToString(Formatting.None));

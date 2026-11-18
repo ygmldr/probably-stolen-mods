@@ -662,8 +662,21 @@ namespace PawnMind.AdapterTests
             CheckField(assembly, "GenericConfirmationUIManager", "confirmButtonTMP");
             CheckField(assembly, "GenericConfirmationUIManager", "cancelButtonTMP");
             CheckField(assembly, "GenericConfirmationUIManager", "cancelButton");
+            CheckField(assembly, "GenericConfirmationUIManager", "confirmButton");
             CheckMethod(assembly, "GenericConfirmationUIManager", "ConfirmButtonPressed");
             CheckMethod(assembly, "GenericConfirmationUIManager", "CancelButtonPressed");
+
+            // R5/B2: the negotiation tablet's own confirm panel (yes/no). The
+            // typed answer goes through the native public callbacks; the read
+            // uses the frame identity, body text and the two option buttons.
+            CheckType(assembly, "NegotiationTabletFrame");
+            CheckField(assembly, "NegotiationTabletFrame", "confirmRoot");
+            CheckField(assembly, "NegotiationTabletFrame", "confirmText");
+            CheckField(assembly, "NegotiationTabletFrame", "confirmButtonHost");
+            CheckField(assembly, "NegociationUIManager", "uiObject");
+            CheckMethod(assembly, "NegociationUIManager", "OnConfirmPanelYes");
+            CheckMethod(assembly, "NegociationUIManager", "OnConfirmPanelNo");
+            CheckProperty(assembly, "NegociationUIManager", "Instance");
 
             // close_windows: the paper panel and the floating window handler.
             CheckProperty(assembly, "PaperUIManager", "Instance");

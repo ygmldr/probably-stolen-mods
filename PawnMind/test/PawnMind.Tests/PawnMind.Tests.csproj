@@ -62,6 +62,7 @@
     <Compile Include="Round4OperationTests.cs" />
     <Compile Include="R5RunChangeTests.cs" />
     <Compile Include="R5SleepVerifierTests.cs" />
+    <Compile Include="R5DayEndModalTests.cs" />
     <Compile Include="UiPressPolicyTests.cs" />
     <Compile Include="OperationSemanticsTests.cs" />
     <Compile Include="TradeServiceTests.cs" />

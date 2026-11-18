@@ -21,11 +21,45 @@ namespace PawnMind.Tests
             return new PendingPrompt
             {
                 Kind = PromptKinds.Confirmation,
+                Target = PromptTargets.GenericConfirmation,
                 Body = body,
                 ConfirmText = confirmText,
                 CancelText = cancelText,
-                SingleButton = singleButton
+                SingleButton = singleButton,
+                ConfirmEnabled = true,
+                CancelEnabled = !singleButton
             };
+        }
+
+        /// <summary>R5-B2: the native negotiation-tablet confirmation modal.</summary>
+        public static PendingPrompt NegotiationConfirm()
+        {
+            return new PendingPrompt
+            {
+                Kind = PromptKinds.NegotiationConfirm,
+                Target = PromptTargets.NegotiationTabletConfirm,
+                Body = "卖出的总价超出顾客预算，仍要卖出吗？",
+                ConfirmText = "是",
+                CancelText = "否",
+                SingleButton = false,
+                ConfirmEnabled = true,
+                CancelEnabled = true
+            };
+        }
+
+        public static PromptSnapshot OpenWith(PendingPrompt prompt)
+        {
+            return new PromptSnapshot
+            {
+                Readable = true,
+                Open = true,
+                Prompt = prompt
+            };
+        }
+
+        public static PromptSnapshot NegotiationConfirmOpen()
+        {
+            return OpenWith(NegotiationConfirm());
         }
 
         public static PromptSnapshot Closed()
@@ -57,7 +91,8 @@ namespace PawnMind.Tests
             int day = 3,
             long cash = 550,
             bool outside = false,
-            string location = null)
+            string location = null,
+            string shopState = null)
         {
             return new PromptStateSummary
             {
@@ -65,7 +100,8 @@ namespace PawnMind.Tests
                 Day = day,
                 Cash = cash,
                 Outside = outside,
-                Location = location
+                Location = location,
+                ShopState = shopState
             };
         }
     }
@@ -74,11 +110,13 @@ namespace PawnMind.Tests
     {
         public PromptSnapshot Snapshot = PromptTestData.Closed();
         public PromptSnapshot AfterAnswer;
+        public PromptAnswerOutcome Outcome;
         public bool ThrowOnRead;
         public bool ThrowOnAnswer;
         public int Reads;
         public int AnswerCalls;
         public string LastChoice;
+        public string LastKind;
 
         public PromptSnapshot Read()
         {
@@ -87,12 +125,15 @@ namespace PawnMind.Tests
             return Snapshot;
         }
 
-        public void Answer(string choice)
+        public PromptAnswerOutcome Answer(PendingPrompt prompt, string choice)
         {
             AnswerCalls++;
             LastChoice = choice;
+            LastKind = prompt == null ? null : prompt.Kind;
             if (ThrowOnAnswer) throw new InvalidOperationException("native prompt callback failed");
+            if (Outcome != null) return Outcome;
             if (AfterAnswer != null) Snapshot = AfterAnswer;
+            return PromptAnswerOutcome.Called();
         }
     }
 

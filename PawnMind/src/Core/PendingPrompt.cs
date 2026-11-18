@@ -21,15 +21,48 @@ namespace PawnMind.Core
         public const string BadChoice = "bad_choice";
         public const string ChoiceUnavailable = "choice_unavailable";
         public const string ConfirmationRequired = "confirmation_required";
+
+        /// <summary>
+        /// R5/B2: more than one known modal owns the input at once. The bridge
+        /// refuses to guess which one an answer belongs to.
+        /// </summary>
+        public const string PromptAmbiguous = "prompt_ambiguous";
+
+        /// <summary>
+        /// R5/B2: the native modal changed between the read and the answer (for
+        /// example another window took the input). Refused before any dispatch.
+        /// </summary>
+        public const string PromptChanged = "prompt_changed";
     }
 
     public static class PromptKinds
     {
-        /// <summary>
-        /// The game's GenericConfirmationUIManager. It is the only modal that
-        /// exposes confirm/cancel callbacks today.
-        /// </summary>
+        /// <summary>The game's GenericConfirmationUIManager.</summary>
         public const string Confirmation = "confirmation";
+
+        /// <summary>
+        /// R5/B2: the negotiation tablet's confirm panel. end_day and a sale the
+        /// client cannot afford are the two native flows that raise it; it is the
+        /// panel the test-only <c>press</c> whitelist used to click.
+        /// </summary>
+        public const string NegotiationConfirm = "negotiation_confirm";
+    }
+
+    /// <summary>
+    /// R5/B2: stable identities of the native modal windows. A caller compares
+    /// the target instead of guessing a button index, so an answer can never be
+    /// delivered to a different panel that happens to have a similar button.
+    /// </summary>
+    public static class PromptTargets
+    {
+        /// <summary>GenericConfirmationUIManager.panel.</summary>
+        public const string GenericConfirmation = "generic_confirmation";
+
+        /// <summary>
+        /// NegotiationTablet/Confirm: the panel built by
+        /// NegociacionUIManager.OpenConfirmPanel.
+        /// </summary>
+        public const string NegotiationTabletConfirm = "negotiation_tablet_confirm";
     }
 
     /// <summary>
@@ -56,6 +89,19 @@ namespace PawnMind.Core
         /// return_home); null for a plain /state or get_pending_prompt read.
         /// </summary>
         public string SourceOp;
+
+        /// <summary>
+        /// R5/B2: stable identity of the native window that owns this prompt
+        /// (see <see cref="PromptTargets"/>). An answer is routed by identity,
+        /// never by button position.
+        /// </summary>
+        public string Target;
+
+        /// <summary>R5/B2: the native confirm option is interactable.</summary>
+        public bool ConfirmEnabled = true;
+
+        /// <summary>R5/B2: the native cancel option is interactable.</summary>
+        public bool CancelEnabled = true;
     }
 
     /// <summary>
@@ -82,6 +128,13 @@ namespace PawnMind.Core
         public long Cash;
         public bool Outside;
         public string Location;
+
+        /// <summary>
+        /// R5/B2: PlayerStore.storeState after the answer (OPEN / CLOSED /
+        /// MORNING). The caller needs it to tell "the modal closed" from "the
+        /// action the modal confirmed actually happened".
+        /// </summary>
+        public string ShopState;
     }
 
     public static class PromptChoices
@@ -148,8 +201,15 @@ namespace PawnMind.Core
             string normalized;
             if (!PromptChoices.TryNormalize(choice, out normalized)) return PromptErrors.BadChoice;
 
+            if (string.Equals(normalized, PromptChoices.Confirm, StringComparison.Ordinal)
+                && !snapshot.Prompt.ConfirmEnabled)
+            {
+                // A greyed-out native option is not a legal player action.
+                return PromptErrors.ChoiceUnavailable;
+            }
+
             if (string.Equals(normalized, PromptChoices.Cancel, StringComparison.Ordinal)
-                && snapshot.Prompt.SingleButton)
+                && (snapshot.Prompt.SingleButton || !snapshot.Prompt.CancelEnabled))
             {
                 return PromptErrors.ChoiceUnavailable;
             }
@@ -167,7 +227,17 @@ namespace PawnMind.Core
 
             try
             {
-                return port.Read() ?? Unreadable();
+                PromptSnapshot snapshot = port.Read();
+                if (snapshot == null) return Unreadable();
+                if (!snapshot.Readable
+                    && string.IsNullOrEmpty(snapshot.Error))
+                {
+                    // An unreadable panel must always carry a reason; never let a
+                    // blank error read as "closed".
+                    snapshot.Error = PromptErrors.ReadFailed;
+                }
+
+                return snapshot;
             }
             catch (Exception)
             {
@@ -186,16 +256,59 @@ namespace PawnMind.Core
         }
     }
 
+    /// <summary>
+    /// R5/B2: what one answer attempt actually did. "I refused because the modal
+    /// changed" is not "the native callback threw": only the former is a safe
+    /// non-dispatch, so the two facts stay separate.
+    /// </summary>
+    public sealed class PromptAnswerOutcome
+    {
+        /// <summary>Exactly one native answer callback was invoked.</summary>
+        public bool Dispatched;
+
+        /// <summary>Null on success; a stable code otherwise.</summary>
+        public string Error;
+
+        public static PromptAnswerOutcome Called()
+        {
+            return new PromptAnswerOutcome { Dispatched = true };
+        }
+
+        public static PromptAnswerOutcome CalledWithError(string error)
+        {
+            return new PromptAnswerOutcome
+            {
+                Dispatched = true,
+                Error = string.IsNullOrEmpty(error)
+                    ? PromptErrors.AnswerFailed
+                    : error
+            };
+        }
+
+        public static PromptAnswerOutcome NotDispatched(string error)
+        {
+            return new PromptAnswerOutcome
+            {
+                Dispatched = false,
+                Error = string.IsNullOrEmpty(error)
+                    ? PromptErrors.PromptChanged
+                    : error
+            };
+        }
+    }
+
     public interface IPromptPort
     {
         /// <summary>Read-only projection of the native modal.</summary>
         PromptSnapshot Read();
 
         /// <summary>
-        /// Exactly one native ConfirmButtonPressed or CancelButtonPressed call.
-        /// The caller validates the choice first; this method never retries.
+        /// Exactly one native answer callback for the modal described by
+        /// <paramref name="prompt"/>. The caller validates the choice first; this
+        /// method never retries. It refuses (Dispatched=false) when the modal it
+        /// would answer is no longer the one that was read.
         /// </summary>
-        void Answer(string choice);
+        PromptAnswerOutcome Answer(PendingPrompt prompt, string choice);
     }
 
     public interface IPromptStatePort

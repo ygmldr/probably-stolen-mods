@@ -17,10 +17,16 @@ namespace PawnMind.Bridge
             row["kind"] = string.IsNullOrEmpty(prompt.Kind)
                 ? PromptKinds.Confirmation
                 : prompt.Kind;
+            // R5/B2: the caller compares identities, never button positions.
+            row["target"] = string.IsNullOrEmpty(prompt.Target)
+                ? PromptTargets.GenericConfirmation
+                : prompt.Target;
             row["body"] = prompt.Body ?? string.Empty;
             row["confirm_text"] = prompt.ConfirmText ?? string.Empty;
             row["cancel_text"] = prompt.CancelText ?? string.Empty;
             row["single_button"] = prompt.SingleButton;
+            row["confirm_enabled"] = prompt.ConfirmEnabled;
+            row["cancel_enabled"] = prompt.CancelEnabled && !prompt.SingleButton;
 
             string source = string.IsNullOrEmpty(sourceOp) ? prompt.SourceOp : sourceOp;
             row["source_op"] = string.IsNullOrEmpty(source)
@@ -63,6 +69,9 @@ namespace PawnMind.Bridge
             row["location"] = string.IsNullOrEmpty(summary.Location)
                 ? JValue.CreateNull()
                 : new JValue(summary.Location);
+            row["shop_state"] = string.IsNullOrEmpty(summary.ShopState)
+                ? JValue.CreateNull()
+                : new JValue(summary.ShopState);
             return row;
         }
     }

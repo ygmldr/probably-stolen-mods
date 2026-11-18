@@ -121,10 +121,14 @@ namespace PawnMind.Tests
             Assert.NotNull(token, "open prompt object");
             Assert.Equal(JTokenType.Object, token.Type, "open prompt object");
             var prompt = (JObject)token;
-            Assert.Equal(6, prompt.Count, "exactly the six prompt fields");
+            // R5/B2 added the native window identity and the option enabled
+            // states: the prompt object is now nine fields, still one shape for
+            // /state and get_pending_prompt.
+            Assert.Equal(9, prompt.Count, "exactly the nine prompt fields");
             foreach (string field in new[]
             {
-                "kind", "body", "confirm_text", "cancel_text", "single_button", "source_op"
+                "kind", "target", "body", "confirm_text", "cancel_text",
+                "single_button", "confirm_enabled", "cancel_enabled", "source_op"
             })
             {
                 Assert.True(prompt[field] != null, "missing prompt field: " + field);
