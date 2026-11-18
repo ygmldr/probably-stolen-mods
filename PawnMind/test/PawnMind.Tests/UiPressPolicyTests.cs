@@ -21,6 +21,9 @@ namespace PawnMind.Tests
             Assert.True(UiPressPolicy.IsAllowedControl(
                 "CanvasScreenLayer2/_DialogueOptionUI/Panel/ApplyButton"),
                 "the dialogue settings apply button");
+            Assert.True(UiPressPolicy.IsAllowedControl(
+                "NegotiationTablet/Confirm/Buttons/Button"),
+                "the day-end confirmation raises a modal nothing else can answer");
         }
 
         [Test]

@@ -147,8 +147,6 @@ namespace PawnMind.AdapterTests
 
             CheckType(assembly, "EndOfDayUIManager");
             CheckMethod(assembly, "EndOfDayUIManager", "OnEndDayButtonClick");
-            // R4-C: sleep refuses to click unless the day-end tablet is open.
-            CheckProperty(assembly, "EndOfDayUIManager", "IsOpen");
 
             CheckType(assembly, "SaveFiles");
             CheckMethod(assembly, "SaveFiles", "IndexLoad");

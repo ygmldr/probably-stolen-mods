@@ -30,9 +30,6 @@ namespace PawnMind.Core
         public const string InventoryUnavailable = "recording_slot_inventory_unavailable";
         public const string AllocationUnknown = "recording_slot_allocation_unknown";
         public const string NotNextFree = "recording_slot_not_next_free";
-
-        /// <summary>R4-C: the day-end tablet is not open, so the sleep click would no-op.</summary>
-        public const string EndOfDayPanelClosed = "end_of_day_panel_closed";
         public const string GameStateUnavailable = "recording_game_state_unavailable";
         public const string ReadbackUnavailable = "recording_readback_unavailable";
         public const string NotInGame = "recording_not_in_game";
@@ -254,12 +251,6 @@ namespace PawnMind.Core
         /// <summary>PlayerStore.CanEndDay(): false while a non-dismissable client waits.</summary>
         public bool CanEndDay;
 
-        /// <summary>
-        /// EndOfDayUIManager.IsOpen: whether the day-end tablet is actually up. The
-        /// sleep button only works while it is; a click otherwise is a silent no-op
-        /// that used to leave an operation running forever (R4-C).
-        /// </summary>
-        public bool EndOfDayReady;
 
         /// <summary>True while the player is out on the night round.</summary>
         public bool Outside;

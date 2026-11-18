@@ -138,7 +138,7 @@ move_item(item, "back")   # 放回 → 触发原生 OpenUI()
 
 ## 3.3 第 4–6 次会话：仍未解决的问题
 
-### C. `sleep` 被模态面板吞掉点击（**已修**）
+### C. `sleep` 被模态面板吞掉点击（**已回滚，前提错误**）
 
 `EndOfDayUIManager.OnEndDayButtonClick` 在「对话与打字机设置」
 （`CanvasScreenLayer2/_DialogueOptionUI`）模态面板开着时**静默无效**。
@@ -148,11 +148,24 @@ move_item(item, "back")   # 放回 → 触发原生 OpenUI()
 `TryResolveSleep`（本轮新增）能在 3 次回读后把它判成 `failed("day_not_changed")`，
 但**前提是能拿到那个 op 的 id**——见 D。
 
-修法：`RecordingGameState.EndOfDayReady`（适配器读 `EndOfDayUIManager.IsOpen`），
-`RecordingSaveService.Sleep` 在派发前检查；不满足返回
-`error:"end_of_day_panel_closed"` + `not_dispatched`——世界没变，换个 action id
-重试是安全的。适配器契约新增 `EndOfDayUIManager.IsOpen`（契约数 503 → 504）。
-测试：`Sleep_Without_The_Day_End_Panel_Is_Not_Dispatched`。
+~~修法：`RecordingGameState.EndOfDayReady` + 派发前检查。~~
+
+**已全部回滚。** 装机实测：加上这个检查后每一次 `sleep` 都被拒
+`end_of_day_panel_closed`，而之前同样的局面睡眠是成功的。原因在反编译里：
+
+```csharp
+public bool IsOpen { get { if (UI != null) return UI.activeSelf; return false; } }
+```
+
+`UI` 是序列化字段，游戏里没有接线，永远为 null → `IsOpen` **恒为 false**。
+用它当"面板是否可点"的判据等于把正常路径全禁掉。
+
+教训：契约测试只能证明成员存在，证明不了它在这个版本里被赋值。
+用某个新读数字段去**否决**一条本来可用的路径前，必须先在真机上确认它在
+"已知可用"的情形下确实为真。
+
+保留下来的是 D（`get_operation("*")` + sleep verifier），它才是这个问题的正解：
+不预判，而是让卡住的操作可发现、可收敛。
 
 ### D. 卡住的操作会掉出 history，再也拿不到 id（**已修**）
 

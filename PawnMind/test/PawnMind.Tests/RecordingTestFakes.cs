@@ -184,7 +184,6 @@ namespace PawnMind.Tests
                 LastSaveTime = "2026-11-14T12:00:00.0000000",
                 DayCycleReadable = true,
                 Day = day,
-                EndOfDayReady = true,
                 RentDaysLeft = rentDaysLeft,
                 Cash = cash,
                 // The shop is closed for the day and nothing blocks ending it:

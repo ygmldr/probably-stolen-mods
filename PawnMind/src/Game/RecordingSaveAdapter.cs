@@ -75,16 +75,6 @@ namespace PawnMind.Game
                         state.WaitingCustomers = GameState.GetWaitingCustomerCount();
                         state.ShopState = store.storeState.ToString();
                         state.CanEndDay = store.CanEndDay();
-                        try
-                        {
-                            EndOfDayUIManager endOfDay = EndOfDayUIManager.Instance;
-                            state.EndOfDayReady = endOfDay != null && endOfDay.IsOpen;
-                        }
-                        catch (Exception)
-                        {
-                            // Unreadable stays false: a no-op click is worse.
-                            state.EndOfDayReady = false;
-                        }
                         state.Outside = GameState.IsOutside;
                         state.DayCycleReadable = true;
                     }
