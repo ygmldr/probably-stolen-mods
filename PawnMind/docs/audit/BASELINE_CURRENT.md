@@ -121,3 +121,14 @@
 | 安装前置 | 游戏**未运行**（`tasklist` 无 `Probably Stolen.exe`）；未启动游戏、未读写存档 | `/mnt/c/Windows/System32/tasklist.exe` |
 | 回滚 | 旧版备份于 `_internal/install-backup-2026-11-18/`（`e9e1bd07…` / `fc14f3b7…`，gitignored） | — |
 | 仍为 `NOT_RUN` | 官方 `mod-scan`、`/health` 实际 MVID、任何玩法/录像项 | 见 `docs/audit/MOD_SCANNER_ROUND4.md` |
+
+## 附录 B — 2026-11-19 00:24 第二次安装（首次真机会话后的修复）
+
+| 项 | 值 |
+|---|---|
+| HEAD | `dc724e2` |
+| `dist/PawnMind/PawnMind.dll` | `ea2cb3ce…`，MVID `4c772a11-2290-48bf-8a7f-84a2f0fd8134` |
+| 已安装 | 同上（逐字节一致；安装时游戏未运行） |
+| 回滚 | `_internal/install-backup-2026-11-19/`（`6adef8ac…`） |
+| 内容 | 交易证据按笔判定 / 新开局跨局确认 / dead-port 夹具 / press 覆盖层白名单 |
+| `recording_slot` | 44（槽 43 已被上一局占用） |
