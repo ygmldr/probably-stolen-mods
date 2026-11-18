@@ -132,17 +132,17 @@ REQUIRE_GAME=1 ./test.sh
 | # | 风险 / 缺口 | 级别 | 下一步 |
 |---|---|---|---|
 | 1 | F7 无官方 `mod-scan` 输出；静态预测 `files` **未声明**（`ScreenCapture` + `System.IO`） | **发布阻塞** | 操作者按 `MOD_SCANNER_ROUND4.md` §4 采集 |
-| 2 | 已安装 DLL `e9e1bd07…` ≠ 本轮构建 `6adef8ac…` | **发布阻塞** | 覆盖 `Mods/PawnMind/` 后再判定 |
+| 2 | ~~已安装 DLL ≠ 本轮构建~~ | **已解决** | 2026-11-18 覆盖安装 `6adef8ac…`，与 `dist` 逐字节一致；旧版备份在 `_internal/install-backup-2026-11-18/` |
 | 3 | `reflection-external`（`NewGameMenuAdapter.cs:400` computed type）2026-12-10 起被拒 | 高 | 向作者申请公开访问器，或放弃逐行 perk 读取 |
 | 4 | 跨局未确认期间的**普通写**未被阻止 | 中 | L3 前由 Skill 流程覆盖；如需硬保证要设计"切换窗口"锁 |
 | 5 | `ActionResult.Failure` 的"派发前拒绝"仍是约定，无静态检查器 | 中 | 新写动作 review 对照 `RAW_DISPATCH_AUDIT.md` |
 | 6 | `initial_result` / `candidate_actions` 尚未进 benchmark schema | 低 | 与实机 schema 冻结一起做 |
 | 7 | C-2（B12 原生方向）、C-3（顾客实例切换）、`PP-READ-01` 运行时 `Refresh()` | 中 | 需要实机 |
-| 8 | `dist` 与 HEAD 已对齐，但未安装 | — | 见 #2 |
+| 8 | `dist` 与 HEAD 已对齐，并已安装到 `Mods/PawnMind/` | — | 已关闭 |
 
 ## 7. 下轮建议（按优先级）
 
-1. **受控 L3 前置**：安装本轮 `dist`，跑官方 `mod-scan`，把原始输出追加到
+1. **受控 L3 前置**：`dist` 已安装（R4-F7-04 PASS），只剩跑官方 `mod-scan`，把原始输出追加到
    `MOD_SCANNER_ROUND4.md` §5；在此之前不要宣称任何 LIVE 结论。
 2. 依据扫描结果决定 `files` 路线（声明 / 关闭截图 / 阻塞发布）。
 3. 把 `run_change_status` 的等待流程写进 benchmark 的"读档"用例。

@@ -18,15 +18,18 @@
 | 对象 | SHA256 | MVID |
 |---|---|---|
 | `PawnMind/dist/PawnMind/PawnMind.dll`（本轮构建，HEAD） | `6adef8ace8511e742053310b29be822905b42b5284f581af7f90ff1fdfceff78` | `4e3a88c5-1812-455d-9c7d-2d12c8d77dd0` |
-| 已安装 `Mods/PawnMind/PawnMind.dll` | `e9e1bd073d0ece5a05ecda6bfd51dfc285fc7c6a5b6626d38a820022c7084ca4` | `63388f67-299e-4f39-9fb8-7f33cb6a03d3` |
+| 已安装 `Mods/PawnMind/PawnMind.dll`（2026-11-18 覆盖为本轮构建） | `6adef8ace8511e742053310b29be822905b42b5284f581af7f90ff1fdfceff78` | `4e3a88c5-1812-455d-9c7d-2d12c8d77dd0` |
+| ~~上一版已安装 DLL~~（备份在 `_internal/install-backup-2026-11-18/`） | `e9e1bd073d0ece5a05ecda6bfd51dfc285fc7c6a5b6626d38a820022c7084ca4` | `63388f67-299e-4f39-9fb8-7f33cb6a03d3` |
 | 游戏 `Probably Stolen_Data/Managed/Assembly-CSharp.dll` | `725cb999d019dff1ff31bed353c7f9bb8d81a7605a15de1f80f5a3a6cf7b1d05` | `911508a6-e0eb-4cc0-91e8-e14b16ea28d7` |
 | `dist/PawnMind/manifest.xml` | `28a3d8b2bbeb79f28a8b7adc7a3af58b1e738090a544f4eb9de1b1ebe2ceb604` | — |
 
 - 游戏程序集 MVID `911508a6-…` 与仓库内既有记录（`agent/fake_game.py` 的
   `FAKE_ASSEMBLY_MVID`）一致 → 本机安装的就是 **0.46D** 这一份，指纹可信。
-- **`R4-F7-04` 未满足**：已安装 DLL ≠ 本轮构建（`e9e1bd07…` vs `6adef8ac…`）。
-  在操作者把 `dist/PawnMind/*` 覆盖到 `Mods/PawnMind/` 之前，
-  **任何 LIVE 通过判定都无效**。
+- **`R4-F7-04` 已满足**：2026-11-18 由用户授权，Agent 在**游戏未运行**（`tasklist` 无
+  `Probably Stolen.exe`）时把 `dist/PawnMind/{PawnMind.dll,manifest.xml}` 覆盖到
+  `Mods/PawnMind/`，安装后 SHA256/MVID 与 `dist` 逐字节一致（见上表）。
+  旧版 DLL 已备份到 `_internal/install-backup-2026-11-18/`（gitignored）。
+  安装过程中**没有启动游戏**、没有读写任何存档。
 - 构建方式：`cd PawnMind && ./build.sh`（只写 `dist/`，不安装、不碰游戏）。
 - 策略指纹：`policy_sha256 = e0da5a24a0c21014db57ee842413ef4d6d10ac0e1dca3545dea417490f22d1cc`
   （`tools/gen_policy_catalog.py --check` 与 `tool_policy.json` 一致）。
@@ -87,7 +90,7 @@
 
 ## 4. 操作者采集步骤（拿到原始输出即可关闭 F7）
 
-前置：
+前置（`R4-F7-04` 已于 2026-11-18 完成，可跳过第 1 步）：
 ```bash
 cd PawnMind && ./build.sh          # dist 必须等于 HEAD
 python3 ../scripts/audit/dll_fingerprint.py dist/PawnMind/PawnMind.dll
@@ -115,7 +118,7 @@ git rev-parse HEAD
 | `R4-F7-01` 原始 scanner 日志 + 指纹 | **NOT_RUN**（指纹部分已就绪，见 §1） |
 | `R4-F7-02` 每项 finding 有定位与 disposition | **PARTIAL**（静态预测已完成，扫描未确认） |
 | `R4-F7-03` 复扫无硬拒绝、`declared ⊇ detected` | **BLOCKED**（C1 预测即拒绝） |
-| `R4-F7-04` 已安装 DLL 与本轮构建匹配 | **NOT_MATCHED**（§1） |
+| `R4-F7-04` 已安装 DLL 与本轮构建匹配 | **PASS**（§1：`6adef8ac…` / `4e3a88c5…` 一致） |
 | `R4-F7-05` 区分"当前可启动"与"2026-12-10 后可启动" | **DONE**（§3.2） |
 
 > **Gate C = BLOCKED。** 不得用静态分析或单元测试替代 LIVE 扫描结论。

@@ -169,7 +169,9 @@ C# 仍是最终门禁。
 - `reflection-external` 已声明，但 `NewGameMenuAdapter.cs:400` 的
   `view.GetType()` 是 computed type，属于官方**计划于 2026-12-10 拒绝**的能力。
   `SlotView` 是私有嵌套类（`_decomp/NewGamePerksUI.cs:7`），没有 `typeof()` 替代。
-- 已安装 DLL `e9e1bd07…` ≠ 本轮构建 `a502ba7f…` → **R4-F7-04 未满足**。
+- 已安装 DLL 已在本轮更新为构建产物（`6adef8ac…` / MVID `4e3a88c5…`，与 `dist` 一致，
+  游戏未运行、未启动、未碰存档）→ **R4-F7-04 PASS**；旧版备份于
+  `_internal/install-backup-2026-11-18/`。
 - **Gate C = BLOCKED**，`Workshop = BLOCKED`。不得用静态分析替代。
 
 ---
@@ -180,7 +182,7 @@ C# 仍是最终门禁。
 |---|---|---|
 | **A** 操作事实正确性 | `R4-F1-*`、`R4-F4-*` 全绿；无提前清理；无派发猜测；旧 F1/F4 回归通过 | **PASS** |
 | **B** 协议与工具暴露 | `R4-F3-*`、`R4-F5-*` 全绿；重试证据无矛盾；MCP 故障关闭；C# 门禁未改 | **PASS** |
-| **C** 发布兼容 | 官方 `mod-scan` 完整证据 + 已安装 DLL 匹配 | **BLOCKED**（两者都缺） |
+| **C** 发布兼容 | 官方 `mod-scan` 完整证据 + 已安装 DLL 匹配 | **BLOCKED**（DLL 匹配已满足，扫描证据仍缺） |
 | **D** Play / 首周租金 | 既定 live gates 独立通过 | **NOT GRANTED**（本轮默认不授予） |
 
 `play_allowlist` 仍为空；未因本轮全绿而填入任何 `live_evidence`。

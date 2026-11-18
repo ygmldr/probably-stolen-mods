@@ -3,6 +3,10 @@
 > 采集时间：2026-11-17 02:40 (Asia/Shanghai)
 > 采集方式：在本机仓库直接执行命令；未运行游戏，因此所有实机项标 `NOT_RUN`。
 > 本文件是**冻结快照**，不是长期结论；提交后若 HEAD 前移需重新采集。
+>
+> **2026-11-18 更新**：`dist` 已与 Round 4 HEAD 对齐，并已覆盖安装到 `Mods/PawnMind/`
+> （两者逐字节一致）。§2 里 `ad335987…` / `e9e1bd07…` 两行描述的是 **11-17 的历史状态**，
+> 当前值见文末「附录 A」。
 
 ---
 
@@ -100,3 +104,20 @@
 4. DSH 对 `ok:false + status:pending` 的处理。
 5. `dist` 与已安装 DLL 的差异来源（只知道哈希/大小不同）。
 6. 任何真机负向用例（`P0-LANDLORD-02`、`P0-OPEN-01`、`PP-READ-*`、`PP-TRADE-*`）。
+
+---
+
+## 附录 A — 2026-11-18 安装更新（Round 4）
+
+| 项 | 值 | 命令 |
+|---|---|---|
+| HEAD | `c8f74ca`（+ 本次文档提交） | `git rev-parse HEAD` |
+| `dist/PawnMind/PawnMind.dll` | `6adef8ac…`，348,160 B | `sha256sum` |
+| `dist/*.dll` MVID | `4e3a88c5-1812-455d-9c7d-2d12c8d77dd0` | `scripts/audit/dll_fingerprint.py` |
+| `dist/PawnMind/manifest.xml` | `28a3d8b2…` | `sha256sum` |
+| **已安装** `Mods/PawnMind/PawnMind.dll` | `6adef8ac…`，348,160 B（= dist） | `sha256sum` / `fingerprint.py` |
+| 已安装 `manifest.xml` | `28a3d8b2…`（= dist） | `sha256sum` |
+| 一致性 | **一致**（逐字节） | 上方两行 |
+| 安装前置 | 游戏**未运行**（`tasklist` 无 `Probably Stolen.exe`）；未启动游戏、未读写存档 | `/mnt/c/Windows/System32/tasklist.exe` |
+| 回滚 | 旧版备份于 `_internal/install-backup-2026-11-18/`（`e9e1bd07…` / `fc14f3b7…`，gitignored） | — |
+| 仍为 `NOT_RUN` | 官方 `mod-scan`、`/health` 实际 MVID、任何玩法/录像项 | 见 `docs/audit/MOD_SCANNER_ROUND4.md` |
