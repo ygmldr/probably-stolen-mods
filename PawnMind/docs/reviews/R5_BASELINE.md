@@ -99,7 +99,12 @@ Python 377 与 `SESSION_2026-11-18_FIRST_WEEK.md` 的 “Python 377 OK” 一致
 > **R5-A4 后更新（2026-11-18）**：`agent/trace_validator.py` 已升级为
 > `VALIDATOR_VERSION 1.2.0` / `TRACE_SCHEMA_VERSION 2`（sha256 变更，见 A4 提交），
 > `SKILL.md` 与 `FIRST_WEEK_BENCHMARK_SPEC.md` 已按 R5-A 事实修订。
-> 上表保留的是**启动基线**，用于回答“本轮改了什么”，不是当前值。
+> **R5-B1 后更新（2026-11-18，提交 `704b5b88`）**：新增公开工具 `stage_negotiation_item`，
+> 工具面 full=**117** / recording=**107**，policy canonical sha256 变为
+> **`774fbfdd7b44ef5c6c7b616f885f1b624758b862b3e750497f8a39cc26763277`**；
+> validator 升至 **1.3.0**（trace schema 仍为 2）。上表保留的是**启动基线**，
+> 用于回答“本轮改了什么”，不是当前值。任何 run 开始前必须**实际计算**当前 policy sha256，
+> 不得把本文档或 Skill 中的哈希当作当前值。
 
 ## 4. 证据差（本轮启动时必须记录的缺口）
 

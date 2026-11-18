@@ -119,13 +119,14 @@ DEPRECATED: reflection-external refused by the game update of December 10, 2026
 
 ---
 
-# 第二部分：2026-11-19 R5-A 离线修订（历史口径更新，L3 一律 NOT_RUN）
+# 第二部分：2026-11-19 R5-A/B 离线修订（历史口径更新，L3 一律 NOT_RUN）
 
 ## 11. R5-A 协议/证据口径更新
 
 > 依据：`docs/reviews/R5_HANDOFF_2026-11-19.md` §2、`docs/reviews/R5_BASELINE.md`、
-> `agent/trace_validator.py`（`VALIDATOR_VERSION = "1.2.0"`）、`skills/pawnmind-first-week/SKILL.md`。
-> 真机（L3）证据：本轮 **`NOT_RUN`**；R5-A 的 A1/A2/A3 只有源码 + 单测证据。
+> `agent/trace_validator.py`（`VALIDATOR_VERSION = "1.3.0"`，trace schema 2；1.2.0 为 R5-A 时的版本，
+> 1.3.0 对齐 R5-B1 的 call-scoped staging 判定）、`skills/pawnmind-first-week/SKILL.md`。
+> 真机（L3）证据：本轮 **`NOT_RUN`**；R5-A/B 只有源码 + 单测/伪端口证据。
 
 ### 11.1 交易：整趟访问完成 ≠ 单笔成交（R5/A3）
 
@@ -178,4 +179,10 @@ DEPRECATED: reflection-external refused by the game update of December 10, 2026
   适配器契约 **506**、Python **377/0**、policy catalog 一致。
 - R5-A4（2026-11-19）：`agent/tests/test_trace_validator.py` 扩到 **115 项**（含 `agent/tests/fixtures/` 6 条正反轨迹），
   全 Python 套件以本轮实跑输出为准；C# 侧 R5-A 数字以 Lead 报告为准（未由本文档作者复核）。
-- 仍未覆盖/未验证：多日真实经营、Play 模式、typed 日终弹窗、重启续档、跨局真机对账。全部 `NOT_RUN` 或 `REPORTED`。
+- R5-B1（2026-11-19，提交 `704b5b88`）：新增 `stage_negotiation_item`（full=117 / recording=107，policy sha256
+  `774fbfdd…`）；validator 1.3.0 起把该 op 纳入 call-scoped 冲突判定；`agent/tests/test_trace_validator.py` 117 项。
+- R5-C（审计记录器/决策接口/fake 六情景）：`agent/trace_recorder.py`、`agent/decision_interface.py`、
+  `agent/fake_game.py` 场景测试；均为 **L1-fake/离线**，`L3 NOT_RUN`；没有 LLM 真机 pilot。
+- 仍未覆盖/未验证：多日真实经营、Play 模式、typed 日终弹窗真机、staging 真机行为、重启续档、跨局真机对账。
+  全部 `NOT_RUN` 或 `REPORTED`。
+- 正式 Play benchmark：`play_allowlist` 仍为空 → 终态 `BLOCKED_BY_PLAY_POLICY`（不是 PASS，也不是 FAIL）。
