@@ -5,6 +5,11 @@
 > 证据分级：L1 = 纯逻辑/伪端口（无 Unity、无游戏进程）；L2 = 适配器契约（对
 > `Assembly-CSharp.dll` 的反射契约，无进程）；L3 = Windows 真机（本轮 **全部 NOT_RUN**）。
 > 相关提交：`c3f34bb6`（A1/A2/A3）、`5b7e2cff`（A4）。
+>
+> **快照说明**：本文件是 **R5-A 阶段快照**（记录当时的真实运行）。A4 之后分支继续前进
+> （B1/B2/B2b/C2/C3/C4 + reviewer WARN 修复）：最终 tip 的门禁数字为 C# 864/0、gate 53/0、
+> contract 526、Python 505 OK、validator 1.3.0/schema 2，见
+> [`R5_INDEPENDENT_FINAL.md`](../reviews/R5_INDEPENDENT_FINAL.md) 与 OVERNIGHT_LOG。
 
 ## 0. 本轮 A 段门禁（整段运行结果）
 

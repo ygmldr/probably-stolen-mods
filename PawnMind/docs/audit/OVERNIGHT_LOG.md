@@ -144,3 +144,64 @@ C4 六情景（多笔交易、预算拒绝、A→B→A staging、日终模态、
 **L3 全部 NOT_RUN；formal Play = BLOCKED_BY_PLAY_POLICY；无 LLM 真机 pilot，不报任何通过率。**
 
 **下一步**：Reviewer B / Reviewer C 独立审计（进行中）→ 提交 review 文档 → 汇总最终交付与残留项。
+
+## [2026-11-18T21:28Z] Reviewer B 完成 + WARN 修复 + 文档收口（B/C 交叉）
+
+**Reviewer B（fresh context）结论**：B1 **PASS**（L1/L2）、B2 **PASS**（L1）、B2b **PASS**（L1）、
+B3 **NOT_RUN**（未实现，handoff 允许后置）；**无 FAIL**，10 条非阻塞 WARN，产出
+`docs/reviews/R5_B_GAMEPLAY_REVIEW.md`（已提交 `6493a553`/`43394e3c`）。
+- 独立复跑（worktree@`49a9f566`）：C# **864/0** + gate **53/0** + contract **526**、Python **485 OK**、
+  Release build OK、policy catalog `774fbfdd…`、MCP stdio `list_tools` full=117/recording=107、
+  `play_allowlist=[]`、8 fixtures 5×0+3×1。
+- 反编译核对：staging 原语 = 玩家拖放同一回调；确认框 yes/no x 序（57/273）与两处调用点
+  （`PlayerStore.SellItemFromTable`、`OnSellAllClick`）——同时指出 B2 文档“end_day 触发”的说法不准确。
+
+**WARN 修复（提交 `2f5b3609` / `f18e25b8`）**
+- W-B2-1：`answer_prompt` 在歧义模态下改为 `prompt_ambiguous` + `dispatched:false`（TDD，先红后绿）；
+- W-B2-4：SKILL 新增 §6.1 typed modal / §6.2 overlay dismissal；benchmark spec 工作流/轨迹字段/schema 行；
+  MCP 工具 docstring；known-limitations 改为“typed 就绪但 Play 仍 BLOCKED_BY_PLAY_POLICY”；
+- W-B1-4：PLAYER_ENTRY_MATRIX OP-063 的 player_entry 改为真实原语；
+- W-DOC-1：root/PawnMind README 117/107 + 真实门禁数字、R5_NEXT_LIVE_SESSION validator 1.3.0、
+  UiPressPolicy 注释（press=legacy/test-only）。
+- 仍保留的 L3 前置 WARN（记录在 review 文档，不静默丢弃）：W-B1-1 模态可读性 fail-open、W-B1-2
+  hidden/trash 可达性、W-B2-2 窄 TOCTOU、W-B2b-1 overlay 路径 fail-open、W-B2b-2 Clean 不含 CustomWindowOpen。
+
+**门禁（修复后实测）**：C# **864/0**、gate **53/0**、contract **526**；Python **498 OK**。
+
+**状态**：Reviewer C 审计进行中；之后提交终审文档、更新本日志、给出最终汇总。
+
+## [2026-11-18T21:52Z] R5 最终验收（独立终审）— 离线交付完成
+
+**Reviewer Final（fresh context，非实现者）**：审计 final HEAD `3a48ecab`，结论 **R5 离线交付 PASS，无 FAIL**：
+A PASS（含复审修复 `c3196301`）、B PASS（B1/B2/B2b；B3 NOT_RUN）、C PASS（L1/L1-fake）；
+**L3 全部 NOT_RUN**；**正式 Play benchmark = `BLOCKED_BY_PLAY_POLICY`**；模型质量 **NOT_MEASURED**，
+未声称任何 benchmark 结果。产出 `docs/reviews/R5_INDEPENDENT_FINAL.md`。
+
+**终审独立复跑（clean worktree @`3a48ecab`，全部 exit 0）**
+
+| 门禁 | 结果 |
+|---|---|
+| C# `./test.sh`（`REQUIRE_GAME=1` + flock） | **passed=864 failed=0**；gate **53/0**；contract **526 / adapter OK** |
+| Python 全量 | **Ran 505 tests，OK**（0 skip） |
+| 策略目录一致性 | `--check` OK，canonical sha **`774fbfdd…26763277`**；tools **117/107**；`play_allowlist=[]` |
+| `dotnet build src/PawnMind.csproj -c Release` | **0 Warning / 0 Error** |
+| 8 个 validator fixture CLI | 5×exit0 + 3×exit1，codes 精确匹配 |
+| recorder→export→validator round-trip | schema 2、validator 1.3.0、0 error/0 warning、无 token 泄漏 |
+| 脚本执行位 | `test.sh`/`run.sh` 均 100755（W-ENV-1 修复生效，53 门禁真实执行） |
+
+**最终交付物**（全部在仓库内）：`R5_BASELINE.md`、`R5_A_TEST_MATRIX.md`、`R5_A_PROTOCOL_REVIEW.md`、
+`R5_B_GAMEPLAY_REVIEW.md`（+addendum）、`R5_C_AGENT_REVIEW.md`（+addendum）、`R5_C_OFFLINE_REPORT.md`、
+`R5_INDEPENDENT_FINAL.md`、`R5_NEXT_LIVE_SESSION.md`、`R5_LLM_PILOT_PROTOCOL.md`、本日志，
+以及 A/B/C 三阶段源码与测试（26 个提交，分支 `r5/overnight`，未 push，`main` 未触碰）。
+
+**终审 WARN（已在本提交收口）**：PawnMind README Python 498→505；C 报告叙述计数 41/19→44/23（+说明）；
+A 阶段文档标注为快照（最终数字见终审/本日志）。历史文档里的 116/106、e0da5a24 属 R5 前历史口径，
+不在本轮同步范围。
+
+**保留的 L3 前置风险**（记录在三个 review 的 WARN 中，不阻塞离线交付）：模态守卫 fail-open（W-B1-1）、
+窄 TOCTOU（W-B2-2）、overlay 路径 fail-open（W-B2b-1）、hidden/trash 可达性（W-B1-2）、
+10s sleep 窗口未校准、重启可观测性、记录器的 prompt/skill/run_id 宿主登记（W-C2-2）。
+真机行为一律 `NOT_RUN`，不得引用为已验证。
+
+**终态**：本轮离线交付完成；停止在“需要用户授权 Windows 真机”的门槛。下一步见
+`docs/audit/R5_NEXT_LIVE_SESSION.md`（授权清单 → 预检 → S1–S9 → 证据/回滚）。

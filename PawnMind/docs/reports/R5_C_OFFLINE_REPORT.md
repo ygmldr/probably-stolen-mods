@@ -52,7 +52,7 @@ host_version/operation_id 或 action_id/op/args/observed_rev/policy_sha256/tool_
 recording_slot/request_status/response_status/execution_status/dispatch_status/delivery_status/
 evidence/state_before_ref/state_after_ref/error/human_intervention/duration_ms）。
 
-**已由测试钉住的关键性质**（`agent/tests/test_trace_recorder.py` 41 项）：
+**已由测试钉住的关键性质**（`agent/tests/test_trace_recorder.py` 44 项；收口时 41，Reviewer-C WARN 修复后 +3 dispatch 轴用例）：
 1. 一行一事件、append-only；每事件 `flush + os.fsync`（测试 patch fsync 断言次数）。
 2. token/auth/secret 不落盘：键名脱敏 + 已知 token 值全串替换 + 写前复查；
    测试断言 token 子串在文件中不存在。
@@ -78,7 +78,7 @@ trace_validator.validate_trace → violations=[]（0 error / 0 warning）
 
 ## 3. C3 — 最小决策接口 + 可信执行层
 
-`agent/decision_interface.py`（19 项测试）把 handoff §4 C3 的四条约束落为代码：
+`agent/decision_interface.py`（23 项测试；收口时 19，Reviewer-C WARN 修复后 +4 surface/参数复核用例）把 handoff §4 C3 的四条约束落为代码：
 
 | 约束 | 实现 | 测试 |
 |---|---|---|
