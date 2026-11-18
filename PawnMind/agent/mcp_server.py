@@ -160,6 +160,7 @@ RECORDING_TOOL_NAMES = frozenset({
     "set_label",
     "set_pen_mode",
     "sleep",
+    "stage_negotiation_item",
     "start_fermentation",
     "toggle_item",
     "toggle_service",
@@ -1213,6 +1214,11 @@ def build_server(client, tool_set=TOOL_SET_FULL, memory_provider=None,
         return client.action("confirm_trade", item_id=item_id, side=side, rev=rev)
 
     @tool()
+    def stage_negotiation_item(item_id: int, rev: int) -> dict:
+        """Stage one item on the weighted/back negotiation counter for the current client, through the same native placement path a player drag uses (no direct assignment of currentNegociatedItem, ownership, intent or price). Pre-checks the current client, the item container/ownership, the current staged item, the negotiation UI and revision and refuses with a stable error (dispatched=false) when a trustworthy field is missing (no_client, client_unreadable, item_not_found, item_sold, item_unreachable, not_owned, already_owned, intent_undefined, modal_open, negotiation_unreadable, back_counter_full). Returns staged_item_id_before, staged_item_id_after, negotiation_open and client_identity_unchanged: completed only when staged_item_id_after equals item_id, the item sits on the weighted counter, the tablet is open and the client identity is unchanged. A silent native return or a mismatched readback is uncertain, never ok:true - read get_state.negotiated_item and do not retry the same item with a new action_id (a different item is allowed); confirm_trade is the next step only after completed."""
+        return client.action("stage_negotiation_item", item_id=item_id, rev=rev)
+
+    @tool()
     def wait_for_events(since_rev: int = -1, timeout_ms: int = 25000) -> dict:
         """Block until the game revision changes; returns the fresh state (long-poll, no busy loop)."""
         return client.wait_events(since_rev, timeout_ms)
@@ -1281,8 +1287,8 @@ def main():
         choices=TOOL_SET_CHOICES,
         default=TOOL_SET_FULL,
         help=(
-            "tool surface to register: full (all 116 tools, default) or "
-            "recording (106 player-equivalent tools; act/press/debug shortcuts, "
+            "tool surface to register: full (all 117 tools, default) or "
+            "recording (107 player-equivalent tools; act/press/debug shortcuts, "
             "save_game and the hardcoded new_game are left out)"
         ),
     )
@@ -1392,7 +1398,7 @@ def allowed_tools_for_mode(mode, policy=None):
 
     ``None`` means "no filtering" and is reserved for the explicitly requested
     test surface. Every unresolved state maps to ``locked`` -> an empty set, so a
-    missing bridge can never expose the full 116-tool surface (R4/F5b).
+    missing bridge can never expose the full 117-tool surface (R4/F5b).
     """
     import tool_policy
 

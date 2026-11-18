@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using PawnMind.Core;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using UnityEngine;
 
 namespace PawnMind.Game
 {
@@ -435,7 +436,6 @@ namespace PawnMind.Game
 
             GameItem machineItem = FindInMachines(uniqueId);
             if (machineItem != null) return machineItem;
-
             return null;
         }
 
@@ -486,6 +486,147 @@ namespace PawnMind.Game
             catch
             {
                 return new List<GameItem>();
+            }
+        }
+
+        /// <summary>
+        /// R5/B1: finds an item together with the bridge container id it directly
+        /// sits in. Machine interiors are reported as "machine" so the staging
+        /// guard can refuse a source the player could not drag from during a
+        /// negotiation. Returns false when the item is nowhere or a container read
+        /// failed; the caller then refuses item_not_found instead of guessing.
+        /// </summary>
+        public static bool TryLocateItem(int uniqueId, out GameItem item, out string container)
+        {
+            item = null;
+            container = null;
+            if (uniqueId <= 0) return false;
+
+            try
+            {
+                List<string> ids = GetContainerIds();
+                for (int i = 0; i < ids.Count; i++)
+                {
+                    GameInventory inventory = GetContainer(ids[i]);
+                    if (inventory == null) continue;
+
+                    List<GameItem> items = inventory.childItems;
+                    for (int j = 0; j < items.Count; j++)
+                    {
+                        GameItem candidate = items[j];
+                        if (candidate == null || candidate.GetUniqueID() != uniqueId) continue;
+                        item = candidate;
+                        container = ids[i];
+                        return true;
+                    }
+                }
+
+                GameItem machineItem = FindInMachines(uniqueId);
+                if (machineItem != null)
+                {
+                    item = machineItem;
+                    container = "machine";
+                    return true;
+                }
+            }
+            catch
+            {
+                item = null;
+                container = null;
+                return false;
+            }
+
+            return false;
+        }
+
+        /// <summary>R5/B1: the weighted/back counter inventory, null when unreadable.</summary>
+        public static GameGridInventory GetBackCounterInventory()
+        {
+            try
+            {
+                EmporiumEntry entry = EmporiumEntry.Instance;
+                return entry == null ? null : entry.backInvinvElement;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// R5/B1: a modal that covers the shop counters and makes a player drag
+        /// impossible. The native confirmation panel paints a full-screen darkness;
+        /// every other visible CustomUIWindow also covers the store (the wild-network
+        /// window blocked day 7 of the first-week session). The negotiation tablet
+        /// and the bargain panel are the two windows a player works *with* while
+        /// dragging, so they are excluded.
+        /// </summary>
+        public static bool IsStagingModalOpen()
+        {
+            try
+            {
+                GenericConfirmationUIManager confirmation = GenericConfirmationUIManager.Instance;
+                if (confirmation != null && confirmation.panel != null
+                    && confirmation.panel.activeInHierarchy)
+                {
+                    return true;
+                }
+
+                CustomUIManager manager = CustomUIManager.Instance;
+                if (manager == null) return false;
+
+                GameObject negotiation = CustomWindowRoot(manager, "negotiation_tablet");
+                GameObject bargain = CustomWindowRoot(manager, "bargain_panel");
+
+                string[] layers =
+                {
+                    CustomUIManager.LAYER_FRONT,
+                    CustomUIManager.LAYER_PAPER,
+                    CustomUIManager.LAYER_REAR,
+                    CustomUIManager.LAYER_META,
+                    CustomUIManager.LAYER_MENU,
+                    CustomUIManager.LAYER_OVERLAY
+                };
+
+                for (int l = 0; l < layers.Length; l++)
+                {
+                    Transform root = manager.GetLayerRoot(layers[l]);
+                    if (root == null) continue;
+
+                    for (int i = 0; i < root.childCount; i++)
+                    {
+                        Transform child = root.GetChild(i);
+                        if (child == null || !child.gameObject.activeSelf) continue;
+                        if (child.gameObject == negotiation || child.gameObject == bargain) continue;
+                        if (child.name.StartsWith("custom_window_", StringComparison.Ordinal)) return true;
+                        // NegociationUIManager renames its own window root; any other
+                        // renamed/unknown active layer child is treated as a blocker
+                        // only when it is not one of the two excluded roots above and
+                        // is not a custom_window_ (which is the checked shape).
+                    }
+                }
+            }
+            catch
+            {
+                // An unreadable modal state must not crash the action; the staging
+                // guard still requires every other field and the native readback.
+                return false;
+            }
+
+            return false;
+        }
+
+        private static GameObject CustomWindowRoot(CustomUIManager manager, string windowId)
+        {
+            try
+            {
+                CustomUIWindow window = manager.GetWindow(windowId);
+                if (window == null || !window.IsAlive) return null;
+                return window.root;
+            }
+            catch
+            {
+                return null;
             }
         }
 

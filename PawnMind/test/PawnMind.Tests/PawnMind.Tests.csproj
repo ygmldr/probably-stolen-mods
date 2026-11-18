@@ -66,6 +66,7 @@
     <Compile Include="UiPressPolicyTests.cs" />
     <Compile Include="OperationSemanticsTests.cs" />
     <Compile Include="TradeServiceTests.cs" />
+    <Compile Include="NegotiationStagingTests.cs" />
     <Compile Include="OperationEndpointTests.cs" />
     <Compile Include="ModePolicyTests.cs" />
     <Compile Include="RunModeTests.cs" />
@@ -102,6 +103,7 @@
     <Compile Include="../../src/Bridge/ActionRouter.cs" />
     <Compile Include="../../src/Bridge/ActionOutcome.cs" />
     <Compile Include="../../src/Bridge/TradeService.cs" />
+    <Compile Include="../../src/Bridge/NegotiationStagingService.cs" />
     <Compile Include="../../src/Bridge/ScreenshotJson.cs" />
     <Compile Include="../../src/Bridge/ActionResult.cs" />
     <Compile Include="../../src/Bridge/NewGameMenuService.cs" />

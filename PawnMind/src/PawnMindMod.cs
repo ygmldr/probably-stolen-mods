@@ -830,6 +830,10 @@ public sealed class PawnMindMod : IMod
                     ReadInt(request, "item_id", -1),
                     (string)request["side"]);
 
+            case "stage_negotiation_item":
+                // R5/B1: one player-equivalent staging step on the weighted counter.
+                return GameActions.StageNegotiationItem(ReadInt(request, "item_id", -1));
+
             case "bargain_preview":
                 return ActionResult.SuccessRaw("bargain_preview", BargainService.PreviewJson(
                     (string)request["direction"], ReadInt(request, "percent", 0)));

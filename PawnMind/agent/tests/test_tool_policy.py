@@ -113,6 +113,27 @@ class ToolPolicyTests(unittest.TestCase):
                 self.assertTrue(entry.get("evidence") or entry.get("status") == "fixed",
                                 "%s allowed without evidence" % name)
 
+    def test_stage_negotiation_item_has_a_reviewed_write_entry(self):
+        """R5-B1: the new player-equivalent staging tool is registered explicitly.
+
+        It mutates the negotiation table, so it must be a real write entry that
+        requires evidence and is kept out of Play until a live run records it.
+        """
+        entry = self.policy["tools"]["stage_negotiation_item"]
+        self.assertEqual("write", entry["purity"])
+        self.assertTrue(entry["player_reachable"])
+        self.assertEqual("open", entry["status"])
+        self.assertEqual("needs_evidence", entry["decision"])
+        self.assertFalse(entry["modes"]["bootstrap"])
+        self.assertFalse(entry["modes"]["play"])
+        self.assertTrue(entry["modes"]["test"])
+        self.assertTrue(entry["reason"])
+        self.assertTrue(entry["evidence"], "the staging guard must be named")
+        self.assertEqual([], entry["live_evidence"],
+                         "no live evidence exists for this build")
+        self.assertNotIn("stage_negotiation_item", allowlist(self.policy, "play"))
+        self.assertNotIn("stage_negotiation_item", allowlist(self.policy, "bootstrap"))
+
     def test_generated_csharp_catalog_matches_the_policy(self):
         """The C# runtime gate must read the same policy, not a second copy."""
         import importlib.util

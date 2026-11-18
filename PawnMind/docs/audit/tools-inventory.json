@@ -1102,6 +1102,19 @@
    ]
   },
   {
+   "name": "stage_negotiation_item",
+   "description": "Stage one item on the weighted/back negotiation counter for the current client, through the same native placement path a player drag uses (no direct assignment of currentNegociatedItem, ownership, intent or price). Pre-checks the current client, the item container/ownership, the current staged item, the negotiation UI and revision and refuses with a stable error (dispatched=false) when a trustworthy field is missing (no_client, client_unreadable, item_not_found, item_sold, item_unreachable, not_owned, already_owned, intent_undefined, modal_open, negotiation_unreadable, back_counter_full). Returns staged_item_id_before, staged_item_id_after, negotiation_open and client_identity_unchanged: completed only when staged_item_id_after equals item_id, the item sits on the weighted counter, the tablet is open and the client identity is unchanged. A silent native return or a mismatched readback is uncertain, never ok:true - read get_state.negotiated_item and do not retry the same item with a new action_id (a different item is allowed); confirm_trade is the next step only after completed.",
+   "readOnlyHint": null,
+   "required": [
+    "item_id",
+    "rev"
+   ],
+   "properties": [
+    "item_id",
+    "rev"
+   ]
+  },
+  {
    "name": "start_fermentation",
    "description": "Try to start fermentation on a wine bottle.",
    "readOnlyHint": null,
@@ -1349,6 +1362,7 @@
   "set_label",
   "set_pen_mode",
   "sleep",
+  "stage_negotiation_item",
   "start_fermentation",
   "toggle_item",
   "toggle_service",

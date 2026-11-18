@@ -108,11 +108,18 @@ namespace PawnMind.Core
 /// live session proved the coarse rule is actively harmful there: one uncertain
 /// `confirm_trade` on an item the customer could not afford disabled every other
 /// trade. Everything else keeps the conservative op-name match.
+///
+/// R5/B1 adds `stage_negotiation_item`: an uncertain staging attempt may have
+/// moved the item onto the weighted counter, so retrying *that item* under a new
+/// action id is a blind replay, while staging a different item is an independent
+/// step the workflow must keep.
 /// </summary>
 public static class PendingScope
 {
     public static bool IsCallScoped(string op)
     {
-        return op == "confirm_trade";
+        // PendingScope lives outside the PawnMind.Core namespace (historical),
+        // so the staging op name is referenced fully-qualified to keep one source.
+        return op == "confirm_trade" || op == PawnMind.Core.StagingOps.Name;
     }
 }

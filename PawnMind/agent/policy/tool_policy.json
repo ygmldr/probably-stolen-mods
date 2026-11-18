@@ -1739,6 +1739,27 @@
    "live_evidence": [],
    "offline_tests": []
   },
+  "stage_negotiation_item": {
+   "purity": "write",
+   "player_reachable": true,
+   "status": "open",
+   "decision": "needs_evidence",
+   "evidence": [
+    "R5-B1"
+   ],
+   "reason": "new guard (R5-B1): player-equivalent weighted-counter staging with before/after readback; completed only when staged_item_id_after==item_id, the item is on the counter, the negotiation tablet is open and the client identity is unchanged; silent/mismatched native results are uncertain; L3 live acceptance NOT_RUN",
+   "modes": {
+    "bootstrap": false,
+    "play": false,
+    "test": true
+   },
+   "live_evidence": [],
+   "offline_tests": [
+    "NegotiationStagingTests",
+    "R5_STAGE_01..38",
+    "agent/tests/test_mcp_tools_mode.py::test_stage_negotiation_item_is_a_typed_single_step_write"
+   ]
+  },
   "wait_for_events": {
    "purity": "pure",
    "player_reachable": null,

@@ -469,6 +469,20 @@ namespace PawnMind.Bridge
                 itemId, side, StateSnapshot.CurrentRevision);
         }
 
+        /// <summary>
+        /// R5/B1: stage one item for the current client negotiation through the
+        /// player-equivalent native weighted-counter path. The service pre-checks
+        /// every readable field, dispatches at most one native staging step and
+        /// only reports completed when the readback proves the staged pointer, the
+        /// physical counter position, the open negotiation tablet and an unchanged
+        /// client identity.
+        /// </summary>
+        public static ActionResult StageNegotiationItem(int itemId)
+        {
+            return new NegotiationStagingService(new GameNegotiationStagingPort())
+                .Stage(itemId, StateSnapshot.CurrentRevision);
+        }
+
         private static NegociationUIManager GetNegotiationUi()
         {
             try

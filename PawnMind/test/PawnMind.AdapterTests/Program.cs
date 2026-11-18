@@ -172,6 +172,25 @@ namespace PawnMind.AdapterTests
             CheckMethod(assembly, "GameInventory", "IsInsertLocked");
             CheckProperty(assembly, "GameItem", "parentInventory");
             CheckProperty(assembly, "GameItem", "modifiedShape");
+
+            // R5-B1: player-equivalent negotiation staging.
+            // The weighted/back counter is EmporiumEntry.backInvinvElement; its
+            // onSlotAddItemEndFunc/onSlotRemoveItemEndFunc callbacks call these
+            // PlayerStore methods, which set currentNegociatedItem and run the
+            // negotiation/tutorial side effects. The bridge only performs the same
+            // native inventory accept/expel a drag does and verifies the readback.
+            CheckMethod(assembly, "PlayerStore", "AddedItemToWeightedArea");
+            CheckMethod(assembly, "PlayerStore", "RemovedItemToWeightedArea");
+            CheckMethod(assembly, "GameGridInventory", "Expel");
+            CheckMethod(assembly, "GameInventory", "MayHaveValidInventorySlot");
+            CheckField(assembly, "NegociationUIManager", "uiObject");
+            CheckType(assembly, "CustomUIWindow");
+            CheckMethod(assembly, "CustomUIManager", "GetWindow");
+            CheckField(assembly, "CustomUIWindow", "root");
+            CheckProperty(assembly, "CustomUIWindow", "IsAlive");
+            CheckType(assembly, "GenericConfirmationUIManager");
+            CheckField(assembly, "GenericConfirmationUIManager", "panel");
+
             CheckMethod(assembly, "StoreBookData", "GetBookById");
             CheckMethod(assembly, "PaperBookRegistry", "Resolve");
             CheckProperty(assembly, "PaperBookRegistry", "All");

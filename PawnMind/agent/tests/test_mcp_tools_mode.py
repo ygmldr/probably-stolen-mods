@@ -134,6 +134,7 @@ EXPECTED_RECORDING_TOOLS = frozenset({
     "set_label",
     "set_pen_mode",
     "sleep",
+    "stage_negotiation_item",
     "start_fermentation",
     "toggle_item",
     "toggle_service",
@@ -248,7 +249,7 @@ class ToolsModeTests(ModeTestCase):
         default_names = self._list_tool_names()
         explicit_names = self._list_tool_names("--tools", "full")
 
-        self.assertEqual(116, len(default_names))
+        self.assertEqual(117, len(default_names))
         self.assertEqual(default_names, explicit_names,
                          "omitting --tools must behave exactly like --tools full")
         for expected in ("act", "press", "get_ui_snapshot", "new_game", "save_game"):
@@ -257,7 +258,7 @@ class ToolsModeTests(ModeTestCase):
     def test_recording_mode_registers_only_the_recording_surface(self):
         names = self._list_tool_names("--tools", "recording")
 
-        self.assertEqual(106, len(EXPECTED_RECORDING_TOOLS))
+        self.assertEqual(107, len(EXPECTED_RECORDING_TOOLS))
         self.assertEqual(set(EXPECTED_RECORDING_TOOLS), names)
         self.assertEqual(EXPECTED_RECORDING_TOOLS, mcp_server.RECORDING_TOOL_NAMES)
         for required in EXPECTED_RECORDING_TOOLS:
@@ -385,6 +386,33 @@ class ToolsModeTests(ModeTestCase):
         self.assertEqual("invalid_argument", mcp_server._check_days(15)["error"])
         self.assertEqual("invalid_argument", mcp_server._check_days(True)["error"])
 
+    def test_stage_negotiation_item_is_a_typed_single_step_write(self):
+        tools = self._list_tools("--tools", "recording")
+
+        self.assertIn("stage_negotiation_item", tools)
+        stage = tools["stage_negotiation_item"]
+        self.assertEqual(
+            {"item_id", "rev"},
+            set(stage.input_schema.get("properties", {})),
+            "stage_negotiation_item exposes only item_id and rev",
+        )
+        self.assertEqual(
+            {"item_id", "rev"},
+            set(stage.input_schema.get("required", [])),
+            "stage_negotiation_item requires both item_id and rev",
+        )
+        self.assertEqual("integer", stage.input_schema["properties"]["item_id"]["type"],
+                         "item_id is an integer item id")
+        self.assertEqual("integer", stage.input_schema["properties"]["rev"]["type"],
+                         "rev is an integer revision")
+        text = (stage.description or "").lower()
+        self.assertIn("stage", text)
+        self.assertIn("negotiation", text)
+        self.assertIn("staged_item_id_after", text)
+        self.assertIn("uncertain", text)
+        self.assertIn("do not retry", text)
+        self.assertNotIn("read-only", text)
+
     def test_recording_mode_withholds_the_high_risk_surface(self):
         full_names = self._list_tool_names("--tools", "full")
         recording_names = self._list_tool_names("--tools", "recording")
@@ -426,7 +454,7 @@ class ToolsModeTests(ModeTestCase):
 
     def test_explicit_test_mode_keeps_the_full_surface(self):
         _, config_path = self.bridge("test")
-        self.assertEqual(116, len(self._list_tool_names("--mode", "test",
+        self.assertEqual(117, len(self._list_tool_names("--mode", "test",
                                                        config_path=config_path)))
 
     def test_demo_allowlist_is_a_subset_of_the_recording_surface(self):
@@ -505,7 +533,7 @@ class ModeLockdownTests(ModeTestCase):
         self.assertTrue(names <= set(mcp_server.LOCAL_TOOL_NAMES),
                         "explicit --mode test must not override the bridge: %r"
                         % (sorted(names),))
-        self.assertNotEqual(116, len(names))
+        self.assertNotEqual(117, len(names))
 
     def test_r4_f5_05_mode_change_refuses_the_stale_surface(self):
         bridge, config_path = self.bridge("bootstrap")
