@@ -126,6 +126,7 @@
 | `delivery_status` | `pending_delivery \| delivered \| undelivered`（只描述“调用方有没有拿到响应”） |
 | `dispatch_status` | `not_dispatched \| dispatched \| unknown`：是否真的调用了原生。`unknown` **不是**"没调用" |
 | `dispatched` | 与上一行同源的兼容布尔：`true` / `false` / **`null`**（`null` 即 unknown） |
+| `visit_complete` | 仅 `confirm_trade`：这位顾客**整趟**逛完了没有。`false` 表示这笔成交了、但顾客可能还要买 |
 
 规则：
 
@@ -177,6 +178,18 @@
 ## 5. 普通交易（首周核心收入，C 模块已冻结证据协议）
 
 ### 5.1 流程
+
+**先开谈判面板。** 面板不会自己开：它由"把商品放上称重台"这个原生动作触发。
+若 `confirm_trade` 返回 `error:"no_negotiation"`（`execution_status:"rejected"`、
+`dispatch_status:"not_dispatched"`），说明面板没开，**世界没有任何变化**，可以安全地：
+
+```
+move_item(item_id=<该商品>, target="main")     # 从货架取下
+move_item(item_id=<该商品>, target="back")     # 放回称重台 → 原生 OpenUI()
+confirm_trade(item_id=<该商品>, side=...)      # 用新的 action_id 重试
+```
+
+买顾客（`client.intent=="SELL"`）的商品还在 `front`：先 `move_item(item, "back")` 再按上面走。
 
 1. **看货**：`list_goods(scope="all")` → 每项 `id/identifier/name/value/owned/sellable`。
 2. **对账基线**：`get_state()` 记 `cash`、`inventory_count`、`back_counter_count`。

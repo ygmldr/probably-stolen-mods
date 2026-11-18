@@ -104,10 +104,17 @@ namespace PawnMind.Bridge
                     itemId, side, revision, guard, evidence);
             }
 
-            if (!evidence.BusinessComplete)
+            // R4: two different facts.
+            //   business_complete = the customer finished their whole visit;
+            //   items_transferred = THIS item left the negotiation table.
+            // A customer buying several items is "visit open" after each sale, so
+            // requiring business_complete made a real sale look unproven (and, being
+            // non-terminal, it then blocked every later confirm_trade).
+            bool tradeProven = evidence.ItemsTransferred && evidence.ClientUnchanged;
+            if (!evidence.BusinessComplete && !tradeProven)
             {
                 // PP-TRADE-06: the native button returned without completing the
-                // business. Never report ok:true on that.
+                // business and nothing moved. Never report ok:true on that.
                 return Uncertain(TradeErrors.OutcomeUnverified, "business_not_complete",
                     itemId, side, revision, guard, evidence);
             }
@@ -127,7 +134,9 @@ namespace PawnMind.Bridge
             row["item_id"] = itemId;
             row["side"] = TradeGuardPolicy.IsSell(side) ? "sell" : "buy";
             row["client_intent"] = guard.ClientIntent;
-            row["business_complete"] = true;
+            row["business_complete"] = evidence.BusinessComplete;
+            row["visit_complete"] = evidence.BusinessComplete;
+            row["items_transferred"] = evidence.ItemsTransferred;
             row["client_unchanged"] = true;
             row["staged_item_id"] = guard.StagedItemId;
             row["items_transferred"] = evidence.ItemsTransferred;

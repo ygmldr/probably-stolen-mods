@@ -57,6 +57,14 @@ namespace PawnMind.Core
     public static class RunChangePolicy
     {
         /// <summary>
+        /// The reader's answer when the game definitively has no run (main menu).
+        /// It is distinct from <c>null</c>, which means "cannot tell" (loading
+        /// screen, unreadable store). A NUL prefix can never collide with a real
+        /// run id and is never serialized to a client.
+        /// </summary>
+        public const string NoRun = "\u0000no-run";
+
+        /// <summary>
         /// Compares two opaque native run identities.
         ///
         /// Only two non-empty, different identities prove the switch. A readable
@@ -66,8 +74,24 @@ namespace PawnMind.Core
         /// </summary>
         public static string Classify(string before, string after)
         {
+            // null/empty means "cannot tell" (loading screen, unreadable store).
             if (string.IsNullOrEmpty(before) || string.IsNullOrEmpty(after))
                 return RunChangeStatus.Unknown;
+
+            bool beforeKnown = !string.Equals(before, NoRun, StringComparison.Ordinal);
+            bool afterKnown = !string.Equals(after, NoRun, StringComparison.Ordinal);
+
+            // Still at the main menu: the request was accepted, nothing switched.
+            if (!beforeKnown && !afterKnown) return RunChangeStatus.Requested;
+
+            // A run appeared where the game definitely had none. There is no
+            // previous run to misattribute, so this is the one asymmetric case that
+            // can be confirmed without a before-id.
+            if (!beforeKnown) return RunChangeStatus.Confirmed;
+
+            // A run disappeared: mid-swap (load) or back to the menu. Not proof of
+            // a completed switch, so the old evidence stays put.
+            if (!afterKnown) return RunChangeStatus.Unknown;
 
             return string.Equals(before, after, StringComparison.Ordinal)
                 ? RunChangeStatus.Requested

@@ -1,0 +1,105 @@
+# LIVE_SESSION_2026-11-18 — 第一次真实开局与首笔成交
+
+> 执行者：用户授权后，由 Agent 通过本地 HTTP 桥驱动（`run_mode=test`）。
+> 游戏：*Probably Stolen* 0.46D，`VERSION 100-Rev13` / MVID `911508a6-…`。
+> 安装：`6adef8ac…`（Round 4 构建）。
+> 证据等级：**LIVE**（真实游戏进程、真实存档槽 43）。
+> 未做：没有读写其它存档槽；没有 `new_game`（走的是原生菜单 + `confirm_new_game`）。
+
+## 1. 做成了什么
+
+| 步骤 | 结果 |
+|---|---|
+| 原生开局菜单（specialization → perks → difficulty） | 全部 `completed` / `dispatched` |
+| 特质 | `saving`(+150) / `proficient_scavenger` / `lucky`，3/3 点 |
+| 难度 | `normal` |
+| `confirm_new_game` | 写进槽 43；Day 1，现金 700，租金 200（6 天） |
+| `open_shop` | `MORNING → OPEN` |
+| 上货 | `move_item` ×7 → 后台货架 7 件 |
+| 首笔成交 | 星际客买走「泥炭合成肉」，**现金 700 → 729** |
+
+## 2. 三个真机缺陷（本轮已修其中两个）
+
+### 2.1 交易证据粒度错误 → 交易死锁（已修）
+
+**现象**：成交后响应是
+
+```json
+{"ok": false, "error": "outcome_unverified", "detail": "business_not_complete",
+ "execution_status": "uncertain", "dispatch_status": "dispatched", "staged_item_id": 13}
+```
+
+而同一时刻 `/state` 显示现金 +29、货架少一件。随后第二笔立刻被挡：
+
+```json
+{"error": "operation_pending", "execution_status": "uncertain"}
+```
+
+**根因**：`TradeService` 把 `business_complete`（顾客**整趟**逛完）当成"**这一笔**成交"的判据。
+顾客想买 3 件时，第一件卖完 `business_complete` 仍为 false → 每笔部分成交都 `uncertain`；
+而未终态的 `confirm_trade` 被 `ActionGate.FindPendingFor` 按 D4 规则挡住 →
+**一笔正常成交把交易功能锁死到下次重启 Mod**。
+
+**修法**（`src/Bridge/TradeService.cs`）：
+`tradeProven = items_transferred && client_unchanged`；
+`BusinessComplete || tradeProven` 即 `completed`，并把两个事实分开输出：
+`business_complete` / `visit_complete`（整趟）+ `items_transferred`（这一笔）。
+
+**测试**：`R4_TRADE_01/02/03`（后者专门钉死"成交后不再阻塞下一笔"）。
+
+### 2.2 谈判面板不会自己开（已记录，未加新工具）
+
+**现象**：`confirm_trade` → `{"error":"no_negotiation","execution_status":"rejected",
+"dispatch_status":"not_dispatched"}`。
+
+**原因**：面板由原生的"把商品放上称重台"（`PlayerStore.AddedItemToWeightedArea` →
+`HandleAutoNegoUIDisplay` → `NegociationUIManager.OpenUI()`）触发。桥里没有"打开谈判"工具。
+
+**实测可用的等价动作**（玩家就是拖一下）：
+
+```
+move_item(item, "main")   # 取下
+move_item(item, "back")   # 放回 → 触发原生 OpenUI()
+```
+
+重放后 `negotiation_open:true`、`negotiated_item` 指向该商品，随后 `confirm_trade` 成功。
+
+**OPEN**：建议后续加一等公民 `open_negotiation(item_id)`；本轮不加，因为会让公开工具面
+从 116/106 变成 117/107，并改动 policy 哈希，需要单独一轮审计。当前把上述两步写进 Skill。
+
+### 2.3 新开局无法确认"跨局"（已修，F1b 回归）
+
+**现象**：`confirm_new_game` 返回 `run_change_status:"unknown"` 且永不改变。
+
+**根因**：开局前 `ReadRunId()` 返回 `null`（主菜单无 `PlayerStore`），而 `RunChangePolicy.Classify`
+要求"前后都可读且不同"才判 `confirmed` → 从主菜单开局这条路径**永远确认不了**。
+后果不只是显示错误：该未确认操作会让 `FindUnconfirmedRunChange` 挡住之后所有
+`load_game`（`run_change_pending`），本局内无法读档重来。
+
+**修法**：
+- `RunChangePolicy.NoRun` 哨兵，区分"确定没有 run"（主菜单）与"读不到"（加载中/异常）；
+- `Classify`：`NoRun → real` = **confirmed**（之前根本没有 run，无可误归属）；
+  `real → NoRun` = **unknown**（可能正在换档，不驱逐）；`NoRun → NoRun` = requested；
+  任一为 `null` = unknown；
+- `GameState.ReadRunId()` 在主菜单返回 `NoRun`。
+
+**测试**：`R4_F1_10/11/12/13`。
+
+## 3. 真机确认"闸门是对的"
+
+| 场景 | 响应 | 判定 |
+|---|---|---|
+| 在难度页用 `new_game_continue` 想直接开局 | `error:"difficulty_start_forbidden"`, `rejected`, `not_dispatched` | ✅ 开局只能走 `confirm_new_game` |
+| 面板没开就想成交 | `error:"no_negotiation"`, `rejected`, `not_dispatched` | ✅ 未派发不是失败 |
+| 槽位配置 42 但游戏下一个自动槽是 43 | `recording_slot_not_next_free` 前先由 `get_recording_save_status` 暴露 `next_free_slot` | ✅ 预检可用 |
+
+## 4. 复现
+
+```bash
+cd PawnMind
+./test.sh R4_F1        # 13 tests
+./test.sh R4_TRADE     # 3 tests
+./test.sh              # 782 passed / 0 failed
+```
+
+真机侧的完整命令序列见 `skills/pawnmind-first-week/SKILL.md` §4–§5。

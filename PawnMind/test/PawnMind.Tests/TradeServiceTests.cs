@@ -255,6 +255,8 @@ namespace PawnMind.Tests
         {
             var port = new FakeTradePort();
             port.Evidence.BusinessComplete = false;
+            // A silent return moved nothing: that is the fact under test.
+            port.Evidence.ItemsTransferred = false;
 
             JObject json = Run(new TradeService(port));
 
@@ -297,6 +299,78 @@ namespace PawnMind.Tests
             Assert.False((bool)json["ok"], "not called is not ok");
             Assert.Equal("uncertain", (string)json["execution_status"], "uncertain");
         }
+        // ------------------------------------------- R4: per-trade vs per-visit
+
+        /// <summary>
+        /// R4-TRADE-01: a customer buying several items finishes their visit later.
+        /// Each sale still completed: the negotiated item left the table for the same
+        /// client. Reporting that as uncertain made a normal sale look unproven.
+        /// </summary>
+        [Test]
+        public static void R4_TRADE_01_Partial_Sale_Is_Completed_And_Flags_The_Visit()
+        {
+            var port = new FakeTradePort();
+            port.Guard.StagedItemOwned = true;   // selling my own item
+            port.Evidence.BusinessComplete = false;
+            port.Evidence.ItemsTransferred = true;
+
+            JObject json = Run(new TradeService(port), "sell");
+
+            Assert.True((bool)json["ok"], "the sale moved the item, so it completed");
+            Assert.Equal("completed", (string)json["execution_status"], "completed");
+            Assert.False((bool)json["visit_complete"],
+                "the customer may still buy more; the visit is not complete");
+            Assert.True((bool)json["items_transferred"], "the transfer is the evidence");
+            Assert.Equal(1, port.AcceptCalls, "one click");
+        }
+
+        /// <summary>
+        /// R4-TRADE-02: nothing moved and the visit did not complete -> uncertain.
+        /// </summary>
+        [Test]
+        public static void R4_TRADE_02_Nothing_Moved_Is_Still_Uncertain()
+        {
+            var port = new FakeTradePort();
+            port.Guard.StagedItemOwned = true;
+            port.Evidence.BusinessComplete = false;
+            port.Evidence.ItemsTransferred = false;
+
+            JObject json = Run(new TradeService(port), "sell");
+
+            Assert.False((bool)json["ok"], "nothing moved is not a sale");
+            Assert.Equal("uncertain", (string)json["execution_status"], "uncertain");
+            Assert.Equal("business_not_complete", (string)json["detail"], "stable detail");
+        }
+
+        /// <summary>
+        /// R4-TRADE-03: because the sale is terminal, a second trade with a new
+        /// action id is not blocked by operation_pending. The live session deadlocked
+        /// on exactly this.
+        /// </summary>
+        [Test]
+        public static void R4_TRADE_03_Completed_Sale_Does_Not_Block_The_Next_Trade()
+        {
+            var port = new FakeTradePort();
+            port.Guard.StagedItemOwned = true;
+            port.Evidence.BusinessComplete = false;
+            port.Evidence.ItemsTransferred = true;
+            ActionRouter router = Router(port);
+
+            string first = router.Handle(
+                "{\"op\":\"confirm_trade\",\"action_id\":\"trade-a\","
+                + "\"rev\":42,\"item_id\":56,\"side\":\"sell\"}");
+            Assert.Contains(first, "\"ok\":true", "the first sale completed");
+
+            port.Guard.StagedItemId = 57;
+            port.Evidence.StagedItemIdAfter = 58;
+            string second = router.Handle(
+                "{\"op\":\"confirm_trade\",\"action_id\":\"trade-b\","
+                + "\"rev\":42,\"item_id\":57,\"side\":\"sell\"}");
+            Assert.False(second.Contains("operation_pending"),
+                "a completed sale must not lock trading: " + second);
+            Assert.Equal(2, port.AcceptCalls, "the second sale reached the native click");
+        }
+
         // ---------------------------------------------- operation / dialogue split
 
         private const string GameVersion = "VERSION 1-Rev1";
@@ -373,6 +447,7 @@ namespace PawnMind.Tests
         {
             var port = new FakeTradePort();
             port.Evidence.BusinessComplete = false;
+            port.Evidence.ItemsTransferred = false;
             ActionRouter router = Router(port);
 
             string response = router.Handle(

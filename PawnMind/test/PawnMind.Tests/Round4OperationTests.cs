@@ -725,5 +725,117 @@ namespace PawnMind.Tests
                 ((JArray)json["initial_result"]["readback"]["extra"]["b"]).ToString(Formatting.None),
                 "nested JSON is preserved, not flattened");
         }
+
+        /// <summary>
+        /// R4-F1-10: starting a new game from the main menu has no previous run id,
+        /// so "requested" must still become "confirmed" once a run appears. Without
+        /// this the switch is unconfirmable forever and blocks every later load.
+        /// </summary>
+        [Test]
+        public static void R4_F1_10_Start_From_No_Run_Is_Confirmed()
+        {
+            string runId = RunChangePolicy.NoRun;
+            int confirmations = 0;
+            ActionRouter router = Router(
+                3,
+                delegate(string op, JObject request)
+                {
+                    runId = "run-new";
+                    return ActionResult.SuccessRaw(op,
+                            "{\"ok\":true,\"dispatched\":true,\"start_requested\":true}")
+                        .WithRunChangeRequested();
+                },
+                null,
+                delegate { return runId; },
+                delegate { confirmations++; });
+
+            JObject json = JObject.Parse(router.Handle(Write("confirm_new_game", "f1b-new", 3)));
+
+            Assert.Equal(RunChangeStatus.Confirmed, (string)json["run_change_status"],
+                "a run appearing where there was none is a confirmed switch");
+            Assert.Equal(1, confirmations, "the old-run bookkeeping runs once");
+        }
+
+        /// <summary>
+        /// R4-F1-11: a run that becomes unreadable may be loading or gone. That is
+        /// never proof of a completed switch.
+        /// </summary>
+        [Test]
+        public static void R4_F1_11_A_Vanishing_Run_Is_Not_A_Confirmed_Switch()
+        {
+            string runId = "run-a";
+            ActionRouter router = Router(
+                3,
+                delegate(string op, JObject request)
+                {
+                    if (op != "load_game") return ActionResult.Success(op);
+                    runId = RunChangePolicy.NoRun;
+                    return ActionResult.SuccessRaw(op,
+                            "{\"ok\":true,\"dispatched\":true,\"load_requested\":true}")
+                        .WithRunChangeRequested();
+                },
+                null,
+                delegate { return runId; });
+
+            router.Handle(Write("open_shop", "old-vanish", 3));
+            JObject json = JObject.Parse(router.Handle(Write("load_game", "f1b-vanish", 3)));
+
+            Assert.Equal(RunChangeStatus.Unknown, (string)json["run_change_status"],
+                "mid-load is unknown, not confirmed");
+            Assert.True((bool)router.GetOperationJson("old-vanish")["known"],
+                "nothing is evicted while the run is mid-load");
+        }
+
+        /// <summary>
+        /// R4-F1-12: still no run after the request is only "requested".
+        /// </summary>
+        [Test]
+        public static void R4_F1_12_No_Run_To_No_Run_Stays_Requested()
+        {
+            ActionRouter router = Router(
+                3,
+                delegate(string op, JObject request)
+                {
+                    return ActionResult.SuccessRaw(op,
+                            "{\"ok\":true,\"dispatched\":true,\"prompt_confirmed\":true}")
+                        .WithRunChangeRequested();
+                },
+                null,
+                delegate { return RunChangePolicy.NoRun; });
+
+            JObject json = JObject.Parse(router.Handle(Write("confirm_new_game", "f1b-none", 3)));
+            Assert.Equal(RunChangeStatus.Requested, (string)json["run_change_status"],
+                "no run before and after is still only a request");
+        }
+
+        /// <summary>
+        /// R4-F1-13: after the switch is confirmed, a second run-changing action is
+        /// allowed again. This is the deadlock the live session hit.
+        /// </summary>
+        [Test]
+        public static void R4_F1_13_Confirmed_Switch_Releases_The_Run_Change_Gate()
+        {
+            string runId = RunChangePolicy.NoRun;
+            int loads = 0;
+            ActionRouter router = Router(
+                3,
+                delegate(string op, JObject request)
+                {
+                    if (op == "load_game") loads++;
+                    runId = "run-" + (loads + 1);
+                    return ActionResult.SuccessRaw(op,
+                            "{\"ok\":true,\"dispatched\":true,\"load_requested\":true}")
+                        .WithRunChangeRequested();
+                },
+                null,
+                delegate { return runId; });
+
+            router.Handle(Write("confirm_new_game", "f1b-gate-1", 3));
+            string second = router.Handle(Write("load_game", "f1b-gate-2", 3));
+
+            Assert.False(second.Contains(OperationErrors.RunChangePending),
+                "a confirmed switch must not keep blocking the next one");
+            Assert.Equal(1, loads, "the second run-changing action was dispatched");
+        }
     }
 }

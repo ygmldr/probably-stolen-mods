@@ -587,7 +587,9 @@ namespace PawnMind.Game
         {
             try
             {
-                if (!PlayerStore.HasInstance) return null;
+                // "No run" and "cannot tell" are different facts (R4/F1b): the main
+                // menu is the first, a loading screen or a broken store the second.
+                if (!PlayerStore.HasInstance) return RunChangePolicy.NoRun;
                 PlayerStore store = PlayerStore.Instance;
                 if (store == null) return null;
                 string runId = store.runID;

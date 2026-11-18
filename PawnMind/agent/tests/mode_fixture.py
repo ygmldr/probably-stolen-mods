@@ -7,6 +7,7 @@ reports one. These helpers keep that fixture in one place.
 
 import json
 import os
+import socket
 import tempfile
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -78,8 +79,20 @@ class FakeBridge:
 
 
 def dead_config():
-    """A config for a port nothing listens on."""
+    """A config for a port nothing listens on.
+
+    The port is probed, not hard-coded: a developer machine may well have the
+    real bridge (or anything else) on the default 15528, which would turn this
+    fixture into a live endpoint and silently invalidate the test.
+    """
+    probe = socket.socket()
+    try:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+    finally:
+        probe.close()
+
     handle, path = tempfile.mkstemp(suffix=".conf")
     with os.fdopen(handle, "w") as config:
-        config.write("port=15528\ntoken=%s\n" % ("0" * 32))
+        config.write("port=%d\ntoken=%s\n" % (port, "0" * 32))
     return path
