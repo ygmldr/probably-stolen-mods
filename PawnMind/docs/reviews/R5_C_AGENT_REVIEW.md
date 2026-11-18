@@ -1,7 +1,7 @@
 # R5_C_AGENT_REVIEW — R5-C（C1–C4）独立审计
 
 > 审计者：`reviewer-c`（fresh context，非实现者，未参与 R5-C 任何代码/测试编写；本次未修改生产代码/测试，未 `git add`/`commit`）。
-> 审计时间：2026-11-18T21:10Z – 21:42Z（Linux 主机；无 Windows、无游戏进程、无存档操作、无对网络/Workshop/扫描器/dev 的调用）。
+> 审计时间：2026-11-18T21:10Z – 21:38Z（Linux 主机；无 Windows、无游戏进程、无存档操作、无对网络/Workshop/扫描器/dev 的调用）。
 > 分支：`r5/overnight`。审计目标快照 **`243d1f91`**（R5-C4 head）：
 >
 > | 提交 | 内容 | 审计位置 |
@@ -342,3 +342,41 @@ PYTHONPATH=$PWD /root/work/game_mods/PawnMind/.venv/bin/python \
 - **C 阶段离线退出门槛：满足**（可放行进入最终汇总/停止等待 Windows 授权）。若 Lead 决定在 L3 前修 WARN，本审计建议至少修 W-C2-2（run identity/prompt/skill 登记）与 W-C3-1（空 surface fail-open）。
 
 > 审计声明：本文件为 reviewer-c 本次唯一写入；未修改生产代码/测试，未 `git add`/`commit`，未构建 `dist/`。所有“VERIFIED”均可在本次会话命令与 `_internal/logs/review_c_cs.log`、`_internal/logs/review_c_py.log`（gitignored 原始输出）中复核；“REPORTED/NOT_RUN”按 §6 显式区分，未把开发者/Lead 的数字当作自己执行的结果。
+
+---
+
+## 9. Addendum（post-WARN-fix 复验，`9680e3ba`）
+
+> 追加时间：2026-11-18T21:38Z。触发：Lead 收到本审计 WARN 后提交 `9680e3ba fix(r5-c): address reviewer-C offline warnings`（改动 `agent/trace_recorder.py`、`agent/decision_interface.py`、对应测试与两份文档；**该提交无 C# 文件**）。复验 worktree：`_internal/review-c-warnfix`（detached `9680e3ba`，`git status` 干净）。本节只追加，不修改上文原始审计目标（`243d1f91`）的记录。
+
+### 9.1 WARN 关闭情况（审计者独立复验）
+
+| ID | 原问题 | 修复证据（`9680e3ba`） | 审计者独立复验 | 状态 |
+|---|---|---|---|---|
+| **W-C2-1** | result 事件 `dispatch_status` 无条件 `dispatched` | 新 `_dispatch_claim(payload)`：写路径按响应 `dispatched`（true→`dispatched`，false→`not_dispatched`，缺失/类型错→`unknown`），读路径仍 `dispatched`；`DispatchAxisTests` 3 例 | 探针：`stale_rev` 拒绝→`not_dispatched`；无 claim→`unknown`；`dispatched:true`→`dispatched`；读→`dispatched`，全部 MATCH；post-fix e2e 写 op 轴全正确 | **CLOSED** |
+| **W-C3-1** | 空 `allowed_tools` fail-open | `Executor.__init__`：`None` 才表示 unrestricted，空 iterable=`set()`（deny-all）；`_surface_refusal` 相应区分；2 个新用例 | 探针：空 surface→`BLOCKED`/0 calls；`None`→`COMPLETED`/1 call，MATCH | **CLOSED** |
+| **W-C3-2** | 直接构造的 `Decision` 绕过参数校验 | `execute()` 先对 `decision.args` 重新执行 `_check_args`（拒绝执行层保留键/隐藏字段探针）；未知工具在 `_surface_refusal` → `tool_not_allowed`（surface BLOCK，不派发）；2 个新用例 | 探针：`Decision(args={"rev":9})`→`REJECTED`/0 calls；未知工具→`BLOCKED`/0 calls，MATCH | **CLOSED** |
+| **W-C3-3** | 协议文档仍写 validator v1.2.0 | `R5_LLM_PILOT_PROTOCOL.md:9,41` 改为 v1.3.0 | 实测 `agent/trace_validator.py:169 VALIDATOR_VERSION="1.3.0"`；grep 协议两处均为 1.3.0 | **CLOSED** |
+| **W-C2-2** | 协议 §2 强制字段未被 `--trace-recording` 自动填充 | 协议 §2 新增“记录器已自动填写的字段”清单，并明确 `prompt_sha256`/`skill_sha256`/桥 `run_id` 必须由宿主提供并单独存档（L3 前待办，不是“已记录”） | 文本核对；实现未变（按设计） | **PARTIALLY CLOSED**：文档已如实；L3 宿主集成项保留 |
+| **W-C4-1** | 默认 fake sleep 与 R5 桥不一致 + 报告绝对表述 | `R5_C_OFFLINE_REPORT.md` §4 增加范围说明（默认 `async_sleep=False` 为预 R5 S6B 遗留即时 `ok:true`；R5 异步模型是 opt-in，情景 5 使用）；fake 代码未改（无需改） | 文本核对 | **CLOSED（措辞）** |
+| R-C2-2 | recorder docstring 称自动创建父目录（实际 `open()` 不创建，行为本身 fail-closed） | 本提交未改 | 复读 docstring 仍未修改 | **OPEN（低，文档 nit）** |
+
+### 9.2 新 tip 全量门禁（VERIFIED，clean worktree of `9680e3ba`）
+
+| 套件 | 命令 | exit | 结果 |
+|---|---|---|---|
+| Python 全量 | `PYTHONPATH=$PWD .venv/bin/python -m unittest discover -s agent/tests` | **0** | **Ran 505 tests，OK**（0 skip；`243d1f91` 为 498，+7 新测试） |
+| 记录器 | `… -m unittest agent.tests.test_trace_recorder` | **0** | **Ran 44 — OK**（含 3 个 `DispatchAxisTests`） |
+| 决策接口 | `… -m unittest agent.tests.test_decision_interface` | **0** | **Ran 23 — OK**（含 4 个 surface guard 用例） |
+| validator | `… -m unittest agent.tests.test_trace_validator` | **0** | **Ran 117 — OK** |
+| fixtures CLI（8 个） | `python agent/trace_validator.py <fixture>` | — | **5×exit 0（codes=[]）+ 3×exit 1**：`pending_same_item_retry_conflict`/`pending_stage_same_item_retry_conflict` → `CONFLICTING_WRITE_WHILE_PENDING`；`trade_visit_complete_no_effect_invalid` → `TRADE_EVIDENCE_MISSING` |
+| C#（该提交无 C# 改动；仍复跑作当前 tip 的背景证据） | `flock … REQUIRE_GAME=1 ./test.sh`（env 同前） | **0** | **passed=864 failed=0；gate 53/0；contract checks=526 / OK**（与 `243d1f91` 一致；该区间另含 B 复审 C# 修复，仍全绿） |
+| post-fix recorder e2e | FakeGame→TraceRecorder→export→validator | **0** | 28 事件 / **14 steps** / validator **0 error 0 warn**；写 op `dispatch_status` 全正确；token 未落盘 |
+
+原始日志：`_internal/logs/review_c_warnfix_py.log`、`_internal/logs/review_c_warnfix_cs.log`。
+
+### 9.3 判定
+
+- 未发现新缺陷：`_dispatch_claim` 只影响记录事件的 dispatch 轴（恢复/导出分别使用 execution/response 轴与响应原始字节），44 个记录器测试 + post-fix e2e 证明未回归；空 surface deny-all 与 Decision 二次校验没有削弱既有测试语义。
+- **Verdict 不变：C1 PASS / C2 PASS / C3 PASS / C4 PASS（均为离线/L1/L1-fake）；L3 全部 `NOT_RUN`；正式 Play 终态 `BLOCKED_BY_PLAY_POLICY`。** 6 个 WARN 中 5 个关闭（W-C2-2 由“协议未覆盖”转为“文档如实 + L3 宿接待办”），R-C2-2 低文档 nit 仍开；均不影响 C 段判据。
+- 本节唯一写入为本文件追加；未改代码/测试，未 `git add`/`commit`。

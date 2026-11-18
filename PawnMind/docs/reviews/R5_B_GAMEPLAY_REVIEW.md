@@ -308,3 +308,64 @@ PYTHONPATH=$PWD /root/work/game_mods/PawnMind/.venv/bin/python -m unittest disco
 | W-DOC-1 | P3 | 根/PawMind README 仍 116/106；`R5_NEXT_LIVE_SESSION` 仍写 validator 1.2.0；known-limitations §11.5 wording | 随文档 pass 收口（不阻塞 B） |
 
 > 审计声明：本文件为 `reviewer-b` 本次唯一写入；未修改生产代码/测试，未 `git add`/`commit`，未构建 `dist/`、未安装 DLL、未启动游戏、未接触存档/网络/Workshop/dev-scan。所有 VERIFIED 结论可在本次会话命令与 `_internal/logs/review_b_{cs,py,build}.log` 中复核；REPORTED/NOT_RUN 已逐项显式区分，未把开发者/历史报告的数字当作本次自己执行的结果。
+
+---
+
+## Addendum（post-WARN-fix re-check，2026-11-18T21:29Z）
+
+> 复核目标：分支 tip **`f18e25b8`**（含 `2f5b3609` WARN 修复、`f18e25b8` 文档清理、`43394e3c` 本 review 正文纠正）。干净 worktree `_internal/review-b-addendum-worktree@f18e25b8`；本 Addendum 由 `reviewer-b` 重新执行全部门禁后追加。未修改代码/测试，未 commit（仅追加本文件）。
+> 审计范围之外：复核期间共享工作树另有 teammate 的未提交 C 阶段改动（`agent/trace_recorder.py`、`decision_interface.py` 等），**不属于**本目标提交、未运行未验证，不影响下列结论。
+
+### A.0 新 tip 门禁（本次实测，VERIFIED）
+
+| 套件 | 结果 | 退出码 | 日志 |
+|---|---|---|---|
+| C# `./test.sh`（`REQUIRE_GAME=1` + flock） | **passed=864 failed=0**；gate **passed=53 failed=0**；**contract checks=526 / adapter OK**；R5_STAGE 38 + R5_MODAL 8 + R5_WIN 4 全 PASS | **0** | `_internal/logs/review_b_addendum_cs.log` |
+| Python 全量 | **Ran 498 tests — OK**（55.2s） | **0** | `_internal/logs/review_b_addendum_py.log` |
+| `src/PawnMind.csproj` Release build | **0 Warning(s) / 0 Error(s)** | **0** | `_internal/logs/review_b_addendum_build.log` |
+| `tools/gen_policy_catalog.py --check` | sha256 **`774fbfdd7b44ef5c6c7b616f885f1b624758b862b3e750497f8a39cc26763277`** 一致 | **0** | `_internal/logs/review_b_addendum_policy.log` |
+| validator 聚焦 + fixtures | **Ran 117 — OK**；validator/fixtures 文件自 `49a9f566` 起**字节未变**；8 个 fixture 本轮复跑 **5×exit0 + 3×exit1**（`CONFLICTING_WRITE_WHILE_PENDING`×2 含 relation=`same_item`、`TRADE_EVIDENCE_MISSING`；code 集与 `EXPECTED_CODES` 一致） | **0** | 终端 |
+| 执行位 | `git ls-files -s`：`test.sh`、`test/ContractGate.Tests/run.sh` 均 **100755** | — | 终端 |
+
+**计数对账：**
+- C# **864 不变**：`2f5b3609` 只给 `R5_MODAL_04` 补断言、未加测试用例；gate/contract 也未变（contract 526）。
+- Python **485 → 498（+13）** 不来自 B 修复：来自 C 阶段 `243d1f91` 的 `test_fake_scenarios.py`（+11 个 test）+ `test_fake_game_contract.py`（+2 个 test）。`2f5b3609`/`f18e25b8` 提交信息里的 “Python 498 OK” 实测成立。
+- 产品/测试代码实际改动（`git diff 49a9f566..f18e25b8`）：仅 `src/Bridge/PromptService.cs`（**+11，W-B2-1 修复**）、`src/Core/UiPressPolicy.cs`（**仅注释**）、`agent/mcp_server.py`（**仅 docstring**）、`test/PawnMind.Tests/R5DayEndModalTests.cs`（**+3 断言**）。B1 staging、B2 `PromptAdapter`、B2b `WindowAdapter/Windows` 代码均未改。
+- `agent/policy/tool_policy.json`、`src/Core/PolicyCatalog.g.cs`、`agent/trace_validator.py`、`agent/tests/fixtures/` 自 `49a9f566` 起**均未改动**（diff 为空）。
+
+### A.1 WARN 关闭情况（逐条复核）
+
+**CLOSED / PARTIAL：**
+
+| WARN | 状态 | 复核证据 |
+|---|---|---|
+| **W-B1-4** | **CLOSED** | `PLAYER_ENTRY_MATRIX.csv:64`（OP-063）player_entry 已改为 `native inventory placement: EmporiumEntry.backInvinvElement.TryAcceptAll (add) / Expel+UncheckedAccept (remove+add)`，与代码（`NegotiationStagingAdapter.cs:171–218`）及反编译 wiring 一致。 |
+| **W-B2-1** | **CLOSED** | `PromptService.cs:67–76` 在 `ValidateAnswer` 之前对 `!Readable && Error==PromptAmbiguous` 直接 `Failure(..., PromptErrors.PromptAmbiguous, false, before)` → `error:"prompt_ambiguous"` + `dispatched:false` + 零点击；与 `get_pending_prompt` 的错误码一致。`R5DayEndModalTests.cs:124–129` 现精确断言 `error==prompt_ambiguous`、`dispatched==false`、`AnswerCalls==0`，实测 PASS。“先红”为 **REPORTED**（未回放 pre-fix；按旧代码 `ValidateAnswer` 会返回 `no_prompt`，新增断言在旧代码下必失败，属真实补钉）。 |
+| **W-B2-4** | **CLOSED（文档/描述面）** | SKILL §6.1/§6.2（`:335`/`:353`）、错误表三码（`:459–461`）、证据字段（`:545–547`）；benchmark 工作流 item 8（`:115–120`）、trace 字段（`:253–255`）、两条 schema 行（`:425–426`）、§11 头（`:412,417`）；`known-limitations` Play 措辞改为 typed 就绪 + **BLOCKED_BY_PLAY_POLICY**（`:174–175,190`）；`UiPressPolicy.cs:34–39` 注释改为 “legacy/test-only fallback … must never be the Play path”；`mcp_server.py:630,635,648` 三个工具 docstring 与真实响应/错误码一致。全部未见“已 L3 / 已 Play”的表述。 |
+| **W-DOC-1** | **PARTIAL** | 已修：root README 工具数 117/107（`README.md:135`）、PawnMind/README 工具数+状态门禁 864/53/526/498 + L3 NOT_RUN（`PawnMind/README.md:7,16`）、`R5_NEXT_LIVE_SESSION.md:34` validator 1.3.0。**仍开**：root README “当前状态（2026-11-17）”的 `:136` 仍写 `C# 750 / 门禁 53 / 适配器契约 503 / Python 365`，`:137` 仍写 `policy sha256=e0da5a24…`；`f18e25b8` 提交信息“root README status line now shows actual R5 offline gate”不成立（只有 PawnMind/README 更新了状态行）。 |
+
+**OPEN（本轮复核确认代码未动，结论同主 review）：**
+
+| WARN | 状态 | 说明 |
+|---|---|---|
+| **W-B1-1** | **OPEN（L3-pre）** | `GameState.IsStagingModalOpen` 未改：仍 catch→false（fail-open）、只认 `custom_window_` 前缀，改名 CustomUIWindow（EndOfDayTablet 等）与 `closeShutterConfirmationPanel` 仍漏检。 |
+| **W-B1-2** | **OPEN（L3）** | `hidden`/`trash` 可达性未改。 |
+| **W-B1-3** | **OPEN（P3）** | client 身份仍 `RuntimeHelpers.GetHashCode`。 |
+| **W-B2-2** | **OPEN（L3-pre）** | `PromptAdapter.AnswerNegotiationConfirm` 未改：changed-modal 仍只验同族可读/打开/enabled，无 body/标签/owner 指纹（TOCTOU）。 |
+| **W-B2-3** | **PARTIAL / OPEN** | agent 文档已正确（`SKILL.md:341` 明确 “NegotiationTablet/Confirm：超预算仍要卖的确认框”）；但代码注释 `PendingPrompt.cs:43–48` / `PromptAdapter.cs:17–25` 仍写 “end_day … raise it”（未改），yes/no 左右布局依赖仍待 L3 语义复核。 |
+| **W-B2b-1** | **OPEN（L3-pre）** | `WindowAdapter.FindControl/PathOf` 未改：路径失配仍 fail-open、未忽略 Unity ` (1)` 后缀。 |
+| **W-B2b-2** | **OPEN（P3，既有）** | `WindowSnapshot.Clean` 仍不含 `CustomWindowOpen`，`Describe` 仍未输出新字段。 |
+
+### A.2 本轮新发现（修复引入/遗留的文档漂移）
+
+- **W-ADD-1（P3，新增）**：`docs/audit/tools-inventory.json` 仍是旧 `tools/list` 快照——`get_pending_prompt` description 仍为旧的 `{body, confirm_text, cancel_text, single_button}`（inventory `:462–465`）、`answer_prompt` 仍为 “Press exactly one button …”、`close_windows` 仍未提 overlays；而 `mcp_server.py` 三个 docstring 已在 `f18e25b8` 更新。该文件在 ROUND2 定位为真实 tools/list 全量快照（schema 2），benchmark 也要求 run 时记录其 SHA；建议重新生成。**不影响 gate**：`test_tool_policy.py` 只校验工具名集合（117/107），本 review §4 的“工具名集合一致”结论不变，但“description 与 mcp_server 一致”已被本次 docstring 更新破坏。
+- 备注（非本轮引入）：benchmark `§2` 的编号列表仍为 `1, 2, [R5/A1 note], 7, 8, 3..6`（7/8 在 3 之前）——`2f5b3609` 之前已如此，本次只在其后追加 item 8，内容正确，建议顺带重排。
+
+### A.3 判定
+
+- **Verdict 不改变**：**B1 PASS（L1/L2）、B2 PASS（L1）、B2b PASS（L1）、B3 NOT_RUN；无 FAIL；L3 NOT_RUN；Play BLOCKED_BY_PLAY_POLICY。**
+- 修复独立复核成立：W-B1-4 / W-B2-1 / W-B2-4 关闭，W-DOC-1 仅剩 root README 的测试数/policy sha（以及新的 W-ADD-1 快照漂移，均 P3）；W-B2-3 的 agent 文档面已收口。
+- 仍开项与主 review 一致，且都属于 **L3-pre hardening / doc precision**：W-B1-1、W-B2-2、W-B2b-1 为 L3 前建议收紧；W-B1-2/W-B1-3/W-B2b-2 为 L3/P3 遗留。新 tip 上这些文件与 `49a9f566` 逐字节相同，无需重新判定。
+- B 阶段离线门禁在新 tip 上仍满足（864/0、53/0、526、Python 498/0、build 0/0、policy `774fbfdd…`）；**任何 L3/Play 结论仍为 NOT_RUN/BLOCKED**。
+
+> 复核声明：本节由 `reviewer-b` 追加，未修改生产代码/测试，未 commit；证据见 `_internal/logs/review_b_addendum_{cs,py,build,policy}.log` 与 worktree `_internal/review-b-addendum-worktree@f18e25b8`。
