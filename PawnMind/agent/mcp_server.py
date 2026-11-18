@@ -1268,6 +1268,22 @@ def probe(client):
     print("ping:  ", client.action("ping"))
 
 
+def _recording_slot_from_env():
+    """Optional ``recording_slot`` annotation for trace events.
+
+    The dedicated recording slot is normally only known after the native
+    binding, which happens later than MCP start-up. An operator who already
+    knows it can pin ``PAWNMIND_RECORDING_SLOT``; the value is copied onto the
+    trace events for audit only and grants no permission by itself.
+    """
+    raw = os.environ.get("PAWNMIND_RECORDING_SLOT", "")
+    try:
+        slot = int(raw)
+    except (TypeError, ValueError):
+        return None
+    return slot if slot >= 0 else None
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default=None, help="path to bridge.conf")
@@ -1309,6 +1325,17 @@ def main():
         default=os.environ.get("PAWNMIND_MEMORIES_DB", None),
         help="path to the separate memories.db (default: "
              "<PawnMind>/play/memory/memories.db)",
+    )
+    parser.add_argument(
+        "--trace-recording",
+        default=None,
+        metavar="PATH",
+        help=(
+            "append a trustworthy JSONL call recording (one event before and "
+            "one after every MCP call) to PATH. The server refuses to start if "
+            "the recording cannot be opened: a run must never silently lose its "
+            "evidence. --probe exits before the recorder starts"
+        ),
     )
     args = parser.parse_args()
 
@@ -1366,6 +1393,41 @@ def main():
                   file=sys.stderr)
             return 4
 
+    # R5/C2: the trustworthy call layer. Wrapped after the memory recorder so
+    # every MCP tool call produces exactly one intent/result event pair. When
+    # requested it is mandatory: an unopenable recording is a start-up failure,
+    # never a silent run without evidence (fail closed).
+    trace_recorder = None
+    if args.trace_recording:
+        try:
+            from .trace_recorder import TraceRecorder, TraceRecorderError
+        except ImportError:
+            try:
+                from trace_recorder import TraceRecorder, TraceRecorderError
+            except ImportError as error:
+                print("pawnmind: trace recording unavailable, refusing to run"
+                      " unrecorded: %s" % error, file=sys.stderr)
+                return 5
+        try:
+            trace_recorder = TraceRecorder(
+                client,
+                args.trace_recording,
+                actor="mcp",
+                model_id=os.environ.get("PAWNMIND_MODEL_ID"),
+                policy_sha256=expected_policy_sha256,
+                tool_surface=args.tools,
+                host_version=args.mode,
+                recording_slot=_recording_slot_from_env(),
+            )
+        except (TraceRecorderError, OSError) as error:
+            print("pawnmind: cannot open trace recording %s: %s; refusing to"
+                  " run without a trustworthy recording"
+                  % (args.trace_recording, error), file=sys.stderr)
+            return 5
+        client = trace_recorder
+        print("pawnmind: recording MCP call trace to %s"
+              % args.trace_recording, file=sys.stderr)
+
     memory_provider = _MemoryStoreProvider(
         args.memories_db or _default_memories_db(),
         events_db=memory_events_db)
@@ -1383,6 +1445,8 @@ def main():
         memory_provider.close()
         if recorder is not None:
             recorder.store.close()
+        if trace_recorder is not None:
+            trace_recorder.close()
     return 0
 
 
