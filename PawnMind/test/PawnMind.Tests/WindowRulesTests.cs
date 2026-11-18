@@ -83,6 +83,44 @@ namespace PawnMind.Tests
             False(WindowRules.IsClean(snapshot), "unreadable is not clean");
         }
 
+        // ------------------------------------- R5/B2: typed overlay dismissal
+
+        /// <summary>
+        /// R5-B2: the two adapter-less overlays (control-hint tutorial overlay
+        /// and the dialogue/typewriter settings dialog) used to need the
+        /// test-only <c>press</c>. close_windows now dismisses them through the
+        /// same typed op, before the other panels.
+        /// </summary>
+        [Test]
+        public static void R5_WIN_01_Plan_Dismisses_Typed_Overlays_First()
+        {
+            var snapshot = new WindowSnapshot
+            {
+                TutorialOverlayOpen = true,
+                DialogueSettingsOpen = true,
+                PaperOpen = true
+            };
+
+            var plan = WindowRules.PlanClosures(snapshot);
+            Equal(2, plan.Count, "one overlay dismissal plus the paper close");
+            Equal(WindowKinds.Overlays, plan[0], "overlays are dismissed first");
+            Equal(WindowKinds.Paper, plan[1], "then the paper panel");
+        }
+
+        /// <summary>
+        /// R5-B2: a screen with one of those overlays is not clean, otherwise the
+        /// typed dismissal could claim success while the player still cannot click.
+        /// </summary>
+        [Test]
+        public static void R5_WIN_02_Clean_Requires_Overlays_Closed()
+        {
+            False(new WindowSnapshot { TutorialOverlayOpen = true }.Clean,
+                "the tutorial overlay keeps the screen dirty");
+            False(new WindowSnapshot { DialogueSettingsOpen = true }.Clean,
+                "the dialogue settings dialog keeps the screen dirty");
+            True(new WindowSnapshot().Clean, "a plain screen is clean");
+        }
+
         [Test]
         public static void IsClean_Requires_A_Readable_Empty_Screen()
         {

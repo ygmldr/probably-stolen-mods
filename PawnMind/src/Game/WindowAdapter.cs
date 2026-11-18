@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using PawnMind.Core;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace PawnMind.Game
 {
@@ -14,6 +15,16 @@ namespace PawnMind.Game
     internal sealed class WindowAdapter : IWindowPort
     {
         public static readonly WindowAdapter Instance = new WindowAdapter();
+
+        // R5/B2: the two adapter-less overlays. The paths are the ones the live
+        // session observed in the UI snapshot; the buttons are the player's own
+        // dismiss/apply controls, so only the onClick callback is invoked.
+        private const string TutorialOverlayButton =
+            "CanvasScreenLayer2/_ControlOverLay/CloseOverlayButton";
+        private const string DialogueSettingsCloseButton =
+            "CanvasScreenLayer2/_DialogueOptionUI/Panel/CloseButton";
+        private const string DialogueSettingsApplyButton =
+            "CanvasScreenLayer2/_DialogueOptionUI/Panel/ApplyButton";
 
         public WindowSnapshot ReadWindows()
         {
@@ -42,6 +53,12 @@ namespace PawnMind.Game
                 snapshot.TabletOpen = AnyTabletOpen();
                 snapshot.MovableVisible = CountVisibleMovable();
                 snapshot.CustomWindowOpen = HasCustomWindow();
+
+                // R5/B2: typed overlay dismissal instead of the test-only press.
+                snapshot.TutorialOverlayOpen = FindControl(TutorialOverlayButton) != null;
+                snapshot.DialogueSettingsOpen =
+                    FindControl(DialogueSettingsCloseButton) != null
+                    || FindControl(DialogueSettingsApplyButton) != null;
                 return snapshot;
             }
             catch (Exception)
@@ -133,6 +150,63 @@ namespace PawnMind.Game
         {
             CustomUIManager manager = CustomUIManager.Instance;
             if (manager != null) manager.CloseAllWindows();
+        }
+
+        /// <summary>
+        /// R5/B2: dismisses the tutorial control-hint overlay and the dialogue
+        /// settings dialog by invoking their own close/apply buttons. If neither
+        /// control can be found the call throws; WindowService turns that into a
+        /// readback mismatch, never a success.
+        /// </summary>
+        public void CloseOverlays()
+        {
+            bool dismissedTutorial = InvokeControl(TutorialOverlayButton);
+
+            // Apply is the dialog's confirm path; Close is a fallback when the
+            // apply button is not present in this build/layout.
+            bool dismissedDialogue = InvokeControl(DialogueSettingsApplyButton);
+            if (!dismissedDialogue) dismissedDialogue = InvokeControl(DialogueSettingsCloseButton);
+
+            if (!dismissedTutorial && !dismissedDialogue)
+            {
+                throw new InvalidOperationException("no overlay control");
+            }
+        }
+
+        private static bool InvokeControl(string path)
+        {
+            Button button = FindControl(path);
+            if (button == null) return false;
+            button.onClick.Invoke();
+            return true;
+        }
+
+        private static Button FindControl(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return null;
+            Button[] buttons = UnityEngine.Object.FindObjectsOfType<Button>();
+            for (int i = 0; i < buttons.Length; i++)
+            {
+                Button button = buttons[i];
+                if (button == null || !button.isActiveAndEnabled) continue;
+                if (string.Equals(PathOf(button.transform), path, StringComparison.Ordinal))
+                    return button;
+            }
+
+            return null;
+        }
+
+        private static string PathOf(Transform transform)
+        {
+            string path = transform.name;
+            Transform parent = transform.parent;
+            for (int i = 0; i < 3 && parent != null; i++)
+            {
+                path = parent.name + "/" + path;
+                parent = parent.parent;
+            }
+
+            return path;
         }
 
         /// <summary>

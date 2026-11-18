@@ -11,6 +11,7 @@ namespace PawnMind.Tests
         public WindowSnapshot Snapshot = new WindowSnapshot();
         public readonly List<string> Closed = new List<string>();
         public int HideCalls;
+        public int OverlayDismissCalls;
         public bool ThrowOnClose;
         public WindowSnapshot AfterOverride;
 
@@ -40,6 +41,13 @@ namespace PawnMind.Tests
         {
             if (ThrowOnClose) throw new InvalidOperationException("native_error");
             Closed.Add(WindowKinds.Custom);
+        }
+
+        public void CloseOverlays()
+        {
+            OverlayDismissCalls++;
+            if (ThrowOnClose) throw new InvalidOperationException("native_error");
+            Closed.Add(WindowKinds.Overlays);
         }
     }
 
@@ -154,6 +162,53 @@ namespace PawnMind.Tests
             Assert.False((bool)json["ok"], "throw is a failure");
             Assert.Equal(WindowErrors.ReadbackMismatch, (string)json["error"], "stable code");
             Assert.Equal(0, harness.Port.Closed.Count, "the throw aborted before recording");
+        }
+
+        // ------------------------------------- R5/B2: typed overlay dismissal
+
+        /// <summary>
+        /// R5-B2: close_windows dismisses the two adapter-less overlays through
+        /// the typed port (the native close/apply buttons), so the Play path no
+        /// longer needs the test-only press op.
+        /// </summary>
+        [Test]
+        public static void R5_WIN_03_Overlays_Are_Dismissed_Through_The_Typed_Port()
+        {
+            var harness = new WindowHarness();
+            harness.Port.Snapshot = new WindowSnapshot
+            {
+                TutorialOverlayOpen = true,
+                DialogueSettingsOpen = true
+            };
+            harness.Port.AfterOverride = new WindowSnapshot();
+
+            JObject json = harness.Json(harness.Service.Close());
+
+            Assert.True((bool)json["ok"], "the dismissal is verified by the readback");
+            Assert.True((bool)json["dispatched"], "native dismiss ran");
+            Assert.True((bool)json["changed"], "the screen changed");
+            JArray closed = (JArray)json["closed"];
+            Assert.Equal(1, closed.Count, "one plan entry covers both overlays");
+            Assert.Equal(WindowKinds.Overlays, (string)closed[0], "overlay dismissal kind");
+            Assert.Equal(1, harness.Port.OverlayDismissCalls, "one typed dismissal call");
+        }
+
+        /// <summary>
+        /// R5-B2: if the overlays are still on screen after the typed dismissal,
+        /// the op must report a mismatch instead of a success.
+        /// </summary>
+        [Test]
+        public static void R5_WIN_04_Overlay_Still_Open_Is_A_Readback_Mismatch()
+        {
+            var harness = new WindowHarness();
+            harness.Port.Snapshot = new WindowSnapshot { TutorialOverlayOpen = true };
+            harness.Port.AfterOverride = new WindowSnapshot { TutorialOverlayOpen = true };
+
+            JObject json = harness.Json(harness.Service.Close());
+
+            Assert.False((bool)json["ok"], "a still-open overlay is not a success");
+            Assert.Equal(WindowErrors.ReadbackMismatch, (string)json["error"], "readback mismatch");
+            Assert.True((bool)json["dispatched"], "the dismissal did run");
         }
 
         [Test]

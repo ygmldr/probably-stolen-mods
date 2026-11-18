@@ -69,6 +69,12 @@ namespace PawnMind.Bridge
                     {
                         port.CloseCustomWindows();
                     }
+                    else if (kind == WindowKinds.Overlays)
+                    {
+                        // R5/B2: typed dismissal of the two adapter-less overlays.
+                        // The port invokes their own native close/apply buttons.
+                        port.CloseOverlays();
+                    }
                     else
                     {
                         port.CloseWindow(kind);

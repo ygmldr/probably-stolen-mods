@@ -23,6 +23,14 @@ namespace PawnMind.Core
         public const string Tablet = "tablet";
         public const string Movable = "movable";
         public const string Custom = "custom";
+
+        /// <summary>
+        /// R5/B2: the two adapter-less overlays (the control-hint tutorial
+        /// overlay and the dialogue/typewriter settings dialog). They are
+        /// dismissed through their own native close/apply buttons, which is what
+        /// the player clicks; the generic test-only <c>press</c> is not needed.
+        /// </summary>
+        public const string Overlays = "overlays";
     }
 
     /// <summary>
@@ -51,13 +59,26 @@ namespace PawnMind.Core
         /// </summary>
         public bool CustomWindowOpen;
 
+        /// <summary>
+        /// R5/B2: the control-hint tutorial overlay is on screen
+        /// (CanvasScreenLayer2/_ControlOverLay/CloseOverlayButton).
+        /// </summary>
+        public bool TutorialOverlayOpen;
+
+        /// <summary>
+        /// R5/B2: the dialogue/typewriter settings dialog is on screen
+        /// (CanvasScreenLayer2/_DialogueOptionUI).
+        /// </summary>
+        public bool DialogueSettingsOpen;
+
         /// <summary>True when nothing this op can close is on screen.</summary>
         public bool Clean
         {
             get
             {
                 return !BookOpen && !PaperOpen && !ContractOpen && !DeedOpen
-                    && !TabletOpen && MovableVisible <= 0;
+                    && !TabletOpen && MovableVisible <= 0
+                    && !TutorialOverlayOpen && !DialogueSettingsOpen;
             }
         }
     }
@@ -78,6 +99,12 @@ namespace PawnMind.Core
 
         /// <summary>CustomUIManager.CloseAllWindows: what the player's ESC does.</summary>
         void CloseCustomWindows();
+
+        /// <summary>
+        /// R5/B2: dismiss the two adapter-less overlays by invoking their own
+        /// native close/apply buttons (the same click the player makes).
+        /// </summary>
+        void CloseOverlays();
     }
 
     public static class WindowRules
@@ -91,6 +118,11 @@ namespace PawnMind.Core
         {
             var plan = new List<string>();
             if (snapshot == null || !snapshot.Readable) return plan;
+
+            // The overlays sit on top of everything and steal the clicks, so they
+            // are dismissed before any panel is closed.
+            if (snapshot.TutorialOverlayOpen || snapshot.DialogueSettingsOpen)
+                plan.Add(WindowKinds.Overlays);
 
             if (snapshot.BookOpen) plan.Add(WindowKinds.Book);
             if (snapshot.PaperOpen) plan.Add(WindowKinds.Paper);
