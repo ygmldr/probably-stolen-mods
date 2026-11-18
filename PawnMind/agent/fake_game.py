@@ -34,6 +34,43 @@ taken from `src/Bridge/*` so the demo can be re-pointed at the real bridge):
 * Receipts: one ``last_payment`` per payment, reused verbatim on later reads;
   a controlled load resets the live receipt tracker like the C# bridge does.
 
+R5 contract mirror (L1-fake, scenarios in ``tests/test_fake_scenarios.py``):
+
+* ``stage_negotiation_item`` mirrors ``Bridge/NegotiationStagingService``: the
+  response carries ``staged_item_id_before/after``, ``negotiation_open``,
+  ``client_identity_unchanged``, ``item_on_weighted_counter``,
+  ``native_primitive`` and nested ``evidence``; a pre-dispatch guard refusal is
+  ``dispatched:false``/``rejected`` and a silent native return is
+  ``uncertain``/``outcome_unverified`` (never ``ok:true``). Item id ``0`` means
+  "no staged item", exactly like the C# adapter.
+* When a customer is at the counter (a host-side fixture injects it),
+  ``confirm_trade`` mirrors ``Bridge/TradeService``: ok:true only with
+  per-trade evidence (``items_transferred`` or ``cash_moved``) plus
+  ``client_unchanged``; the client-budget gate refuses
+  ``client_budget_insufficient`` before the native click. Without a customer
+  the fake keeps its older simplified store trade model (used by the S6B
+  contract tests).
+* ``get_pending_prompt``/``answer_prompt`` mirror ``Bridge/PromptService``: the
+  typed ``negotiation_confirm``/``negotiation_tablet_confirm`` panel, a
+  ``prompt_closed`` + ``state.shop_state`` readback, and ``no_prompt`` with
+  zero native clicks when nothing is open.
+* ``sleep`` can run the asynchronous model (``async_sleep=True``): the dispatch
+  is ``running``/``pending``, a missing day change is inconclusive, a later
+  observed day advance promotes the operation to ``completed`` (completion
+  evidence ``source:"day_readback"``) and the 10s observation window degrades
+  to ``sleep_unconfirmed``/``uncertain`` without ever reporting
+  ``failed``/``day_not_changed``.
+* Every write is tracked in-process and queryable at ``GET /operation?id=``
+  (including ``"*"`` with ``count``/``total_non_terminal``/``truncated``) with
+  the C# two-axis envelope (``operation_id``/``execution_status``/
+  ``delivery_status``/``dispatch_status``/``dispatched``) and the call-scoped
+  duplicate refusal ``operation_pending`` (<- ``confirm_trade`` and
+  ``stage_negotiation_item`` share one fingerprint scope).
+
+The R5 behaviours are deterministic: the clock is simulated (``advance_clock``)
+and every async transition is driven by a host hook (``finish_sleep``), never by
+the wall clock.
+
 Host-only helper (never an MCP tool): :meth:`FakeGame.return_to_menu` models
 the human returning the game to the main menu before a controlled load.
 """
@@ -139,6 +176,7 @@ OFFERS = (
 
 READ_ONLY_OPS = frozenset({
     "get_new_game_options",
+    "get_pending_prompt",
     "get_recording_save_status",
     "list_goods",
     "list_inventory",
@@ -155,9 +193,59 @@ WRITE_OPS = frozenset({
     "load_recording_game",
     "confirm_trade",
     "choose_dialogue",
+    "answer_prompt",
     "end_day",
     "sleep",
+    "stage_negotiation_item",
 })
+
+# R5-C4: mirrors RecordingSaveService.SleepObservationWindowMs (A2). A sleep
+# whose day has not been observed to change within this window is *uncertain*,
+# never failed: the native blackscreen transition is asynchronous.
+SLEEP_OBSERVATION_WINDOW_MS = 10000
+
+# R5-B1: stable refusal code -> human detail, mirrored from
+# Bridge/NegotiationStagingService.DetailFor. The fake never invents a success
+# field for a pre-dispatch refusal.
+STAGE_REFUSAL_DETAILS = {
+    "not_in_game": "no_player_store",
+    "no_client": "no_current_client",
+    "client_unreadable": "client_intent_unreadable",
+    "staging_read_failed": "staged_item_unreadable",
+    "negotiation_unreadable": "negotiation_ui_unwired",
+    "modal_open": "blocking_modal_open",
+    "item_not_found": "item_not_found",
+    "item_sold": "item_in_sold_container",
+    "item_unreadable": "item_state_unreadable",
+    "item_unreachable": "item_container_not_reachable",
+    "not_owned": "client_buys_an_unowned_item",
+    "already_owned": "client_sells_an_owned_item",
+    "intent_undefined": "client_intent_undefined",
+    "back_counter_unreadable": "weighted_counter_unreadable",
+    "back_counter_full": "weighted_counter_rejects_item",
+}
+
+# Core/PendingScope.IsCallScoped: these two ops share a fingerprint so a
+# same-item retry while one attempt is non-terminal is blocked, while a
+# different item/side stays an independent native call.
+CALL_SCOPED_OPS = frozenset({"confirm_trade", "stage_negotiation_item"})
+
+# Containers a player can drag from while negotiating (Core/StagingContainers).
+PLAYER_REACHABLE_CONTAINERS = frozenset(
+    {"main", "front", "back", "showcase", "hidden", "trash"})
+
+NEGOTIATION_UNCERTAIN_NEXT = (
+    "the staging attempt ran but its outcome is not proven: do not retry"
+    " the same item with a new action_id; read get_state.negotiated_item and"
+    " decide, or stage a different item")
+
+SLEEP_PENDING_NEXT = ("the day transition is still running; call"
+                      " get_operation or wait_operation, do not re-dispatch")
+
+OPERATION_PENDING_NEXT = (
+    "call get_operation or wait_operation for the blocking id;"
+    " do not start a new action id for the same op")
+
 
 PHASE_FOR_KIND = {
     "scenario": "specialization",
@@ -171,7 +259,7 @@ class FakeGame:
 
     def __init__(self, recording_mode="off", recording_slot=None,
                  next_free_slot=None, token=None, start_cash=START_CASH,
-                 rent=RENT_DUE):
+                 rent=RENT_DUE, async_sleep=False, clock=None):
         if recording_mode not in ("off", "armed"):
             raise ValueError("recording_mode must be 'off' or 'armed' (a real "
                              "'bound' state is reached through confirm_new_game)")
@@ -184,6 +272,11 @@ class FakeGame:
         self.token = token or secrets.token_hex(16)
         self.start_cash = int(start_cash)
         self.rent = int(rent)
+        # R5-C4: opt-in asynchronous sleep model. The wall clock is never used
+        # by tests: `clock` (callable, milliseconds) or `advance_clock` drives
+        # the observation window.
+        self.async_sleep = bool(async_sleep)
+        self._clock = clock
         self.requests = []
         self.health_payload = {
             "ok": True,
@@ -242,6 +335,23 @@ class FakeGame:
         self.binding = None
         self.save = None
         self.last_save_time = None
+        # R5 contract state ---------------------------------------------------
+        # The current counter customer (host fixture), the pointer to the item
+        # on the weighted/back counter (0 = nothing staged, like the C#
+        # adapter's StagedItemId), the typed modal slot and the native click
+        # counters the fail-closed scenarios assert on.
+        self.client = None
+        self.staged_item_id = 0
+        self.negotiation_open = False
+        self.modal = None
+        self.native_clicks = {"stage_negotiation_item": 0, "confirm_trade": 0,
+                              "answer_prompt": 0}
+        # In-process operation records: action_id -> two-axis record. Never
+        # persisted; the real bridge is also in-process only.
+        self._operations = {}
+        self._pending_sleep = None
+        self._faults = {}
+        self._fake_clock_ms = 0
 
     def start(self):
         self._httpd = ThreadingHTTPServer((HOST, 0), _FakeGameHandler)
@@ -316,6 +426,19 @@ class FakeGame:
                 "last_save_time": self.last_save_time,
                 "save": copy.deepcopy(self.save),
                 "rev": self.rev,
+                # R5 contract inspection fields ------------------------------
+                "client": self._client_payload(),
+                "negotiation_open": self._negotiation_is_open(),
+                "staged_item_id": self.staged_item_id or 0,
+                "inventory_ids": [item["id"] for item in self.inventory],
+                "prompt": self._prompt_object(),
+                "native_clicks": copy.deepcopy(self.native_clicks),
+                "async_sleep": self.async_sleep,
+                "sleep_pending": copy.deepcopy(self._pending_sleep),
+                "operations": {
+                    action_id: copy.deepcopy(record)
+                    for action_id, record in self._operations.items()
+                },
             }
 
     # ------------------------------------------------------------ host action
@@ -335,8 +458,228 @@ class FakeGame:
             self.shop_state = "CLOSED"
             self.can_end_day = False
             self.dialogue = None
+            self._clear_negotiation()
             self.menu_phase = "closed"
             self.rev += 1
+
+    # ------------------------------------------------- R5 host-only fixtures
+    #
+    # The following helpers model game-world facts a player can cause but the
+    # *model* must never fabricate: a customer walking up, the shop stock the
+    # player already owns, the native day-end confirm panel, the asynchronous
+    # blackscreen day transition and the native clock. They are host-only (like
+    # return_to_menu) and are never exposed as HTTP ops.
+
+    def _now_ms(self):
+        try:
+            if self._clock is not None:
+                return int(self._clock())
+        except Exception:
+            pass
+        return self._fake_clock_ms
+
+    def advance_clock(self, milliseconds):
+        """Advance the injectable fake clock (the observation window fixture)."""
+        with self._lock:
+            self._fake_clock_ms += int(milliseconds)
+            return self._fake_clock_ms
+
+    def stock_item(self, name, value, container="main", identifier=None):
+        """Fixture step: the player already owns this item on the shop floor."""
+        with self._lock:
+            self.item_seq += 1
+            item = {
+                "id": 5000 + self.item_seq,
+                "identifier": identifier or name.lower().replace(" ", "_"),
+                "name": name,
+                "count": 1,
+                "value": int(value),
+                "sell": int(value),
+                "container": container,
+                "owned": True,
+            }
+            self.inventory.append(item)
+            self.rev += 1
+            return copy.deepcopy(item)
+
+    def arrive_customer(self, name="Customer", intent="BUY", budget=200,
+                        uses_budget=True, purchases=1, items=None,
+                        business_complete=False):
+        """Fixture step: a customer stands at the counter to negotiate."""
+        with self._lock:
+            self.client = {
+                "name": name,
+                "intent": (intent or "").upper(),
+                "budget": int(budget),
+                "uses_budget": bool(uses_budget),
+                "purchases_left": int(purchases),
+                "business_complete": bool(business_complete),
+                "items": list(items or []),
+            }
+            self.staged_item_id = 0
+            self.negotiation_open = True
+            self.rev += 1
+            return copy.deepcopy(self.client)
+
+    def clear_customer(self):
+        """Fixture step: the customer leaves the counter."""
+        with self._lock:
+            self._clear_negotiation()
+            self.rev += 1
+
+    def raise_negotiation_confirm(self, body, confirm_text="Confirm",
+                                  cancel_text="Cancel", confirm_enabled=True,
+                                  cancel_enabled=True, single_button=False):
+        """Fixture step: the native day-end flow opened the tablet confirm."""
+        with self._lock:
+            self.modal = {
+                "kind": "negotiation_confirm",
+                "target": "negotiation_tablet_confirm",
+                "body": body,
+                "confirm_text": confirm_text,
+                "cancel_text": cancel_text,
+                "single_button": bool(single_button),
+                "confirm_enabled": bool(confirm_enabled),
+                "cancel_enabled": bool(cancel_enabled),
+                "source_op": None,
+            }
+            self.rev += 1
+            return copy.deepcopy(self.modal)
+
+    def dismiss_modal(self):
+        """Fixture step: the native panel closed outside the bridge."""
+        with self._lock:
+            self.modal = None
+            self.rev += 1
+
+    def finish_sleep(self):
+        """Host step: the native async blackscreen finally advances the day.
+
+        Returns True when a pending sleep was applied. Applying the advance is
+        observable game state: the next get_operation read promotes the running
+        (or timed-out uncertain) sleep operation to completed.
+        """
+        with self._lock:
+            if self._pending_sleep is None:
+                return False
+            before_day = self.day
+            self._pending_sleep = None
+            self.day += 1
+            self.rent_days_left = max(0, self.rent_days_left - 1)
+            self.shop_state = "OPEN"
+            self.can_end_day = True
+            if (self.rent_days_left == 0
+                    and not (self.dialogue and self.dialogue.get("available"))):
+                self._landlord_arrives()
+            self.offers = self._offers_for(self.day)
+            self.rev += 1
+            self._write_save()
+            return self.day > before_day
+
+    def inject_native_fault(self, op, detail="native_not_called", count=1):
+        """Fault injection: the next native calls of `op` return silently.
+
+        Mirrors a native call that returns without doing anything (the bridge
+        can only report uncertain). Never used to fabricate a success.
+        """
+        with self._lock:
+            self._faults.setdefault(op, []).append([detail, int(count)])
+
+    def _take_native_fault(self, op):
+        faults = self._faults.get(op)
+        if not faults:
+            return None
+        detail, count = faults[0]
+        if count <= 1:
+            faults.pop(0)
+        else:
+            faults[0][1] = count - 1
+        return detail
+
+    def _clear_negotiation(self):
+        self.client = None
+        self.staged_item_id = 0
+        self.negotiation_open = False
+
+    # ------------------------------------------------------ game projections
+
+    def _intent(self):
+        return (self.client or {}).get("intent", "")
+
+    def _negotiation_is_open(self):
+        return bool(self.client is not None and self.negotiation_open)
+
+    def _find_owned_item(self, item_id):
+        return next((row for row in self.inventory if row["id"] == item_id),
+                    None)
+
+    def _find_client_item(self, item_id):
+        if self.client is None:
+            return None
+        return next((row for row in self.client["items"]
+                     if row["id"] == item_id), None)
+
+    def _staged_item(self):
+        if not self.staged_item_id:
+            return None
+        return (self._find_owned_item(self.staged_item_id)
+                or self._find_client_item(self.staged_item_id))
+
+    def _item_value(self, item):
+        if item is None:
+            return 0
+        return int(item.get("value", item.get("sell", 0)))
+
+    @staticmethod
+    def _describe_item(item):
+        """Project an item exactly like StateSnapshot.DescribeItem (no id)."""
+        if item is None:
+            return None
+        return {
+            "name": item.get("name"),
+            "identifier": item.get("identifier"),
+            "count": item.get("count", 1),
+            "value": int(item.get("value", item.get("sell", 0))),
+        }
+
+    def _client_payload(self):
+        client = self.client
+        if client is None:
+            return None
+        # Mirrors Core/ClientSnapshotProjection: player-visible client fields
+        # only (never the hidden wallet).
+        return {
+            "name": client["name"],
+            "intent": client["intent"],
+            "uses_budget": client["uses_budget"],
+            "impatience": 0,
+            "is_wanted": False,
+            "report_reward": 0,
+            "reported": False,
+            "wanted_poster_id": None,
+            "bargain_available": False,
+            "faction": None,
+            "budget": int(client["budget"]),
+        }
+
+    def _prompt_object(self):
+        """Project the open modal exactly like Bridge/PromptJson.PromptObject."""
+        modal = self.modal
+        if modal is None:
+            return None
+        single = bool(modal.get("single_button", False))
+        return {
+            "kind": modal.get("kind", "confirmation"),
+            "target": modal.get("target", "generic_confirmation"),
+            "body": modal.get("body") or "",
+            "confirm_text": modal.get("confirm_text") or "",
+            "cancel_text": modal.get("cancel_text") or "",
+            "single_button": single,
+            "confirm_enabled": bool(modal.get("confirm_enabled", True)),
+            "cancel_enabled": (bool(modal.get("cancel_enabled", True))
+                               and not single),
+            "source_op": modal.get("source_op"),
+        }
 
     # ------------------------------------------------------------- HTTP layer
 
@@ -364,7 +707,7 @@ class FakeGame:
             self._send(handler, 200, payload)
             return
 
-        if path not in ("/state", "/action"):
+        if path not in ("/state", "/action", "/operation"):
             record["status"] = 404
             self._remember(record)
             self._send(handler, 404, {"ok": False, "error": "not_found"})
@@ -384,6 +727,23 @@ class FakeGame:
                 return
             with self._lock:
                 payload = self._state_payload()
+            record["status"] = 200
+            self._remember(record)
+            self._send(handler, 200, payload)
+            return
+
+        if path == "/operation":
+            if method != "GET":
+                record["status"] = 405
+                self._remember(record)
+                self._send(handler, 405, {"ok": False, "error": "method_not_allowed"})
+                return
+            query = urllib.parse.parse_qs(
+                urllib.parse.urlsplit(handler.path).query)
+            operation_id = (query.get("id") or [None])[0]
+            record["operation_id"] = operation_id
+            with self._lock:
+                payload = self._operation_payload(operation_id)
             record["status"] = 200
             self._remember(record)
             self._send(handler, 200, payload)
@@ -458,23 +818,282 @@ class FakeGame:
         if cached is not None:
             if cached[0] != fingerprint:
                 return {"ok": False, "error": "action_conflict", "rev": self.rev}
-            return copy.deepcopy(cached[1])
+            record = self._operations.get(action_id)
+            if record is None:
+                return copy.deepcopy(cached[1])
+            return self._decorate(cached[1], record)
 
         if rev != self.rev:
             return {"ok": False, "error": "stale_rev", "rev": self.rev}
         if op not in WRITE_OPS:
             return {"ok": False, "op": op, "error": "unknown_op", "rev": self.rev}
 
-        payload = self._write(op, body)
-        payload["rev"] = self.rev
-        self._cache[action_id] = (fingerprint, copy.deepcopy(payload))
-        return payload
+        # D4 / R5-B1: while the same native call is still non-terminal, a
+        # second action id would issue a duplicate native call. Call-scoped ops
+        # (confirm_trade / stage_negotiation_item) compare the fingerprint, so a
+        # different item/side stays available; every other op blocks by op name.
+        call_scoped = op in CALL_SCOPED_OPS
+        pending = self._find_pending(op, fingerprint if call_scoped else None)
+        if pending is not None:
+            return self._operation_pending_payload(op, pending)
+
+        raw = self._write(op, body)
+        if not isinstance(raw, dict):
+            raw = {"ok": False, "op": op, "error": "bad_response"}
+        raw["op"] = op
+        raw["rev"] = self.rev
+
+        execution, dispatch = self._classify(raw)
+        record = {
+            "operation_id": action_id,
+            "op": op,
+            "fingerprint": fingerprint,
+            "execution_status": execution,
+            "delivery_status": "delivered",
+            "dispatch_status": dispatch,
+            "rev": rev,
+            "result_rev": self.rev,
+            "error": raw.get("error"),
+            "completion_evidence": None,
+            "sleep": None,
+        }
+        if execution == "running" and op == "sleep":
+            readback = raw.get("readback") or {}
+            record["sleep"] = {
+                "day_before": int(readback.get("day_before", self.day)),
+                "issued_at_ms": self._now_ms(),
+                "timed_out": False,
+            }
+        self._operations[action_id] = record
+        self._cache[action_id] = (fingerprint, copy.deepcopy(raw))
+        return self._decorate(raw, record)
 
     @staticmethod
     def _fingerprint(op, body):
         args = {key: value for key, value in body.items()
                 if key not in ("action_id", "rev")}
         return (op, json.dumps(args, sort_keys=True, default=str))
+
+    # ------------------------------------------------- D2 operation envelope
+    #
+    # Mirrors Bridge/ActionRouter: every write gets a two-axis record and the
+    # cached response is decorated with the record facts (never re-derived from
+    # the body). GET /operation?id= exposes it, with the same fail-closed rules.
+
+    @staticmethod
+    def _classify(raw):
+        """Mirror Core/ExecutionStatus.Classify + Bridge/ActionResult dispatch."""
+        ok = raw.get("ok") is True
+        pending = raw.get("pending") is True
+        uncertain = raw.get("uncertain") is True or raw.get("unknown") is True
+        claim = raw.get("dispatched")
+        if claim is True:
+            dispatch = "dispatched"
+        elif claim is False:
+            dispatch = "not_dispatched"
+        else:
+            dispatch = "unknown"
+
+        if pending:
+            return "running", dispatch
+        if uncertain:
+            return "uncertain", dispatch
+        if ok:
+            return "completed", dispatch
+        if dispatch == "not_dispatched":
+            return "rejected", dispatch
+        if dispatch == "dispatched":
+            return "failed", dispatch
+        return "uncertain", dispatch
+
+    @staticmethod
+    def _dispatched_json(dispatch):
+        if dispatch == "dispatched":
+            return True
+        if dispatch == "not_dispatched":
+            return False
+        return None
+
+    @staticmethod
+    def _is_terminal(execution):
+        return execution in ("completed", "rejected", "failed")
+
+    def _decorate(self, raw, record):
+        """Mirror Bridge/ActionRouter.DecorateResponse for one response body."""
+        body = copy.deepcopy(raw)
+        completed = record["execution_status"] == "completed"
+
+        # A promoted operation keeps its dispatch-time body verbatim and exposes
+        # only the current provable facts at the top level.
+        if completed and (body.get("pending") is True
+                          or body.get("uncertain") is True
+                          or body.get("unknown") is True):
+            initial = copy.deepcopy(body)
+            initial.pop("initial_result", None)
+            body = {
+                "op": initial.get("op"),
+                "initial_result": initial,
+                "initial_result_note": (
+                    "the dispatch-time response; its readback describes the"
+                    " moment of the call, not the moment it completed"),
+            }
+
+        body["ok"] = completed
+        body["operation_id"] = record["operation_id"]
+        body["execution_status"] = record["execution_status"]
+        body["delivery_status"] = record["delivery_status"]
+        body["dispatch_status"] = record["dispatch_status"]
+        body["dispatched"] = self._dispatched_json(record["dispatch_status"])
+        evidence = record.get("completion_evidence")
+        if completed and evidence:
+            body["completion_evidence"] = copy.deepcopy(evidence)
+        return body
+
+    def _find_pending(self, op, fingerprint):
+        for record in self._operations.values():
+            if record["op"] != op:
+                continue
+            if fingerprint is not None and record["fingerprint"] != fingerprint:
+                continue
+            # "unknown" may have run: it blocks a second native call just like a
+            # confirmed dispatch. Only a provably-not-dispatched call is safe.
+            if record["dispatch_status"] == "not_dispatched":
+                continue
+            if self._is_terminal(record["execution_status"]):
+                continue
+            if record.get("_claimed_not_issued"):
+                continue
+            return copy.deepcopy(record)
+        return None
+
+    def _operation_pending_payload(self, op, pending):
+        return {
+            "ok": False,
+            "error": "operation_pending",
+            "op": op,
+            "rev": self.rev,
+            "blocking_operation_id": pending["operation_id"],
+            "blocking_same_call": True,
+            "execution_status": pending["execution_status"],
+            "delivery_status": pending["delivery_status"],
+            "dispatch_status": pending["dispatch_status"],
+            "dispatched": self._dispatched_json(pending["dispatch_status"]),
+            "next": OPERATION_PENDING_NEXT,
+        }
+
+    def _operation_payload(self, operation_id):
+        if operation_id == "*":
+            return self._list_operations_payload()
+
+        if (not isinstance(operation_id, str)
+                or operation_id.strip() == ""
+                or len(operation_id) > 128
+                or any(ord(ch) < 0x20 for ch in operation_id)):
+            return {"ok": False, "known": False,
+                    "error": "bad_operation_id"}
+
+        record = self._operations.get(operation_id)
+        if record is None:
+            payload = {
+                "ok": False,
+                "known": False,
+                "operation_id": operation_id,
+                "error": "unknown_operation",
+                "next": ("do not replay this id or start a new action id for"
+                         " the same op; re-read get_state and decide again"),
+            }
+            return payload
+
+        record = self._verify_operation(record)
+        payload = {
+            "ok": record["execution_status"] == "completed",
+            "known": True,
+            "operation_id": record["operation_id"],
+            "op": record["op"],
+            "execution_status": record["execution_status"],
+            "delivery_status": record["delivery_status"],
+            "dispatch_status": record["dispatch_status"],
+            "dispatched": self._dispatched_json(record["dispatch_status"]),
+            "error": record.get("error"),
+            "rev": record["rev"],
+            "result_rev": record["result_rev"],
+        }
+        if (record["execution_status"] == "completed"
+                and record.get("completion_evidence")):
+            payload["completion_evidence"] = copy.deepcopy(
+                record["completion_evidence"])
+        if not self._is_terminal(record["execution_status"]):
+            payload["next"] = (
+                "the outcome is unknown: do not retry with a new action id;"
+                " read state and decide"
+                if record["execution_status"] == "uncertain"
+                else "still running: call wait_operation or read state again;"
+                     " do not re-dispatch")
+        return payload
+
+    def _list_operations_payload(self):
+        non_terminal = [record for record in self._operations.values()
+                        if not self._is_terminal(record["execution_status"])]
+        total = len(non_terminal)
+        rows = []
+        for record in list(reversed(non_terminal))[:20]:
+            rows.append({
+                "operation_id": record["operation_id"],
+                "op": record["op"],
+                "execution_status": record["execution_status"],
+                "delivery_status": record["delivery_status"],
+                "dispatch_status": record["dispatch_status"],
+                "dispatched": self._dispatched_json(record["dispatch_status"]),
+                "rev": record["rev"],
+                "result_rev": record["result_rev"],
+                "error": record.get("error"),
+            })
+        payload = {
+            "ok": True,
+            "operations": rows,
+            "count": len(rows),
+            "total_non_terminal": total,
+            "truncated": total > len(rows),
+            "next": ("call get_operation with one of these ids; a sleep or"
+                     " save that never finished must be resolved before"
+                     " retrying it"),
+        }
+        if payload["truncated"]:
+            payload["truncation_note"] = (
+                "only the newest %d non-terminal operations are listed; older"
+                " ones can still be resolved by get_operation with their known id"
+                % len(rows))
+        return payload
+
+    def _verify_operation(self, record):
+        """Mirror the D2 readback verifier: only the sleep op has one here."""
+        if record["op"] != "sleep" or self._is_terminal(record["execution_status"]):
+            return record
+        sleep = record.get("sleep")
+        if not sleep:
+            return record
+
+        if self.day > sleep["day_before"]:
+            record["execution_status"] = "completed"
+            record["error"] = None
+            record["result_rev"] = self.rev
+            record["completion_evidence"] = {
+                "source": "day_readback",
+                "observed_rev": self.rev,
+            }
+            return record
+
+        if (not sleep["timed_out"]
+                and self._now_ms() - sleep["issued_at_ms"]
+                >= SLEEP_OBSERVATION_WINDOW_MS):
+            # Past the window with no trusted evidence that the native action did
+            # nothing: uncertainty, not failure. It stays non-terminal and keeps
+            # the anti-duplicate block.
+            record["execution_status"] = "uncertain"
+            record["error"] = "sleep_unconfirmed"
+            record["result_rev"] = self.rev
+            sleep["timed_out"] = True
+        return record
 
     # ------------------------------------------------------------- read ops
 
@@ -483,6 +1102,8 @@ class FakeGame:
             payload = {"ok": True, "op": op}
             payload.update(self._menu_view())
             return payload
+        if op == "get_pending_prompt":
+            return self._get_pending_prompt(op)
         if op == "get_recording_save_status":
             return self._status_payload(op)
         if op == "list_goods":
@@ -570,7 +1191,7 @@ class FakeGame:
                 "name": item["name"],
                 "identifier": item["identifier"],
                 "container": "main",
-                "value": item["sell"],
+                "value": item.get("sell", item.get("value", 0)),
                 "count": item["count"],
                 "owned": True,
                 "sellable": True,
@@ -596,7 +1217,7 @@ class FakeGame:
             "id": item["id"],
             "name": item["name"],
             "identifier": item["identifier"],
-            "value": item["sell"],
+            "value": item.get("sell", item.get("value", 0)),
             "count": item["count"],
             "owned": True,
             "sellable": True,
@@ -629,17 +1250,37 @@ class FakeGame:
                  "legal_actions": self._legal_actions(),
                  # Mirror the B-module split: the fake never claims a candidate
                  # is legal, it simply has no unconfirmed actions.
-                 "candidate_actions": []}
+                 "candidate_actions": [],
+                 "prompt": self._prompt_object() if self.modal else None}
         if not self.in_game:
             state.update({
                 "client": None,
                 "negotiated_item": None,
+                "negotiation_open": False,
                 "run_summary": None,
                 "rent": None,
             })
             return state
 
         dialogue_active = bool(self.dialogue and self.dialogue.get("available"))
+        if self.client is not None:
+            client = self._client_payload()
+            client_name = client["name"]
+            client_intent = client["intent"]
+        elif dialogue_active:
+            client = {"name": "Landlord", "intent": "RENT",
+                      "uses_budget": False, "impatience": 0,
+                      "is_wanted": False, "report_reward": 0,
+                      "reported": False, "wanted_poster_id": None,
+                      "bargain_available": False, "faction": None,
+                      "budget": 0}
+            client_name = "Landlord"
+            client_intent = "RENT"
+        else:
+            client = None
+            client_name = None
+            client_intent = None
+        client_items = (self.client or {}).get("items", []) if self.client else []
         state.update({
             "day": self.day,
             "shop_state": self.shop_state,
@@ -650,7 +1291,8 @@ class FakeGame:
             "rent_days_left": self.rent_days_left,
             "rent_value": self.rent,
             "starting_day": START_DAY,
-            "client_arrived": dialogue_active,
+            "client_arrived": bool(self.client is not None or dialogue_active),
+            "waiting_customers": 0,
             "back_counter_count": len(self.offers),
             "back_counter": [{
                 "name": offer["name"],
@@ -660,24 +1302,24 @@ class FakeGame:
             } for offer in self.offers],
             "front_counter_count": 0,
             "front_counter": [],
-            "client_item_count": 0,
-            "client_items": [],
-            "negotiation_open": False,
+            "client_item_count": len(client_items),
+            "client_items": [self._describe_item(item) for item in client_items],
+            "negotiation_open": self._negotiation_is_open(),
             "bargain": {"open": False},
             "inventory_count": len(self.inventory),
             "inventory": [{
                 "name": item["name"],
                 "identifier": item["identifier"],
                 "count": item["count"],
-                "value": item["sell"],
+                "value": item.get("sell", item.get("value", 0)),
             } for item in self.inventory],
-            "can_call_next": False,
+            "can_call_next": bool(self.client is not None
+                                  and self.client.get("business_complete")),
             "can_end_day": self.can_end_day,
             "dialogue": self._dialogue_payload(),
             "rent": self._rent_state(),
-            "client": ({"name": "Landlord", "intent": "RENT"}
-                       if dialogue_active else None),
-            "negotiated_item": None,
+            "client": client,
+            "negotiated_item": self._describe_item(self._staged_item()),
             "run_summary": {
                 "day": self.day,
                 "shop_state": self.shop_state,
@@ -686,8 +1328,8 @@ class FakeGame:
                 "inventory_count": len(self.inventory),
                 "front_counter_count": 0,
                 "back_counter_count": len(self.offers),
-                "client_name": "Landlord" if dialogue_active else None,
-                "client_intent": "RENT" if dialogue_active else None,
+                "client_name": client_name,
+                "client_intent": client_intent,
             },
         })
         return state
@@ -698,23 +1340,34 @@ class FakeGame:
             return actions
         # Mirror the C# contract: legal rows carry availability="available";
         # candidate rows (never legal) would carry "unknown" + requires.
-        for offer in self.offers:
-            actions.append({"action": "confirm_trade",
-                            "args": {"item_id": offer["id"], "side": "buy"},
+        def add(action, **args):
+            actions.append({"action": action, "args": args,
                             "availability": "available"})
-        for item in self.inventory:
-            actions.append({"action": "confirm_trade",
-                            "args": {"item_id": item["id"], "side": "sell"},
-                            "availability": "available"})
+
+        if self.client is not None:
+            # Negotiation in progress: staging and the accept click are the two
+            # player actions. Store-shelf rows would be a different workflow.
+            intent = self._intent()
+            if self.staged_item_id:
+                add("confirm_trade", item_id=self.staged_item_id,
+                    side="sell" if intent == "BUY" else "buy")
+            stageable = (self.inventory if intent == "BUY"
+                         else self.client["items"])
+            for item in stageable:
+                add("stage_negotiation_item", item_id=item["id"])
+        else:
+            for offer in self.offers:
+                add("confirm_trade", item_id=offer["id"], side="buy")
+            for item in self.inventory:
+                add("confirm_trade", item_id=item["id"], side="sell")
         if self.can_end_day:
-            actions.append({"action": "end_day"})
+            add("end_day")
         if self.dialogue and self.dialogue.get("available"):
             for choice in self.dialogue["choices"]:
                 if self._choice_enabled(choice):
-                    actions.append({"action": "choose_dialogue",
-                                    "args": {"index": choice["index"]}})
+                    add("choose_dialogue", index=choice["index"])
         if self.bound:
-            actions.append({"action": "sleep"})
+            add("sleep")
         return actions
 
     def _rent_state(self):
@@ -786,6 +1439,7 @@ class FakeGame:
             "ok": False,
             "op": op,
             "error": error,
+            "dispatched": False,
             "prompt_pending": False,
             "view": self._menu_view(),
         }
@@ -1003,6 +1657,10 @@ class FakeGame:
             return self._load_recording(op)
         if op == "confirm_trade":
             return self._confirm_trade(op, body)
+        if op == "stage_negotiation_item":
+            return self._stage_negotiation_item(op, body)
+        if op == "answer_prompt":
+            return self._answer_prompt(op, body)
         if op == "choose_dialogue":
             return self._choose_dialogue(op, body)
         if op == "end_day":
@@ -1025,8 +1683,8 @@ class FakeGame:
         self.selected_difficulty = None
         self.hovered = None
         self.rev += 1
-        return {"ok": True, "op": op, "prompt_pending": False,
-                "view": self._menu_view()}
+        return {"ok": True, "op": op, "dispatched": True,
+                "prompt_pending": False, "view": self._menu_view()}
 
     def _select_option(self, op, body):
         denied = self._gate_menu_write()
@@ -1038,6 +1696,7 @@ class FakeGame:
         result = {
             "ok": False,
             "op": op,
+            "dispatched": False,
             "kind": kind if isinstance(kind, str) else "none",
             "requested_id": option_id if isinstance(option_id, str) else "",
             "action": "none",
@@ -1092,7 +1751,8 @@ class FakeGame:
             self.selected_difficulty = option_id
         self.hovered = None
         self.rev += 1
-        result.update({"ok": True, "action": "set", "view": self._menu_view()})
+        result.update({"ok": True, "dispatched": True, "action": "set",
+                       "view": self._menu_view()})
         return result
 
     def _select_perk(self, result, perk_id):
@@ -1114,8 +1774,8 @@ class FakeGame:
                 self.selected_perks.remove(perk_id)
                 self.hovered = None
                 self.rev += 1
-                result.update({"ok": True, "action": "remove",
-                               "view": self._menu_view()})
+                result.update({"ok": True, "dispatched": True,
+                               "action": "remove", "view": self._menu_view()})
                 return result
             # The available card is built first and swallows the same-id click.
             result["error"] = "ambiguous_target"
@@ -1142,7 +1802,8 @@ class FakeGame:
         self.selected_perks.append(perk_id)
         self.hovered = {"id": perk_id, "row": "available"}
         self.rev += 1
-        result.update({"ok": True, "action": "add", "view": self._menu_view()})
+        result.update({"ok": True, "dispatched": True, "action": "add",
+                       "view": self._menu_view()})
         return result
 
     def _next_page(self, op, body):
@@ -1177,8 +1838,8 @@ class FakeGame:
 
         self.hovered = None
         self.rev += 1
-        return {"ok": True, "op": op, "prompt_pending": False,
-                "view": self._menu_view()}
+        return {"ok": True, "op": op, "dispatched": True,
+                "prompt_pending": False, "view": self._menu_view()}
 
     def _focus_perk(self, op, body):
         denied = self._gate_menu_write()
@@ -1203,13 +1864,14 @@ class FakeGame:
             if self.hovered["row"] == "available":
                 return self._menu_write_failure(op, "hover_conflict",
                                                 "available_card_is_hovered")
-            return {"ok": True, "op": op, "reason": "already_focused",
-                    "prompt_pending": False, "view": self._menu_view()}
+            return {"ok": True, "op": op, "dispatched": False,
+                    "reason": "already_focused", "prompt_pending": False,
+                    "view": self._menu_view()}
 
         self.hovered = {"id": perk_id, "row": "selected"}
         self.rev += 1
-        return {"ok": True, "op": op, "prompt_pending": False,
-                "view": self._menu_view()}
+        return {"ok": True, "op": op, "dispatched": True,
+                "prompt_pending": False, "view": self._menu_view()}
 
     def _blur_option(self, op, body):
         denied = self._gate_menu_write()
@@ -1228,8 +1890,9 @@ class FakeGame:
         row = self.hovered["row"]
         self.hovered = None
         self.rev += 1
-        return {"ok": True, "op": op, "blurred_row": row,
-                "prompt_pending": False, "view": self._menu_view()}
+        return {"ok": True, "op": op, "dispatched": True,
+                "blurred_row": row, "prompt_pending": False,
+                "view": self._menu_view()}
 
     def _continue_menu(self, op):
         denied = self._gate_menu_write()
@@ -1261,8 +1924,8 @@ class FakeGame:
         self.selected_page = 0
         self.hovered = None
         self.rev += 1
-        return {"ok": True, "op": op, "prompt_pending": False,
-                "view": self._menu_view()}
+        return {"ok": True, "op": op, "dispatched": True,
+                "prompt_pending": False, "view": self._menu_view()}
 
     def _confirm_new_game(self, op):
         if self.recording_mode == "off":
@@ -1326,6 +1989,9 @@ class FakeGame:
         self.rent_weeks_missed = 0
         self.last_payment = None
         self.dialogue = None
+        self._clear_negotiation()
+        self.modal = None
+        self._pending_sleep = None
         self.inventory = []
         self.item_seq = 0
         self.offers = self._offers_for(self.day)
@@ -1391,6 +2057,9 @@ class FakeGame:
         self.inventory = copy.deepcopy(save["inventory"])
         self.offers = self._offers_for(self.day)
         self.dialogue = None
+        self._clear_negotiation()
+        self.modal = None
+        self._pending_sleep = None
         self.menu_phase = "closed"
         # The C# bridge resets its receipt tracker after a controlled load.
         self.last_payment = None
@@ -1427,7 +2096,7 @@ class FakeGame:
     # -------------------------------------------------------- first-week ops
 
     def _trade_failure(self, op, error):
-        return {"ok": False, "op": op, "error": error}
+        return {"ok": False, "op": op, "error": error, "dispatched": False}
 
     def _confirm_trade(self, op, body):
         if not self.in_game:
@@ -1436,7 +2105,14 @@ class FakeGame:
         side = body.get("side")
         if isinstance(item_id, bool) or not isinstance(item_id, int):
             return self._trade_failure(op, "bad_item_id")
+        if self.client is not None:
+            # R5/A3 + R5/B1: a customer is negotiating, so the trade mirrors
+            # Bridge/TradeService (staged item, per-trade evidence, budget gate).
+            return self._negotiation_confirm_trade(op, body, item_id, side)
+        return self._legacy_confirm_trade(op, item_id, side)
 
+    def _legacy_confirm_trade(self, op, item_id, side):
+        """The S6B simplified store model (no customer at the counter)."""
         if side == "buy":
             offer = next((row for row in self.offers if row["id"] == item_id), None)
             if offer is None:
@@ -1454,9 +2130,13 @@ class FakeGame:
                 "name": offer["name"],
                 "count": 1,
                 "sell": offer["sell"],
+                "value": offer["sell"],
+                "container": "main",
+                "owned": True,
             })
             self.rev += 1
-            return {"ok": True, "op": op, "action": "buy", "item_id": offer["id"]}
+            return {"ok": True, "op": op, "dispatched": True,
+                    "action": "buy", "item_id": offer["id"]}
 
         if side == "sell":
             item = next((row for row in self.inventory if row["id"] == item_id), None)
@@ -1466,9 +2146,358 @@ class FakeGame:
             self.inventory.remove(item)
             self.cash += item["sell"]
             self.rev += 1
-            return {"ok": True, "op": op, "action": "sell", "item_id": item_id}
+            return {"ok": True, "op": op, "dispatched": True,
+                    "action": "sell", "item_id": item_id}
 
         return self._trade_failure(op, "bad_side")
+
+    # ------------------------------------------- negotiation trade (R5/A3+B1)
+
+    def _trade_refusal(self, op, error, item_id, side):
+        """Mirror Bridge/TradeService.Refusal (a pre-dispatch rejection)."""
+        return {
+            "ok": False,
+            "op": op,
+            "error": error,
+            "dispatched": False,
+            "execution_status": "rejected",
+            "item_id": item_id,
+            "side": side,
+        }
+
+    @staticmethod
+    def _normalized_side(side):
+        return side.strip().upper() if isinstance(side, str) else ""
+
+    def _trade_uncertain(self, op, item_id, side, intent, staged_id,
+                         detail, evidence=None):
+        """Mirror Bridge/TradeService.Uncertain: dispatched, no proof, never ok."""
+        row = {
+            "ok": False,
+            "op": op,
+            "error": "outcome_unverified",
+            "detail": detail,
+            "dispatched": True,
+            "unknown": True,
+            "execution_status": "uncertain",
+            "item_id": item_id,
+            "side": side,
+            "client_intent": intent,
+            "staged_item_id": staged_id,
+            "evidence": copy.deepcopy(evidence) if evidence else {},
+            "next": ("the native accept click returned without trusted completion"
+                     " evidence: do not retry with a new action id. Read get_state"
+                     " (business_complete / client_items) and decide."),
+        }
+        if evidence is not None:
+            row["business_complete"] = evidence["business_complete"]
+            row["visit_complete"] = evidence["business_complete"]
+            row["client_unchanged"] = evidence["client_unchanged"]
+            row["items_transferred"] = evidence["items_transferred"]
+            row["cash_moved"] = evidence["cash_moved"]
+        return row
+
+    def _negotiation_confirm_trade(self, op, body, item_id, side):
+        """Mirror Core/TradeGuardPolicy + Bridge/TradeService.Confirm."""
+        client = self.client
+        intent = self._intent() or "UNDEFINED"
+        staged_id = self.staged_item_id or 0
+        staged_item = self._staged_item()
+        sold = self._normalized_side(side)
+
+        def refuse(error):
+            return self._trade_refusal(op, error, item_id, side)
+
+        # Core/TradeGuardPolicy.Evaluate order, as shipped in R5.
+        if not self._negotiation_is_open():
+            return refuse("no_negotiation")
+        if item_id <= 0:
+            return refuse("item_not_found")
+        if staged_id != item_id:
+            return refuse("item_not_staged")
+        selling = sold == "SELL"
+        if not selling and sold != "BUY":
+            return refuse("bad_side")
+        if intent == "UNDEFINED":
+            return refuse("intent_undefined")
+        if client.get("business_complete"):
+            return refuse("business_complete")
+
+        owned = staged_item is not None and self._find_owned_item(item_id) is not None
+        if selling and not owned:
+            return refuse("not_owned")
+        if not selling and owned:
+            return refuse("already_owned")
+
+        if intent == "BARTER":
+            return refuse("barter_not_acceptable")
+        if intent == "INFORMATION_DEALER":
+            return refuse("not_introduced")
+        if intent == "GUNSMITH":
+            return refuse("gun_order_not_accepted")
+
+        price = self._item_value(staged_item)
+        # B16: the native buy/sell gate for the requested direction. The fake
+        # cannot read the native predicate, so it models the two player-visible
+        # facts: a staged item exists and the player has the cash to buy.
+        if selling:
+            if staged_item is None:
+                return refuse("client_refuses_item")
+        else:
+            if staged_item is None or self.cash < price:
+                return refuse("cannot_buy_from_table")
+
+        # R5/A3: the native sell path silently ignores an unaffordable sale;
+        # refuse before the click with player-visible values only.
+        if (selling and client.get("uses_budget")
+                and price > int(client.get("budget") or 0)):
+            return refuse("client_budget_insufficient")
+
+        fault = self._take_native_fault(op)
+        if fault is not None:
+            # The native accept call returned without doing anything (R5 bug
+            # shape): dispatched but unproven => uncertain, never completed.
+            return self._trade_uncertain(op, item_id, side, intent, staged_id,
+                                         fault)
+
+        self.native_clicks["confirm_trade"] += 1
+        cash_before = self.cash
+        cash_after = cash_before
+        items_transferred = False
+        if selling:
+            self.inventory.remove(self._find_owned_item(item_id))
+            self.cash += price
+            cash_after = self.cash
+            if client.get("uses_budget"):
+                client["budget"] = max(0, int(client["budget"]) - price)
+            # The sold item leaves the negotiation table.
+            self.staged_item_id = 0
+            items_transferred = True
+        else:
+            bought = self._find_client_item(item_id)
+            client["items"].remove(bought)
+            bought = dict(bought)
+            bought["owned"] = True
+            bought["container"] = "main"
+            self.inventory.append(bought)
+            self.cash -= price
+            cash_after = self.cash
+            if client.get("uses_budget"):
+                client["budget"] = int(client["budget"]) + price
+            # R5/A3: a purchase keeps `currentNegociatedItem` on the bought
+            # item, so `items_transferred` is false and cash is the evidence.
+            self.staged_item_id = item_id
+            items_transferred = False
+
+        client["purchases_left"] = int(client.get("purchases_left", 1)) - 1
+        business_complete = client["purchases_left"] <= 0
+        client["business_complete"] = business_complete
+        cash_moved = cash_before != cash_after
+        self.rev += 1
+
+        evidence = {
+            "called": True,
+            "error": None,
+            "business_complete": business_complete,
+            "client_unchanged": True,
+            "items_transferred": items_transferred,
+            "cash_moved": cash_moved,
+            "cash_before": cash_before,
+            "cash_after": cash_after,
+            "staged_item_id_after": self.staged_item_id or 0,
+        }
+        if not (items_transferred or cash_moved):
+            # Whole-visit completion is attribution context, never per-trade
+            # proof: report uncertain, never ok:true.
+            return self._trade_uncertain(
+                op, item_id, side, intent, staged_id,
+                "no_trade_evidence" if business_complete
+                else "business_not_complete",
+                evidence)
+        return {
+            "ok": True,
+            "op": op,
+            "dispatched": True,
+            "execution_status": "completed",
+            "item_id": item_id,
+            "side": "sell" if selling else "buy",
+            "client_intent": intent,
+            "business_complete": business_complete,
+            "visit_complete": business_complete,
+            "items_transferred": items_transferred,
+            "cash_moved": cash_moved,
+            "client_unchanged": True,
+            "staged_item_id": staged_id,
+            "cash_before": cash_before,
+            "cash_after": cash_after,
+            "cash_changed": cash_moved,
+            "evidence": evidence,
+        }
+
+    # ---------------------------------------------- negotiation staging (B1)
+
+    def _stage_refusal(self, op, error, item_id):
+        return {
+            "ok": False,
+            "op": op,
+            "error": error,
+            "detail": STAGE_REFUSAL_DETAILS.get(error, error),
+            "dispatched": False,
+            "execution_status": "rejected",
+            "item_id": item_id,
+            "staged_item_id_before": self.staged_item_id or 0,
+            "staged_item_id_after": None,
+            "negotiation_open": self._negotiation_is_open(),
+            "client_identity_unchanged": None,
+            "client_intent": self._intent() or None,
+        }
+
+    def _stage_negotiation_item(self, op, body):
+        """Mirror Bridge/NegotiationStagingService.Stage (read -> guard -> act)."""
+        item_id = body.get("item_id")
+        if isinstance(item_id, bool) or not isinstance(item_id, int):
+            return {"ok": False, "op": op, "error": "bad_item_id",
+                    "dispatched": False}
+        if not self.in_game:
+            return self._stage_refusal(op, "not_in_game", item_id)
+        if self.client is None:
+            return self._stage_refusal(op, "no_client", item_id)
+        intent = self._intent() or "UNDEFINED"
+        if intent == "UNDEFINED":
+            return self._stage_refusal(op, "intent_undefined", item_id)
+        if not self._negotiation_is_open():
+            return self._stage_refusal(op, "negotiation_unreadable", item_id)
+        if self.modal is not None:
+            return self._stage_refusal(op, "modal_open", item_id)
+
+        owned_item = self._find_owned_item(item_id)
+        client_item = self._find_client_item(item_id)
+        item = owned_item or client_item
+        if item is None:
+            return self._stage_refusal(op, "item_not_found", item_id)
+        container = (item.get("container") or "main").strip().lower()
+        if container == "sold":
+            return self._stage_refusal(op, "item_sold", item_id)
+        if container not in PLAYER_REACHABLE_CONTAINERS:
+            return self._stage_refusal(op, "item_unreachable", item_id)
+        if intent == "BUY" and owned_item is None:
+            return self._stage_refusal(op, "not_owned", item_id)
+        if intent == "SELL" and owned_item is not None:
+            return self._stage_refusal(op, "already_owned", item_id)
+
+        staged_before = self.staged_item_id or 0
+        on_counter = staged_before == item_id
+
+        # Host-side fault injection: the native call returns silently. The bridge
+        # can only report uncertain; nothing moves and no native click counts.
+        fault = self._take_native_fault(op)
+        if fault is not None:
+            return {
+                "ok": False,
+                "op": op,
+                "error": "outcome_unverified",
+                "detail": fault,
+                "dispatched": True,
+                "uncertain": True,
+                "execution_status": "uncertain",
+                "item_id": item_id,
+                "staged_item_id_before": staged_before,
+                "staged_item_id_after": None,
+                "negotiation_open": None,
+                "client_identity_unchanged": None,
+                "client_intent": intent,
+                "evidence": {},
+                "next": NEGOTIATION_UNCERTAIN_NEXT,
+            }
+
+        self.native_clicks["stage_negotiation_item"] += 1
+        primitive = ("weighted_area_remove_add" if on_counter
+                     else "weighted_area_add")
+        self.staged_item_id = item_id
+        self.negotiation_open = True
+        self.rev += 1
+        evidence = {
+            "called": True,
+            "error": None,
+            "staged_item_id_before": staged_before,
+            "staged_item_id_after_readable": True,
+            "staged_item_id_after": item_id,
+            "item_on_weighted_counter": True,
+            "negotiation_readable_after": True,
+            "negotiation_open_after": True,
+            "client_identity_unchanged": True,
+            "native_primitive": primitive,
+        }
+        return {
+            "ok": True,
+            "op": op,
+            "dispatched": True,
+            "execution_status": "completed",
+            "item_id": item_id,
+            "staged_item_id_before": staged_before,
+            "staged_item_id_after": item_id,
+            "negotiation_open": True,
+            "client_identity_unchanged": True,
+            "item_on_weighted_counter": True,
+            "client_intent": intent,
+            "native_primitive": primitive,
+            "evidence": evidence,
+        }
+
+    # ---------------------------------------------- typed modal (R5/B2)
+
+    def _get_pending_prompt(self, op):
+        """Mirror Bridge/PromptService.GetPending (read-only, no rev needed)."""
+        return {"ok": True, "op": op, "prompt": self._prompt_object()}
+
+    def _prompt_failure(self, op, error, dispatched=False):
+        """Mirror Bridge/PromptService.FailureRow."""
+        return {
+            "ok": False,
+            "op": op,
+            "error": error,
+            "dispatched": dispatched,
+            "prompt": self._prompt_object(),
+        }
+
+    def _answer_prompt(self, op, body):
+        """Mirror Bridge/PromptService.AnswerPrompt + Core/PromptPolicy."""
+        if self.modal is None:
+            return self._prompt_failure(op, "no_prompt")
+        choice = body.get("choice")
+        normalized = choice.strip() if isinstance(choice, str) else None
+        if normalized not in ("confirm", "cancel"):
+            return self._prompt_failure(op, "bad_choice")
+        prompt = self._prompt_object()
+        if normalized == "confirm" and not prompt["confirm_enabled"]:
+            return self._prompt_failure(op, "choice_unavailable")
+        if normalized == "cancel" and (prompt["single_button"]
+                                       or not prompt["cancel_enabled"]):
+            return self._prompt_failure(op, "choice_unavailable")
+
+        self.native_clicks["answer_prompt"] += 1
+        if normalized == "confirm":
+            # The day-end confirm panel's native callback closes the shop.
+            self.shop_state = "CLOSED"
+            self.can_end_day = False
+        self.modal = None
+        self.rev += 1
+        return {
+            "ok": True,
+            "op": op,
+            "dispatched": True,
+            "choice": normalized,
+            "prompt_closed": True,
+            "prompt": None,
+            "state": {
+                "readable": True,
+                "day": self.day,
+                "cash": self.cash,
+                "outside": False,
+                "location": None,
+                "shop_state": self.shop_state,
+            },
+        }
 
     def _choose_dialogue(self, op, body):
         if not self.in_game:
@@ -1490,21 +2519,25 @@ class FakeGame:
         before_cash = self.cash
         before_days = self.rent_days_left
         before_day = self.day
+        dispatch_rev = body.get("rev")
         receipt = None
         if choice.get("action") == "pay_rent":
             self.cash -= self.rent
             self.rent_paid_total += self.rent
             self.rent_weeks_paid += 1
             self.rent_days_left = RENT_PERIOD_DAYS
+            # Mirror Core/RentReceiptTracker: the id is built from the two
+            # counters and paid_at_rev is the revision the native call ran at.
             receipt = {
-                "id": "rent-%04d" % self.rent_weeks_paid,
+                "id": "rent_%d_%d" % (self.rent_weeks_paid,
+                                      self.rent_paid_total),
                 "amount": self.rent,
                 "cash_before": before_cash,
                 "cash_after": self.cash,
                 "cash_delta": self.cash - before_cash,
                 "rent_days_left_before": before_days,
                 "rent_days_left_after": self.rent_days_left,
-                "paid_at_rev": self.rev + 1,
+                "paid_at_rev": dispatch_rev,
                 "source": "dialogue_choice",
                 "day": self.day,
                 "weeks_paid_delta": 1,
@@ -1536,6 +2569,40 @@ class FakeGame:
     def _end_day(self, op):
         if not self.in_game:
             return {"ok": False, "op": op, "error": "not_in_game", "dispatched": False}
+        if self.async_sleep:
+            # The R5 sleep model mirrors Core/DayEndPolicy: the shutter only
+            # works while the shop is OPEN and no client is still at the counter,
+            # and after it closes the day is *ready* to end (CanEndDay true).
+            if self.client is not None and not self.client.get("business_complete"):
+                return {"ok": False, "op": op, "error": "client_still_present",
+                        "dispatched": False}
+            if self.shop_state != "OPEN":
+                return {"ok": False, "op": op, "error": "shop_not_open",
+                        "dispatched": False}
+            before_day = self.day
+            before_days = self.rent_days_left
+            before_cash = self.cash
+            self.shop_state = "CLOSED"
+            self.can_end_day = True
+            self.rev += 1
+            return {
+                "ok": True,
+                "op": op,
+                "dispatched": True,
+                "readback": {
+                    "readable": True,
+                    "error": None,
+                    "day_before": before_day,
+                    "day_after": self.day,
+                    "rent_days_left_before": before_days,
+                    "rent_days_left_after": self.rent_days_left,
+                    "cash_before": before_cash,
+                    "cash_after": self.cash,
+                    "day_advanced": False,
+                    "changed": True,
+                },
+                "can_end_day_after": True,
+            }
         if not self.can_end_day:
             return {"ok": False, "op": op, "error": "cannot_end_day",
                     "dispatched": False}
@@ -1574,6 +2641,68 @@ class FakeGame:
         if not self.in_game:
             return {"ok": False, "op": op, "error": "recording_not_in_game",
                     "dispatched": False}
+
+        if self.async_sleep:
+            # Mirror RecordingSaveService.Sleep: only a CLOSED shop with no
+            # client waiting may sleep; the native blackscreen then advances the
+            # day asynchronously (finish_sleep), so the dispatch itself is only
+            # running/pending and never an immediate success.
+            blocked = None
+            if not self.can_end_day:
+                blocked = "cannot_end_day"
+            elif self.shop_state != "CLOSED":
+                blocked = "not_closed"
+            if blocked is not None:
+                return {"ok": False, "op": op, "error": blocked,
+                        "dispatched": False}
+            before_day = self.day
+            before_days = self.rent_days_left
+            before_cash = self.cash
+            self._pending_sleep = {
+                "day_before": before_day,
+                "day_after": before_day,
+                "issued_at": self._now_ms(),
+            }
+            self.rev += 1
+            status = self._status_payload(op)
+            return {
+                "ok": False,
+                "op": op,
+                "dispatched": True,
+                "execution_status": "running",
+                "pending": True,
+                "day_changed": False,
+                "saved": False,
+                "slept": True,
+                "save_evidence": "save_unknown",
+                "save_completed": False,
+                "save_unknown": True,
+                "next": SLEEP_PENDING_NEXT,
+                "readback": {
+                    "readable": True,
+                    "error": None,
+                    "day_before": before_day,
+                    "day_after": self.day,
+                    "rent_days_left_before": before_days,
+                    "rent_days_left_after": self.rent_days_left,
+                    "cash_before": before_cash,
+                    "cash_after": self.cash,
+                    "day_advanced": False,
+                    "changed": False,
+                },
+                "report": {
+                    "readable": False,
+                    "reason": "report_unavailable",
+                    "day": self.day,
+                    "lines": [],
+                },
+                "state": status["recording_mode"],
+                "bound": True,
+                "slot_matches": status["slot_matches"],
+                "run_matches": status["run_matches"],
+                "last_save_time": status["last_save_time"],
+                "binding": dict(self.binding),
+            }
 
         before_day = self.day
         before_days = self.rent_days_left

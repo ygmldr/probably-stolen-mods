@@ -20,6 +20,7 @@ AGENT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, AGENT_DIR)
 
 from fake_game import FakeGame  # noqa: E402  (Red: the fake does not exist yet)
+import fake_game as fake_game_module  # noqa: E402
 from pawnmind_client import BridgeClient, BridgeError  # noqa: E402
 
 TOKEN_KEYS = {"ok", "op", "recording_mode", "configured_slot", "bound", "binding",
@@ -731,6 +732,54 @@ class SaveLoadContractTests(_BoundTestCase):
         refused = driver.write("save_recording_game")
         self.assertEqual("recording_not_bound", refused["error"])
         self.assertFalse(game.snapshot()["in_game"])
+
+
+class R5SurfaceContractTests(_BoundTestCase):
+    """R5-C4: the fake exposes the same tool surface the bridge does.
+
+    The deterministic scenarios in ``test_fake_scenarios.py`` assert the field
+    semantics; this class pins the fake's surface itself so a bridge contract
+    change cannot silently disappear from the L1 double.
+    """
+
+    def test_r5_tools_are_on_the_fake_surface(self):
+        self.assertIn("stage_negotiation_item", fake_game_module.WRITE_OPS)
+        self.assertIn("answer_prompt", fake_game_module.WRITE_OPS)
+        self.assertIn("get_pending_prompt", fake_game_module.READ_ONLY_OPS)
+        self.assertIn("confirm_trade", fake_game_module.CALL_SCOPED_OPS)
+        self.assertIn("stage_negotiation_item",
+                      fake_game_module.CALL_SCOPED_OPS)
+        self.assertIn("get_operation",
+                      dir(self.client))
+        # The R5 sleep model is opt-in; the default stays the S6B sync model.
+        self.assertFalse(self.game.async_sleep)
+
+    def test_write_responses_carry_the_two_axis_operation_envelope(self):
+        ended = self.driver.write("end_day")
+        self.assertTrue(ended["ok"], ended)
+        self.assertEqual("completed", ended["execution_status"])
+        self.assertEqual("delivered", ended["delivery_status"])
+        self.assertEqual("dispatched", ended["dispatch_status"])
+        self.assertTrue(ended["dispatched"])
+        operation_id = ended["operation_id"]
+        self.assertTrue(operation_id)
+
+        found = self.client.get_operation(operation_id)
+        self.assertTrue(found["known"], found)
+        self.assertTrue(found["ok"], found)
+        self.assertEqual("end_day", found["op"])
+        self.assertEqual("completed", found["execution_status"])
+
+        unknown = self.client.get_operation("no-such-operation")
+        self.assertFalse(unknown["known"])
+        self.assertEqual("unknown_operation", unknown["error"])
+
+        listing = self.client.get_operation("*")
+        self.assertTrue(listing["ok"], listing)
+        for key in ("operations", "count", "total_non_terminal", "truncated"):
+            self.assertIn(key, listing)
+        self.assertEqual(0, listing["count"], listing)
+        self.assertFalse(listing["truncated"])
 
 
 if __name__ == "__main__":
