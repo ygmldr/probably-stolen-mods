@@ -133,10 +133,10 @@ PawnMind.dll  ── HTTP 127.0.0.1:15528 ──  Python MCP (stdio)
 ## 当前状态（2026-11-17）
 
 - MCP 工具：**117 个**（`--tools recording` → 107；R5-B1 新增 `stage_negotiation_item`）
-- 测试：C# **750** + 脚本门禁 **53** + 适配器契约 **503** + Python **365**，全绿
-- 策略指纹：`policy_schema=2`，`sha256=e0da5a24…`；`play_allowlist` 仍为 **0**
-- **尚未真机验证**：离线 PASS 都是静态 / fake / loopback 证据；实机清单见
-  [`NEXT_LIVE_SESSION.md`](PawnMind/docs/plans/NEXT_LIVE_SESSION.md)
+- 测试（2026-11-19 R5 离线实测）：C# **864** + 脚本门禁 **53** + 适配器契约 **526** + Python **505**，全绿
+- 策略指纹：`policy_schema=2`，`sha256=774fbfdd7b44ef5c6c7b616f885f1b624758b862b3e750497f8a39cc26763277`；`play_allowlist` 仍为 **0**
+- **尚未真机验证**：离线 PASS（L1/L2）都是静态 / fake / loopback 证据，L3 全部 `NOT_RUN`，正式 Play 为
+  `BLOCKED_BY_PLAY_POLICY`；下一次真机步骤见 [`R5_NEXT_LIVE_SESSION.md`](PawnMind/docs/audit/R5_NEXT_LIVE_SESSION.md)
 - `dist/` 未随源码重建，与已安装 DLL 不一致；发布前需要统一版本号与产物
 
 ## 已知限制

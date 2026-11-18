@@ -71,7 +71,7 @@
   },
   {
    "name": "answer_prompt",
-   "description": "Press exactly one button of the open modal. choice is 'confirm' or 'cancel'. Destructive confirmations (discarding ground items, leaving) default to 'cancel' unless you understand the consequence; always read get_pending_prompt first and re-read state afterwards.",
+   "description": "Answer exactly one option of the modal read by get_pending_prompt (routed by kind/target to the native callback; never a guessed button index). choice is 'confirm' or 'cancel'. Success requires prompt_closed:true plus the post-answer state (incl. shop_state), so 'the panel closed' and 'the confirmed action happened' stay separate facts. Unknown/ambiguous modal => prompt_ambiguous (never clicked); a changed modal => prompt_changed with dispatched:false; a disabled option => choice_unavailable. Destructive confirmations default to 'cancel' unless you understand the consequence; always read get_pending_prompt first and re-read state afterwards.",
    "readOnlyHint": null,
    "required": [
     "choice",
@@ -226,7 +226,7 @@
   },
   {
    "name": "close_windows",
-   "description": "Close the note/book/contract/deed panels and hide floating windows so the shop is visible again. Use it right after read_book/read_item/analyze_item and before ending the day; returns what was closed and what (if anything) is still open. One shot: if the screen is still dirty it reports window_readback_mismatch and you must stop, not retry.",
+   "description": "Close the note/book/contract/deed panels, hide floating windows, and dismiss the two adapter-less overlays (tutorial control-hint overlay; dialogue/typewriter settings dialog) through their own native buttons, so the shop is visible again. Use it right after read_book/read_item/analyze_item and before ending the day; 'closed' may contain 'overlays'. Returns what was closed and what (if anything) is still open. One shot: if the screen is still dirty it reports window_readback_mismatch and you must stop, not retry; never fall back to press.",
    "readOnlyHint": null,
    "required": [
     "rev"
@@ -460,7 +460,7 @@
   },
   {
    "name": "get_pending_prompt",
-   "description": "Read the native confirmation modal that currently owns the input, if any: {ok, prompt:{body, confirm_text, cancel_text, single_button}|null}. Read-only, no rev. Call it whenever state.prompt is not null or a write returns confirmation_required, and read the text before deciding.",
+   "description": "Read the native confirmation modal that currently owns the input, if any: {ok, prompt:{kind, target, body, confirm_text, cancel_text, confirm_enabled, cancel_enabled, single_button, source_op}|null}. kind is 'confirmation' (generic) or 'negotiation_confirm' (negotiation-tablet confirm panel); target names the native window, so answer by identity never by button index. Read-only, no rev. Two modals open at once => prompt_ambiguous. Call it whenever state.prompt is not null or a write returns confirmation_required, and read the text before deciding.",
    "readOnlyHint": null,
    "required": [],
    "properties": []

@@ -24,7 +24,7 @@
 
 | 套件 | 命令 | 退出码 | 结果 |
 |---|---|---|---|
-| Python 全量 | `.venv/bin/python -m unittest discover -s agent/tests` | **0** | **Ran 498 tests，OK**（R5 启动基线 377；+121） |
+| Python 全量 | `.venv/bin/python -m unittest discover -s agent/tests` | **0** | **Ran 505 tests，OK**（R5 启动基线 377；+128；收口时 498，Reviewer-C WARN 修复新增 7 个断言/用例） |
 | C# 全量 | `DOTNET=… REQUIRE_GAME=1 ./test.sh`（flock） | **0** | **passed=864 failed=0** |
 | 脚本门禁 | 同上内嵌 | **0** | **passed=53 failed=0** |
 | 适配器契约（L2） | 同上（`Assembly-CSharp.dll` sha256 `725cb999…`） | **0** | **contract checks=526 / adapter contract OK** |

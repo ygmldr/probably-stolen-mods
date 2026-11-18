@@ -17,9 +17,11 @@ namespace PawnMind.Game
     /// R5/B2 recognises two native families:
     ///  * GenericConfirmationUIManager.panel (generic confirm/cancel callbacks),
     ///  * NegotiationTablet/Confirm: the yes/no panel built by
-    ///    NegociacionUIManager.OpenConfirmPanel (raised by end_day / sales over
-    ///    the client's budget). Its two options are answered through the public
-    ///    OnConfirmPanelYes / OnConfirmPanelNo callbacks.
+    ///    NegociacionUIManager.OpenConfirmPanel. Decomp shows it is raised by
+    ///    PlayerStore.SellItemFromTable / OnSellAllClick for a sale over the
+    ///    client's budget (not by end_day; see R5_B_GAMEPLAY_REVIEW W-B2-3). Its
+    ///    two options are answered through the public OnConfirmPanelYes /
+    ///    OnConfirmPanelNo callbacks.
     /// If both are open at once the adapter reports an ambiguity instead of
     /// picking one.
     /// </summary>

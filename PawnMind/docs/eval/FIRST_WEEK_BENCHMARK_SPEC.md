@@ -109,6 +109,15 @@
    `new_game_continue()` → `confirm_new_game()`），或由用户确认后 `load_recording_game()` 读回已绑定槽。
    注意 R5/A1：first-run prompt 确认（`prompt_confirmed:true` + `run_change:"not_issued"`）是独立 UI 操作，
    **不是** run start；确认后可以再次 `confirm_new_game()` 真正开局（详见 SKILL §1.2），不要按“整局只调一次”记录环境步骤。
+3. run 开始前记录存档指纹（来自 `get_recording_save_status()` 的 `binding`）：
+   `slot`、`run_id`、`run_number`、`start_type`、`start_scenario_id`。
+4. 再记录初始状态指纹（来自第一次 `get_state()`）：
+   `day`、`starting_day`、`cash`、`rent.due`、`rent.days_left`、`inventory_count`、`shop_state`、`rev`。
+5. 重复 run 必须从**同一存档指纹**恢复；恢复方式只能是用户操作 + `load_recording_game()`；
+   不允许“读档到一半直接开始”，也不允许修改存档文件。
+6. 若存档指纹与上一次 run 不同（游戏自动存档/时间推进/槽位变化），该 run 标记
+   `BENCH_START_SAVE_UNAVAILABLE` 或 `BENCH_ENV_MISMATCH`，不进入统计。
+
 7. 交易工作流（R5-B1）：先 `stage_negotiation_item(item_id, rev)` 暂存（completed 需 `staged_item_id_after==item_id`
    + `item_on_weighted_counter` + `negotiation_open` + `client_identity_unchanged` 全为真），再 `confirm_trade`；
    暂存 uncertain 时回读 `get_state.negotiated_item`，不得同 item 新 `action_id` 重试、不得直接 confirm_trade。
@@ -119,14 +128,6 @@
    模态变化 → `prompt_changed`（未派发）、点后未关 → `prompt_readback_mismatch`。**正式流程不用 `press`**。
    覆盖层（R5-B2b）：`close_windows(rev)` 的 `closed` 可含 `"overlays"`（教程提示覆盖层 / 对话与打字机设置），
    `remaining` 必须干净；覆盖层仍在 → `window_readback_mismatch`。
-3. run 开始前记录存档指纹（来自 `get_recording_save_status()` 的 `binding`）：
-   `slot`、`run_id`、`run_number`、`start_type`、`start_scenario_id`。
-4. 再记录初始状态指纹（来自第一次 `get_state()`）：
-   `day`、`starting_day`、`cash`、`rent.due`、`rent.days_left`、`inventory_count`、`shop_state`、`rev`。
-5. 重复 run 必须从**同一存档指纹**恢复；恢复方式只能是用户操作 + `load_recording_game()`；
-   不允许“读档到一半直接开始”，也不允许修改存档文件。
-6. 若存档指纹与上一次 run 不同（游戏自动存档/时间推进/槽位变化），该 run 标记
-   `BENCH_START_SAVE_UNAVAILABLE` 或 `BENCH_ENV_MISMATCH`，不进入统计。
 
 > `HYPOTHESIS`：同一存档 + 相同动作序列是否产生相同结果，取决于游戏内部 RNG；在获得多次实机对照前，
 > 不承诺“同存档可完全复现同轨迹”。

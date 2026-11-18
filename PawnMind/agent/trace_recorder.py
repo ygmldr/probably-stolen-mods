@@ -889,8 +889,10 @@ class TraceRecorder:
     Args:
         inner: bridge client (duck-typed; e.g. ``BridgeClient`` or
             ``memory.recorder.RecordingClient``).
-        recording_path: JSONL file to append to (created if missing; parent
-            directory created on demand).
+        recording_path: JSONL file to append to (created if missing). The
+            parent directory must already exist: an unopenable path raises
+            TraceRecorderError (fail closed) instead of silently running
+            unrecorded.
         run_id: stable id for this recorder session (default: random hex).
         actor: who is speaking through this layer (default ``"agent"``).
         model_id, prompt_sha256, skill_sha256, host_version, policy_sha256,

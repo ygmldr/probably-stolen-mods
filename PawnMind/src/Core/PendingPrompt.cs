@@ -41,9 +41,11 @@ namespace PawnMind.Core
         public const string Confirmation = "confirmation";
 
         /// <summary>
-        /// R5/B2: the negotiation tablet's confirm panel. end_day and a sale the
-        /// client cannot afford are the two native flows that raise it; it is the
-        /// panel the test-only <c>press</c> whitelist used to click.
+        /// R5/B2: the negotiation tablet's confirm panel. Native flows that raise
+        /// it: PlayerStore.SellItemFromTable / NegotiationTablet multi-sell when the
+        /// client's budget cannot cover the sale. It is the panel the test-only
+        /// <c>press</c> whitelist used to click (see R5_B_GAMEPLAY_REVIEW W-B2-3:
+        /// end_day itself does not raise it).
         /// </summary>
         public const string NegotiationConfirm = "negotiation_confirm";
     }
