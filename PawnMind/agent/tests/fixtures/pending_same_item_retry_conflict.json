@@ -1,0 +1,81 @@
+{
+  "schema_version": 2,
+  "description": "The same trade (same item, same side) is retried with a new action id while it is still running; the bridge refuses it as operation_pending and the trace must be flagged as a conflicting blind retry.",
+  "steps": [
+    {
+      "tool": "get_state",
+      "args": {},
+      "result": {
+        "ok": true,
+        "in_game": true,
+        "day": 1,
+        "shop_state": "OPEN",
+        "cash": 600,
+        "client": null,
+        "legal_actions": [],
+        "candidate_actions": []
+      }
+    },
+    {
+      "tool": "confirm_trade",
+      "args": {
+        "rev": 5,
+        "action_id": "act-trade-1",
+        "item_id": 101,
+        "side": "buy"
+      },
+      "rev": 5,
+      "result": {
+        "ok": false,
+        "op": "confirm_trade",
+        "operation_id": "op-trade-1",
+        "execution_status": "running",
+        "delivery_status": "delivered",
+        "dispatch_status": "dispatched",
+        "dispatched": true,
+        "pending": true,
+        "item_id": 101,
+        "side": "buy",
+        "next": "wait_operation or get_operation; do not re-dispatch"
+      }
+    },
+    {
+      "tool": "confirm_trade",
+      "args": {
+        "rev": 6,
+        "action_id": "act-trade-2",
+        "item_id": 101,
+        "side": "buy"
+      },
+      "rev": 6,
+      "result": {
+        "ok": false,
+        "op": "confirm_trade",
+        "error": "operation_pending",
+        "blocking_operation_id": "op-trade-1",
+        "blocking_same_call": true,
+        "execution_status": "running",
+        "delivery_status": "delivered",
+        "dispatch_status": "dispatched",
+        "dispatched": true,
+        "next": "call get_operation/wait_operation for the blocking id; do not start a new action id for the same op"
+      }
+    },
+    {
+      "tool": "get_operation",
+      "args": {
+        "operation_id": "op-trade-1"
+      },
+      "result": {
+        "ok": true,
+        "known": true,
+        "operation_id": "op-trade-1",
+        "op": "confirm_trade",
+        "execution_status": "completed",
+        "delivery_status": "delivered",
+        "dispatch_status": "dispatched",
+        "dispatched": true
+      }
+    }
+  ]
+}

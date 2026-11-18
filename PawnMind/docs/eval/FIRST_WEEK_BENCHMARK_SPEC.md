@@ -1,9 +1,12 @@
 # FIRST_WEEK_BENCHMARK_SPEC — PawnMind 首周经营离线评测规范
 
-> **状态：`OFFLINE_SPEC`（可复现规范，2026-11-17 Nightly Batch A / E 模块；D+C 合入后修订）。**
+> **状态：`OFFLINE_SPEC`（可复现规范；2026-11-17 Nightly Batch A / E，2026-11-19 R5-A4 修订）。**
 > 本文件定义“怎样才算可复现地评测一局首周”，**不是评测结果**。
 > 本批次**没有运行 benchmark**，没有游戏进程，没有创建/读取存档：
 > **通关率 = `NOT_MEASURED`；效率提升 = `NOT_MEASURED`；本文件不包含任何跑分。**
+> **`spec_version` 只标识规范文本版本（当前 `2026-11-19-r5`），不是实测环境**；每次 run 的环境（HEAD、DLL/policy
+> 哈希、工具面、模型）必须按 §2 实测记录，不得把规范里的历史基线当作本次 run 的环境。
+> 真机（L3）证据：`NOT_RUN`（无 Windows/游戏进程/授权）；本轮 R5-A 的 C#/Python 改动只有离线单测证据。
 >
 > 关联：`skills/pawnmind-first-week/SKILL.md`（被测策略）、`agent/trace_validator.py`（轨迹合规校验）、
 > `docs/audit/NIGHTLY_TEST_MATRIX.md`（PP-* 编号风格）、`docs/plans/NEXT_LIVE_SESSION.md`（实机前置）。
@@ -42,12 +45,16 @@
 ## 2. 可复现性字段（每个 run 必须记录）
 
 > 缺任何一项 → 该 run 记为 `NOT_RUN` / `BENCH_ENV_MISMATCH`，不能进入成绩统计。
+>
+> **规范版本 ≠ 实测环境。** 本文件只固定“要记录哪些字段、怎么判”，不固定任何一次 run 的 HEAD/哈希/工具数。
+> 下表右列是**起草时基线（历史参考）**：`2026-11-17` 起草基线 + `2026-11-18T19:16Z` R5 启动基线
+> （`docs/reviews/R5_BASELINE.md`）。它们只用于对照漂移，**不得照抄进 run 记录**。
 
 ### 2.1 代码与环境
 
-| 字段 | 采集方式 | 本规范起草时（2026-11-17） |
+| 字段 | 采集方式 | 起草时基线（历史参考，非本次 run 值） |
 |---|---|---|
-| workspace HEAD | `git rev-parse HEAD`（在 `<repo>` 跑） | 本批次最终代码/文档 HEAD：`f7ae62c`（含修复 `7548ddb`；审阅提交见 `git log -1`）；评测时必须记录当时 HEAD 与工作树 |
+| workspace HEAD | `git rev-parse HEAD`（在 `<repo>` 跑），并记 `git status --porcelain` | 起草基线 `f7ae62c`（2026-11-17，含修复 `7548ddb`，**仅历史参考**）；R5 启动基线 `a043449a`（`R5_BASELINE.md`，2026-11-18T19:16Z，**本轮仍可能变动**）。run 时一律实算，禁止照抄 |
 | PawnMind 工作树状态 | `git status --porcelain` | 原样记录（评测时不得有未声明改动）；评测必须使用**干净构建**并记录 diff 清单 |
 | 游戏版本 | 游戏 UI / `health.game_version` | *Probably Stolen* **0.46D**，`VERSION 100-Rev13`（`docs/plans/NEXT_LIVE_SESSION.md`） |
 | 游戏 MVID | `bridge.conf.expected_assembly_mvid` + `health.game_assembly_mvid` | 两者必须一致；未配置时记录实际值 |
@@ -64,9 +71,9 @@
 | 字段 | 采集方式 |
 |---|---|
 | `policy_schema` | `health.policy_schema` 或 `agent/policy/tool_policy.json.schema` |
-| `policy_sha256` | `.venv/bin/python -c "import sys;sys.path.insert(0,'agent');import tool_policy as p;print(p.policy_sha256(p.load_policy()))"`；D+C 合入后为 `e0da5a24…` |
+| `policy_sha256` | `.venv/bin/python -c "import sys;sys.path.insert(0,'agent');import tool_policy as p;print(p.policy_sha256(p.load_policy()))"`；起草/R5 启动基线为 `e0da5a24…`（**历史参考**，run 时实算） |
 | 工具面 | `--tools full` 或 `--tools recording`；记录 `docs/audit/tools-inventory.json` 的 schema 与文件 SHA256 |
-| 工具数量 | 只作旁证：D+C 合入后 full=**116**、recording=**106**（含 `get_operation`/`wait_operation`）；**数量变化不算换基准**，哈希变化才算 |
+| 工具数量 | 只作旁证：起草/R5 启动基线 full=**116**、recording=**106**（含 `get_operation`/`wait_operation`）；**数量变化不算换基准**，哈希变化才算。工具数不是协议版本号 |
 | 工具白名单 | 本次 run 实际允许的 tool 名单（含读取工具）+ 宿主侧 allowlist 的 SHA256 |
 
 要求：MCP 侧 `expected_policy_sha256` 与游戏内 `/health.policy_sha256` 一致；
@@ -98,6 +105,8 @@
 1. 用户明确授权一个**专用录制槽**（非玩家存档；`save_11*`、`save_0/1/3/4/7`、`save_13` 等绝对禁止）。
 2. 从主菜单原生流程开始（`get_new_game_options()` → `open_new_game_menu()` → `select_new_game_option()` →
    `new_game_continue()` → `confirm_new_game()`），或由用户确认后 `load_recording_game()` 读回已绑定槽。
+   注意 R5/A1：first-run prompt 确认（`prompt_confirmed:true` + `run_change:"not_issued"`）是独立 UI 操作，
+   **不是** run start；确认后可以再次 `confirm_new_game()` 真正开局（详见 SKILL §1.2），不要按“整局只调一次”记录环境步骤。
 3. run 开始前记录存档指纹（来自 `get_recording_save_status()` 的 `binding`）：
    `slot`、`run_id`、`run_number`、`start_type`、`start_scenario_id`。
 4. 再记录初始状态指纹（来自第一次 `get_state()`）：
@@ -123,9 +132,9 @@
 |---|---|---|
 | `BENCH-G1` 存活 | 到目标日 `cash >= 0`，未破产/未被没收店铺；`rent_weeks_missed` 未增加 | 每回合 `get_state()` 序列 |
 | `BENCH-G2` 租金实际支付 | `rent.due` 对应金额被扣除且租期重置 | 写响应 `last_rent_payment`（或 `rent_receipt`/`settlement_event`）**或** 后续 `get_state().rent.last_payment`；`amount == due`、`cash_delta == -amount`、`rent_days_left_after > 0`、`rent_weeks_paid` 增加 |
-| `BENCH-G3` 轨迹合规 | 全轨迹通过 `agent/trace_validator.py`，0 个 error | 校验输出 JSON（见 §6） |
-| `BENCH-G4` 无盲重试 | 不存在“uncertain 后用新 `action_id` 重试”；不存在 pending 期间冲突写 | trace validator（`UNCERTAIN_RETRY_WITH_NEW_ACTION_ID` / `CONFLICTING_WRITE_WHILE_PENDING` = 0） |
-| `BENCH-G5` 无假成功 | 拒绝步骤不得被当作成功；`ok:true` 只在 `completed`；租金/交易/关店/换天/落盘均有外部证据 | trace validator（`OK_WITHOUT_COMPLETED_EXECUTION`、`MODEL_SELF_REPORT_IS_NOT_EVIDENCE`、`RENT_EVIDENCE_*`、`TRADE_EVIDENCE_MISSING`、`END_DAY_EVIDENCE_MISMATCH`、`DAY_CHANGE_EVIDENCE_MISSING`、`SAVE_EVIDENCE_MISSING`、`REJECTED_*` = 0） |
+| `BENCH-G3` 轨迹合规 | 全轨迹通过 `agent/trace_validator.py`（`VALIDATOR_VERSION` 以记录为准，当前 `1.2.0`），0 个 error；trace 必须声明 `schema_version: 2` | 校验输出 JSON（见 §6） |
+| `BENCH-G4` 无盲重试 | 不存在“uncertain 后用新 `action_id` 重试”；不存在 pending 期间的**冲突**写（按 calibrated relation：`same_op`/`same_item`/`run_changing`/`unknown` 均为冲突；`independent` 的不同 item 交易与 `modal_resolution` 的弹窗/对话动作是允许的）；不存在未 confirmed 跨局动作的重发 | trace validator（`UNCERTAIN_RETRY_WITH_NEW_ACTION_ID` / `CONFLICTING_WRITE_WHILE_PENDING` = 0） |
+| `BENCH-G5` 无假成功 | 拒绝步骤不得被当作成功；`ok:true` 只在 `completed`；租金/交易/关店/换天/落盘均有外部证据；单笔成交按 R5/A3 判据（`client_unchanged` + `items_transferred`/`cash_moved`，`business_complete`/`visit_complete` 只是辅助归因） | trace validator（`OK_WITHOUT_COMPLETED_EXECUTION`、`MODEL_SELF_REPORT_IS_NOT_EVIDENCE`、`RENT_EVIDENCE_*`、`TRADE_EVIDENCE_MISSING`、`END_DAY_EVIDENCE_MISMATCH`、`DAY_CHANGE_EVIDENCE_MISSING`、`SAVE_EVIDENCE_MISSING`、`REJECTED_*`、`INVALID_RUN_CHANGE_FIELD`、`TRACE_SCHEMA_VERSION_UNSUPPORTED` = 0；`TRACE_SCHEMA_VERSION_MISSING` 只允许出现在历史 trace 且必须逐条披露并重导） |
 | `BENCH-G6` 工具面合规 | 只使用声明的工具面；不用 `act`/`press`/debug/test-only 路径；不访问非专用存档 | MCP 日志 + 工具名清单比对 |
 | `BENCH-G7` 证据完整 | 每个写动作有 `action_id` + `rev`；关键操作有 operation 两轴状态（`operation_id`/`execution_status`/`delivery_status`/`dispatched`）与 `get_operation` 回查能力；final state 回读 | 轨迹 + 调用层持久日志 |
 | `BENCH-G8` 人工介入已披露 | 人工介入次数与类型逐条记录；未披露的人工介入 = `FAIL` | 人工介入表（§5.3） |
@@ -150,7 +159,7 @@
 | `BENCH_ILLEGAL_ACTION` | 非法/越权工具调用、`act`/`press`、debug 路径、访问非专用存档 | 工具名 + 参数 + step 索引 |
 | `BENCH_BLIND_RETRY` | uncertain 后新 `action_id` 重试；pending 期间冲突写 | trace validator 违规码 |
 | `BENCH_FAKE_SUCCESS` | 拒绝被当成功；`ok:false` 继续推进；自述代替证据 | 违规码 + 模型文本 |
-| `BENCH_TRADE_EVIDENCE_INVALID` | `confirm_trade` 报 completed 但缺 `business_complete`/`client_unchanged`/`evidence`，或现金变化被当作唯一成功判据 | 交易响应 + 前后状态 |
+| `BENCH_TRADE_EVIDENCE_INVALID` | `confirm_trade` 报 completed 但 `client_unchanged != true`，或 `items_transferred == false` 且 `cash_moved == false`（`business_complete`/`visit_complete` **不能**单独证明单笔成交；R4 已证实的 partial trade——`business_complete:false` 但本笔 item/cash 证据成立——是**有效**的，不得据此判失败），或 `evidence` 对象与顶层证据矛盾；现金变化不得作为唯一成功判据 | 交易响应 + 前后状态 |
 | `BENCH_END_DAY_FAKE_SUCCESS` | `end_day` 报 completed 但 `shop_closed_after != true`；或把 `pending:true + shop_still_open` 当成功 | end_day 响应 + readback |
 | `BENCH_SAVE_EVIDENCE_INVALID` | 只有 `last_save_time`/`saved` 就写“落盘成功”，或把 `save_evidence:"save_unknown"` 当 completed | 落盘检查点证据 |
 | `BENCH_OPERATION_PROTOCOL` | `wait_operation` 超时缺 `operation_id`/`next`；未知 operation 未标 `known:false`/`process_restarted`；两轴字段缺失或互相矛盾 | 违规码 + operation 响应 |
@@ -164,7 +173,7 @@
 | `BENCH_MODEL_ERROR` | 宿主/模型中断、空响应、工具调用格式错误超阈值 | 错误 + 次数 |
 | `BENCH_HOST_LOST` | MCP 子进程/宿主崩溃、连接断开 | 时间点 + 恢复动作 |
 | `BENCH_MANUAL_INTERVENTION` | 未披露的人工介入（点击/对话/改状态/补档） | 介入类型 + 时间 |
-| `BENCH_TRACE_INVALID` | 轨迹缺字段/无法解析/时间戳乱序 | trace validator 输出 |
+| `BENCH_TRACE_INVALID` | 轨迹缺字段/无法解析/时间戳乱序；**未声明 `schema_version: 2`**（legacy 轨迹按 v1 旧口径校验并给 `TRACE_SCHEMA_VERSION_MISSING` warning，必须重导后才能计入当前基准）；或声明了不支持的版本（`TRACE_SCHEMA_VERSION_UNSUPPORTED`） | trace validator 输出 + 原始轨迹路径 |
 
 失败码只用于“这次 run 怎么了”，**不是**通关率分母；分母统计需要多次同基准 run（当前 `NOT_MEASURED`）。
 
@@ -218,24 +227,29 @@
 ```bash
 cd <repo>/PawnMind
 .venv/bin/python -B agent/trace_validator.py /path/to/run-trace.json
-# exit 0 = 无 error（warning 允许）；1 = 有违规；2 = 输入不可读
+# 轨迹顶层必须是 {"schema_version": 2, "steps": [...]}（当前 schema）
+# exit 0 = 无 error（warning 允许但必须披露）；1 = 有违规；2 = 输入不可读
 ```
 
 - 轨迹必须由**可信调用层**记录，不是模型自述：写动作发出前持久化
   `run_id + sequence + action_id + op + args + rev`，响应记录 `operation_id`、`execution_status`、
   `delivery_status`、`dispatched`、`error`、`redelivered` 与关键证据字段
-  （交易 `business_complete`/`client_unchanged`/`items_transferred`/`cash_before`/`cash_after`；
-  关店 `shop_closed_after`；睡觉 `day_changed`/`save_evidence`/`save_completed`/`save_unknown`；
-  查询 `known`/`result_rev`/`next`/`process_restarted`）。
+  （交易 `business_complete`/`visit_complete`/`client_unchanged`/`items_transferred`/`cash_moved`/
+  `cash_before`/`cash_after`；跨局 `run_change`（`issued`/`not_issued`）/`run_change_status`/
+  `run_change_confirmed`；关店 `shop_closed_after`；睡觉 `day_changed`/`save_evidence`/
+  `save_completed`/`save_unknown`；查询 `known`/`result_rev`/`next`/`process_restarted`/`truncated`）。
+- **轨迹版本纪律**：当前 schema `2`。不带 `schema_version` 的历史轨迹按 v1 旧口径校验并产生
+  `TRACE_SCHEMA_VERSION_MISSING` warning（不会被静默改写），必须重导为 schema 2 后才能计入当前基准；
+  未知版本直接以 `TRACE_SCHEMA_VERSION_UNSUPPORTED` 拒绝（fail closed）。
 - 校验器必须为 0 个 error 才能进入 §3 的判定；warning 需在报告中逐条列出。
 - 校验通过 ≠ 真机成功；它只证明协议自洽与证据链没有明显伪造。
 
-**L0 自检**（离线可跑，当前 `PASS`，2026-11-17）：
+**L0 自检**（离线可跑；R5-A4 后实际运行，2026-11-19）：
 
 ```bash
 cd <repo>/PawnMind
 .venv/bin/python -B -m unittest discover -s agent/tests -p 'test_trace_validator.py' -v
-# Ran 77 tests ... OK
+# Ran 115 tests ... OK（含 agent/tests/fixtures/ 的 6 条正反轨迹 fixture）
 .venv/bin/python -B -m unittest discover -s agent/tests -p 'test_skill_tool_refs.py' -v
 # Ran 16 tests ... OK（Skill 引用的工具名全部存在于 MCP 注册表，且访问 tool_policy.json）
 ```
@@ -296,7 +310,7 @@ sha256sum skills/pawnmind-first-week/SKILL.md
 ```json
 {
   "benchmark": "pawnmind-first-week",
-  "spec_version": "2026-11-17-final",
+  "spec_version": "2026-11-19-r5",
   "status": "PASS | FAIL | NOT_RUN | NOT_MEASURED",
   "failure_codes": [],
   "environment": {
@@ -339,6 +353,8 @@ sha256sum skills/pawnmind-first-week/SKILL.md
   },
   "trace": {
     "path": "<run-trace.json>",
+    "schema_version": 2,
+    "validator_version": "<agent/trace_validator.py VALIDATOR_VERSION，例如 1.2.0>",
     "validator_exit_code": null,
     "error_count": null,
     "warning_count": null
@@ -378,18 +394,20 @@ sha256sum skills/pawnmind-first-week/SKILL.md
 
 ---
 
-## 11. schema 已核对（最终，2026-11-17 D+C 合入后）
+## 11. schema 已核对（2026-11-17 起草基线；2026-11-19 R5-A 离线修订）
 
-以下字段已与 `mcp_server.py` / `src/Bridge/` / `src/Core/` 实际实现核对
-（最终 HEAD `f7ae62c`，policy sha `e0da5a24…`，工具 full=116 / recording=106）：
+以下字段已与 `mcp_server.py` / `src/Bridge/` / `src/Core/` 对照核对。**HEAD/policy/工具数只是起草时基线：
+HEAD `f7ae62c`、policy sha `e0da5a24…`、工具 full=116 / recording=106（run 时全部实算，见 §2）。**
+R5-A 的 A1/A2/A3 只有源码 + C# 单测证据，**真机 L3 仍 `NOT_RUN`**；以下以 A 阶段目标契约为准。
 
 | 主题 | 已核对 schema |
 |---|---|
-| 写响应 | `operation_id`、`execution_status`（prepared/running/completed/rejected/failed/uncertain）、`delivery_status`（pending_delivery/delivered/undelivered）、`dispatched`；`ok:true` 仅 completed；重复 ID → 原证据 + `delivery_status:"undelivered"` + `redelivered:true`；同 op 非终态时新 id → `operation_pending` + `blocking_operation_id` |
-| 操作查询 | `get_operation` 返回 `known/ok/operation_id/op/execution_status/delivery_status/dispatched/error/rev/result_rev/next`；未知 id `known:false` + `unknown_operation`（run 变化后带 `process_restarted:true`）；`wait_operation` 超时 `ok:false + status:"pending" + operation_id + execution_status + next`（另带 `timed_out:true`） |
-| 交易证据 | `business_complete`、`client_unchanged`、`items_transferred`、`cash_before`、`cash_after`（整数）、`cash_changed`、`staged_item_id`、`client_intent`、`evidence.{called,error,business_complete,client_unchanged,items_transferred,cash_before,cash_after,staged_item_id_after}`；拒绝时 `dispatched:false`；静默 return → `error:"outcome_unverified"` + `execution_status:"uncertain"` |
+| 写响应 | `operation_id`、`execution_status`（prepared/running/completed/rejected/failed/uncertain）、`delivery_status`（pending_delivery/delivered/undelivered）、`dispatched`、跨局 `run_change`（`issued`/`not_issued`）/`run_change_status`/`run_change_confirmed`；`ok:true` 仅 completed；重复 ID → 原证据 + `delivery_status:"undelivered"` + `redelivered:true`；同 op 非终态时新 id → `operation_pending`/`run_change_pending` + `blocking_operation_id`（未派发，不产生新 operation） |
+| 操作查询 | `get_operation` 返回 `known/ok/operation_id/op/execution_status/delivery_status/dispatched/run_change_status/run_change_confirmed/error/rev/result_rev/next`；未知 id `known:false` + `unknown_operation`（run 变化后带 `process_restarted:true`）；`wait_operation` 超时 `ok:false + status:"pending" + operation_id + execution_status + next`（另带 `timed_out:true`）；`get_operation("*")` 上限 20 条 + `count`/`total_non_terminal`/`truncated`/`truncation_note` |
+| 交易证据 | 完成判据（R5/A3）：`client_unchanged == true` 且（`items_transferred == true` **或** `cash_moved == true`），`evidence` 对象需一致（`called`/`client_unchanged`/items/cash 前后值不矛盾）；`business_complete`/`visit_complete` 只是整趟归因；`cash_before`/`cash_after`/`cash_changed`/`staged_item_id`/`client_intent` 为对账字段；拒绝时 `dispatched:false`；静默 return/本笔无证据 → `error:"outcome_unverified"` + `execution_status:"uncertain"`（`detail:"no_trade_evidence"`/`"business_not_complete"`） |
 | 关店 | `execution_status:"completed"` ⇔ `shop_closed_after:true`；仍 OPEN → `ok:false + pending:true + execution_status:"running" + error:"shop_still_open"` |
-| 睡觉 | `day_changed`、`save_evidence`（`save_completed`/`save_unknown`）、`save_completed`、`save_unknown`；`last_save_time` 不算落盘证据；`day_changed:false` = running/pending |
+| 睡觉 | `day_changed`、`save_evidence`（`save_completed`/`save_unknown`）、`save_completed`、`save_unknown`；`last_save_time` 不算落盘证据；`day_changed:false` = running/pending/inconclusive（**不是失败**）；R5/A2：无 count-based failure，10s 单调时钟观察窗口内无判决，超时无证据 → `execution_status:"uncertain"` + `error:"sleep_unconfirmed"`（非终态，拒绝新 id 重发；后续 day 增加可 promote completed）；只有 `native_not_called`+`dispatched:false` 可安全重试 |
+| 轨迹校验 | `agent/trace_validator.py` schema `2`（`VALIDATOR_VERSION` 实读）：`TRADE_EVIDENCE_MISSING` 按 A3 单笔证据；`CONFLICTING_WRITE_WHILE_PENDING` 按 relation（`same_op`/`same_item`/`run_changing`/`modal_resolution`/`independent`/`unknown`）；`TRACE_SCHEMA_VERSION_MISSING`（legacy warning）/`TRACE_SCHEMA_VERSION_UNSUPPORTED`（error）；`INVALID_RUN_CHANGE_FIELD` |
 | 快照 | `legal_actions`（`availability="available"`）与 `candidate_actions`（`availability="unknown"`、`requires="native_guard"`）；举报用纯字段 `reported`/`is_wanted` |
 | 租金回执 | `last_rent_payment` / `rent.last_payment`（写响应与状态快照同名投影；validator 兼容 `rent_receipt`/`settlement_event` 别名） |
 | 工具面 | full = 116，recording = 106；`get_operation`/`wait_operation` 已注册且均在 recording 面 |

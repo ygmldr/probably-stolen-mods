@@ -5,8 +5,10 @@ Purpose
 A PawnMind agent run is a JSON trace: an ordered list of MCP tool calls with
 their exact arguments, the exact bridge result, and optional annotations from
 the caller (claims, model text, dependencies). This module checks one trace
-against the Operation protocol invariants agreed on 2026-11-17 and reports
-*structured* violations (``code`` / ``message`` / ``step_index``).
+against the Operation protocol invariants agreed on 2026-11-17 and revised in
+R5/A4 (2026-11-19: per-trade evidence, calibrated pending conflict relation,
+run-change field) and reports *structured* violations (``code`` /
+``message`` / ``step_index``).
 
 It is deliberately offline and self-contained:
 
@@ -20,7 +22,8 @@ Trace format
 ------------
 ::
 
-    trace := list[step] | {"steps": list[step]}
+    trace := {"schema_version": 2, "steps": list[step]}   # canonical (R5)
+           | list[step] | {"steps": list[step]}           # legacy (schema v1)
     step  := {
         "tool": str,              # real MCP tool name
         "args": dict,             # tool arguments; writes carry rev/action_id
@@ -31,6 +34,20 @@ Trace format
         "status_source": str,     # optional; "operation" | "model_text" | ...
         "depends_on": list[int],  # optional; step indexes this step relies on
     }
+
+Schema versions
+---------------
+``schema_version: 2`` is the current trace schema (R5/A4) and selects the v2
+per-trade evidence rule 17. ``schema_version: 1`` (or a bare step list /
+object without a version, the pre-R5 format) is *legacy* and is validated
+with the v1 trade-evidence rule (``business_complete``). It is never silently
+reinterpreted: when an unversioned trace contains a ``confirm_trade`` whose
+verdict differs between v1 and v2, a ``TRACE_SCHEMA_VERSION_MISSING`` warning
+is emitted so the trace must be re-exported with ``schema_version: 2`` before
+it can be judged under the current semantics. An unsupported version is an
+error (``TRACE_SCHEMA_VERSION_UNSUPPORTED``) and the scan stops: fail closed,
+never guess. (Rule 3's calibrated conflict relation is not version-gated: it
+mirrors what the bridge has always allowed, so it applies to every schema.)
 
 Recognised claim codes for the first-week flow: ``trade_completed``,
 ``operation_completed``, ``rent_paid`` / ``paid_rent``, ``day_changed`` /
@@ -43,10 +60,18 @@ Rules enforced (error unless stated otherwise)
    ``action_id``. Retrying with a new ``action_id`` risks double execution.
 2. ``MISSING_OPERATION_QUERY`` (warning) -- the retry above happened without a
    prior ``get_operation`` / ``wait_operation`` query; this is a blind retry.
-3. ``CONFLICTING_WRITE_WHILE_PENDING`` -- while an operation is
-   ``prepared``/``running`` (or ``wait_operation`` timed out as pending), no
-   other write may be issued; even the same operation with a different ``rev``
-   is a conflict. Reads are allowed.
+3. ``CONFLICTING_WRITE_WHILE_PENDING`` -- a write issued while an operation
+   is ``prepared``/``running`` (or ``wait_operation`` timed out as pending) is
+   classified by an explicit conflict relation: ``same_op`` (the same native
+   call, or the same non-call-scoped op with any arguments), ``same_item``
+   (both writes name the same item), ``run_changing`` (a run switch is in
+   flight, or one was requested but not confirmed), ``modal_resolution`` (a
+   dialogue/prompt write that resolves the blocking modal; allowed when the
+   pending op is not itself a dialogue/prompt op), ``independent`` (a
+   call-scoped trade on provably different items; allowed), and ``unknown``
+   (insufficient evidence to prove independence; always an ERROR -- never
+   "allow everything"). Reads are always allowed. Conflicts carry the
+   ``relation`` and ``reason`` in ``details``.
 4. ``OK_WITHOUT_COMPLETED_EXECUTION`` -- ``ok:true`` only ever means
    ``execution_status == "completed"``.
 5. ``MISSING_OPERATION_EVIDENCE`` (warning) -- write responses without
@@ -84,9 +109,19 @@ Rules enforced (error unless stated otherwise)
     (warnings) -- the trace ends while an operation is still unresolved.
 16. ``INVALID_TRACE_STEP`` -- malformed step (not a dict, missing tool, wrong
     args/result type).
-17. ``TRADE_EVIDENCE_MISSING`` -- a completed ``confirm_trade`` needs
-    ``business_complete:true`` + ``client_unchanged:true`` plus the ``evidence``
-    object; a cash delta is supporting evidence only (barter can be zero-cash).
+17. ``TRADE_EVIDENCE_MISSING`` (schema v2) -- a ``confirm_trade`` presented as
+    completed (``ok:true`` / ``execution_status:"completed"`` / a
+    ``trade_completed`` claim) needs *per-trade* evidence from the same client:
+    ``client_unchanged == true`` AND (``items_transferred == true`` OR
+    ``cash_moved == true``; a cash-only delta is a valid purchase and a
+    zero-cash item move is a valid barter), with the ``evidence`` object
+    corroborating those axes (``called:true``, ``client_unchanged:true`` and
+    the same items/cash movement). ``business_complete`` / ``visit_complete``
+    are auxiliary attribution for the whole visit and can neither prove nor
+    replace this trade; a visit-complete report with no item or cash movement
+    is a false success and is flagged. The legacy v1 rule (schema v1 only)
+    instead required ``business_complete:true`` + ``client_unchanged:true`` +
+    the ``evidence`` object.
 18. ``END_DAY_EVIDENCE_MISMATCH`` -- ``end_day`` may report ``completed`` only
     when ``shop_closed_after:true``; still-OPEN is ``running``/``pending``.
 19. ``REJECTED_WITH_DISPATCHED_TRUE`` / ``COMPLETED_WITHOUT_DISPATCH`` /
@@ -97,9 +132,22 @@ Rules enforced (error unless stated otherwise)
 20. ``WAIT_OPERATION_TIMEOUT_MISSING_NEXT`` -- a ``wait_operation`` timeout must
     carry ``operation_id`` and ``next`` instead of looking like a dead end or a
     fake success.
+21. ``TRACE_SCHEMA_VERSION_UNSUPPORTED`` -- the payload declares a
+    ``schema_version`` other than 1 or 2; the scan stops without interpreting
+    any step (fail closed).
+22. ``TRACE_SCHEMA_VERSION_MISSING`` (warning) -- a legacy (unversioned) trace
+    contains a ``confirm_trade`` whose verdict differs between the v1 and v2
+    trade rules; re-export it with ``schema_version: 2`` instead of letting it
+    be silently reinterpreted.
+23. ``INVALID_RUN_CHANGE_FIELD`` -- the additive ``run_change`` response field
+    (R5/A1) must be ``"issued"`` or ``"not_issued"`` when present. A first-run
+    prompt confirmation (``prompt_confirmed:true``) is never a run-changing
+    native start, so it does not register a run change even when a pre-A1
+    trace still carries ``run_change_status:"requested"`` on it.
 
 Frozen D/C schema (HEAD ``f09314e``, policy sha ``e0da5a24``) is described in
-``skills/pawnmind-first-week/SKILL.md`` §13 and the benchmark spec.
+``skills/pawnmind-first-week/SKILL.md`` §13 and the benchmark spec; R5/A4
+revised rules 3 and 17 and added 21-23 (trace schema ``2`` encodes them).
 
 CLI
 ---
@@ -114,14 +162,25 @@ import json
 import re
 from dataclasses import dataclass, field
 
-VALIDATOR_VERSION = "1.1.0"
+VALIDATOR_VERSION = "1.2.0"
+
+#: Current trace schema. v2 = R5/A4 per-trade evidence + calibrated pending
+#: conflict relation. No ``schema_version`` (bare list / object) means legacy v1.
+TRACE_SCHEMA_VERSION = 2
+LEGACY_TRACE_SCHEMA_VERSION = 1
+SUPPORTED_TRACE_SCHEMA_VERSIONS = (LEGACY_TRACE_SCHEMA_VERSION,
+                                   TRACE_SCHEMA_VERSION)
 
 __all__ = [
     "DELIVERY_STATUSES",
     "EXECUTION_STATUSES",
+    "LEGACY_TRACE_SCHEMA_VERSION",
+    "PENDING_CONFLICT_RELATIONS",
+    "TRACE_SCHEMA_VERSION",
     "TraceFormatError",
     "VALIDATOR_VERSION",
     "Violation",
+    "classify_pending_relation",
     "load_trace",
     "main",
     "summarize",
@@ -142,6 +201,60 @@ DELIVERY_STATUSES = frozenset({
 PENDING_STATUSES = frozenset({"prepared", "running"})
 TERMINAL_STATUSES = frozenset({"completed", "rejected", "failed"})
 DEFINITIVE_REJECTION_STATUSES = frozenset({"rejected", "failed"})
+
+#: Relation classes of a write issued while another operation is pending.
+#: Only ``independent`` and ``modal_resolution`` are allowed; the rest are
+#: conflicts, and ``unknown`` is the conservative default when the trace does
+#: not carry enough evidence to prove independence.
+PENDING_CONFLICT_RELATIONS = frozenset({
+    "same_op",
+    "same_item",
+    "run_changing",
+    "modal_resolution",
+    "independent",
+    "unknown",
+})
+ALLOWED_PENDING_RELATIONS = frozenset({"independent", "modal_resolution"})
+
+#: Operations that switch the run/timeline (mirrors Core/RunChangeOps). A write
+#: that issues one of these is the only kind that may start a native run change.
+RUN_CHANGE_OPS = frozenset({
+    "new_game",
+    "load_game",
+    "load_recording_game",
+    "confirm_new_game",
+})
+
+#: The ``run_change`` response field added in R5/A1. ``not_issued`` is the
+#: authoritative fact that a confirmation/refusal did not start a run switch.
+RUN_CHANGE_ISSUED = "issued"
+RUN_CHANGE_NOT_ISSUED = "not_issued"
+VALID_RUN_CHANGE_FIELDS = frozenset({RUN_CHANGE_ISSUED, RUN_CHANGE_NOT_ISSUED})
+
+#: Ops the bridge scopes by arguments when blocking a duplicate native call
+#: (mirrors Core/PendingScope): a second call with different arguments is a
+#: different native call, everything else is blocked by op name.
+CALL_SCOPED_OPS = frozenset({"confirm_trade"})
+
+#: Writes that consume/resolve a native dialogue, prompt or modal input. They
+#: are allowed while an unrelated operation is pending (that is what unblocks a
+#: stuck workflow) but two of them contending for one input is a conflict.
+MODAL_RESOLUTION_OPS = frozenset({
+    "advance_dialogue",
+    "choose_dialogue",
+    "answer_prompt",
+    "close_windows",
+})
+
+#: Argument keys that name one concrete item; shared ids mean a shared target.
+ITEM_ARG_KEYS = ("item_id", "item")
+
+#: Refusals that mean "a duplicate native call was already in flight". The
+#: write was not dispatched and starts no operation of its own.
+REFUSED_BY_PENDING_ERRORS = frozenset({
+    "operation_pending",
+    "run_change_pending",
+})
 
 #: ``wait_operation`` may surface a short ``status`` alias; map it onto the
 #: execution axis instead of inventing a seventh status.
@@ -272,6 +385,22 @@ def _step_result(step):
     return result if isinstance(result, dict) else None
 
 
+def _declared_schema_version(payload):
+    """Return ``(version, declared)`` for a trace payload.
+
+    A bare step list or an object without ``schema_version`` is legacy v1;
+    ``declared`` is False in that case so the validator can warn when the
+    trade verdict would differ under the current rule.
+    """
+    if isinstance(payload, dict) and "schema_version" in payload:
+        return payload.get("schema_version"), True
+    return LEGACY_TRACE_SCHEMA_VERSION, False
+
+
+def _valid_schema_version(raw):
+    return _is_int(raw) and raw in SUPPORTED_TRACE_SCHEMA_VERSIONS
+
+
 def _business_signature(tool, args):
     """op + args identity used to detect retries (rev/action_id excluded)."""
     filtered = {key: value for key, value in args.items()
@@ -279,8 +408,210 @@ def _business_signature(tool, args):
     return tool, _canonical(filtered)
 
 
+def _effective_op(tool, args):
+    """Resolve the generic ``act`` wrapper to the inner op it carries."""
+    if tool == "act":
+        inner = args.get("action")
+        if isinstance(inner, str) and inner.strip():
+            return inner
+    return tool
+
+
+def _item_ids(args):
+    """The concrete item identities named by one write's arguments."""
+    ids = set()
+    for key in ITEM_ARG_KEYS:
+        value = args.get(key)
+        if _is_int(value):
+            ids.add((key, value))
+        elif isinstance(value, str) and value.strip():
+            ids.add((key, value))
+    return frozenset(ids)
+
+
+def classify_pending_relation(pending, write):
+    """Classify one write issued while another operation is pending.
+
+    ``pending``/``write`` are dicts with at least ``tool`` and ``args`` (a
+    write may also carry ``rev``/``action_id``). Returns
+    ``(relation, conflicting, reason)`` where ``relation`` is one of
+    ``PENDING_CONFLICT_RELATIONS``. Only ``independent`` (a call-scoped trade on
+    provably different items) and ``modal_resolution`` (a dialogue/prompt write
+    that can unblock an unrelated pending op) are allowed; insufficient
+    evidence is always ``unknown`` and conflicts, never "allow everything".
+
+    An exact idempotent replay (same action id, args and rev) is handled by the
+    caller before this classifier is consulted.
+    """
+    pending_args = pending.get("args")
+    if not isinstance(pending_args, dict):
+        pending_args = {}
+    write_args = write.get("args")
+    if not isinstance(write_args, dict):
+        write_args = {}
+    pending_tool = pending.get("tool") or "?"
+    write_tool = write.get("tool") or "?"
+    pending_op = _effective_op(pending_tool, pending_args)
+    write_op = _effective_op(write_tool, write_args)
+
+    if pending_op in RUN_CHANGE_OPS or write_op in RUN_CHANGE_OPS:
+        return "run_changing", True, "run_change_in_flight"
+    if write_op in MODAL_RESOLUTION_OPS:
+        if pending_op in MODAL_RESOLUTION_OPS:
+            return "modal_resolution", True, "dialogue_input_shared"
+        return "modal_resolution", False, "resolves_blocking_modal"
+    if pending_op in MODAL_RESOLUTION_OPS:
+        return "unknown", True, "pending_modal_input"
+
+    pending_items = _item_ids(pending_args)
+    write_items = _item_ids(write_args)
+    if pending_items & write_items:
+        return "same_item", True, "same_item"
+    if write_tool == pending_tool:
+        if (_business_signature(write_tool, write_args)
+                == _business_signature(pending_tool, pending_args)):
+            if (pending.get("action_id") is not None
+                    and pending.get("action_id") == write.get("action_id")
+                    and pending.get("rev") != write.get("rev")):
+                return "same_op", True, "different_rev"
+            return "same_op", True, "different_action_id"
+        if pending_tool in CALL_SCOPED_OPS:
+            if pending_items and write_items:
+                return "independent", False, "different_item_trade"
+            return "unknown", True, "cannot_prove_different_item"
+        return "same_op", True, "same_op_native_call"
+    if pending_items or write_items:
+        return "unknown", True, "item_scope_unproven"
+    return "unknown", True, "different_operation_unproven"
+
+
 def _looks_like_success_text(text):
     return bool(isinstance(text, str) and SUCCESS_TEXT_RE.search(text))
+
+
+def _cash_movement(result):
+    """Did this trade move cash? ``True``/``False`` when readable, else None.
+
+    ``cash_moved`` is the canonical R5 field; ``cash_changed`` is the R4
+    compatibility alias and the before/after pair is the last fallback.
+    """
+    moved = result.get("cash_moved")
+    if isinstance(moved, bool):
+        return moved
+    changed = result.get("cash_changed")
+    if isinstance(changed, bool):
+        return changed
+    before = result.get("cash_before")
+    after = result.get("cash_after")
+    if _numeric(before) and _numeric(after):
+        return before != after
+    return None
+
+
+def _evidence_cash_movement(evidence):
+    moved = evidence.get("cash_moved")
+    if isinstance(moved, bool):
+        return moved
+    before = evidence.get("cash_before")
+    after = evidence.get("cash_after")
+    if _numeric(before) and _numeric(after):
+        return before != after
+    return None
+
+
+def _trade_evidence_v1(result):
+    """Legacy (schema v1) per-trade evidence problems.
+
+    Returns a list of ``{"reason": ..., "message": ...}`` dicts; empty means
+    the completion is backed by the old rule (whole-visit evidence).
+    """
+    business = result.get("business_complete")
+    unchanged = result.get("client_unchanged")
+    evidence = result.get("evidence")
+    if business is not True or unchanged is not True:
+        return [{
+            "reason": "business_or_client_not_confirmed",
+            "message": "confirm_trade is presented as completed but"
+                       " business_complete=%r / client_unchanged=%r; both are"
+                       " required by the legacy v1 rule"
+                       % (business, unchanged),
+            "business_complete": business,
+            "client_unchanged": unchanged,
+        }]
+    if not isinstance(evidence, dict) or evidence.get("business_complete") is not True:
+        return [{
+            "reason": "evidence_object_missing",
+            "message": "confirm_trade reports business_complete but the"
+                       " 'evidence' object is missing or does not confirm it",
+        }]
+    return []
+
+
+def _trade_evidence_v2(result):
+    """R5 per-trade evidence problems (schema v2).
+
+    Two different facts must not be mixed: ``business_complete`` /
+    ``visit_complete`` describe the whole visit, while this trade needs the
+    same client plus an item transfer OR a cash movement, corroborated by the
+    ``evidence`` object. Returns a list of ``{"reason", "message"}`` dicts.
+    """
+    problems = []
+    unchanged = result.get("client_unchanged")
+    items = result.get("items_transferred")
+    cash = _cash_movement(result)
+    evidence = result.get("evidence")
+
+    if unchanged is not True:
+        problems.append({
+            "reason": "client_not_unchanged",
+            "message": "confirm_trade is presented as completed but"
+                       " client_unchanged=%r; another client's state may not"
+                       " back this trade" % (unchanged,),
+        })
+    if items is not True and cash is not True:
+        problems.append({
+            "reason": "no_trade_effect",
+            "message": "confirm_trade is presented as completed but"
+                       " items_transferred=%r / cash_moved=%r: the whole-visit"
+                       " business_complete/visit_complete attribution cannot"
+                       " prove this trade; a partial trade needs an item"
+                       " transfer or a cash movement"
+                       % (items, result.get("cash_moved")),
+        })
+    if not isinstance(evidence, dict):
+        problems.append({
+            "reason": "evidence_object_missing",
+            "message": "confirm_trade completion has no 'evidence' object to"
+                       " corroborate the per-trade facts",
+        })
+    else:
+        if evidence.get("called") is not True:
+            problems.append({
+                "reason": "evidence_not_called",
+                "message": "confirm_trade 'evidence.called' is not true; a"
+                           " trade that was not dispatched cannot be completed",
+            })
+        if evidence.get("client_unchanged") is not True:
+            problems.append({
+                "reason": "evidence_client_mismatch",
+                "message": "confirm_trade 'evidence.client_unchanged' is not"
+                           " true; the evidence object contradicts the"
+                           " completion",
+            })
+        if items is True and evidence.get("items_transferred") is not True:
+            problems.append({
+                "reason": "evidence_items_mismatch",
+                "message": "confirm_trade claims items_transferred:true but"
+                           " 'evidence.items_transferred' is %r"
+                           % (evidence.get("items_transferred"),),
+            })
+        if cash is True and _evidence_cash_movement(evidence) is False:
+            problems.append({
+                "reason": "evidence_cash_mismatch",
+                "message": "confirm_trade claims cash movement but"
+                           " 'evidence' reports cash_before == cash_after",
+            })
+    return problems
 
 
 def _find_rent_receipts(result):
@@ -375,10 +706,12 @@ class _Operation:
     execution: object
     delivery: object
     last_index: int
+    args: dict = field(default_factory=dict)
 
 
 class _ScanState:
-    def __init__(self):
+    def __init__(self, schema_version=LEGACY_TRACE_SCHEMA_VERSION,
+                 schema_version_declared=False):
         self.violations = []
         self.operations = {}
         self.pending = {}
@@ -389,6 +722,9 @@ class _ScanState:
         self.claims = []          # (step_index, step, claim set, claim_text)
         self.rejected_steps = set()
         self.last_index = -1
+        self.schema_version = schema_version
+        self.schema_version_declared = schema_version_declared
+        self.unconfirmed_run_change = None
 
     # -- helpers ---------------------------------------------------------
     def add(self, code, message, step_index, severity="error", **details):
@@ -493,6 +829,15 @@ class _ScanState:
                     previous_tool=previous.tool,
                     current_tool=tool)
 
+        # A duplicate-call refusal (operation_pending / run_change_pending) was
+        # not dispatched: its status/dispatched fields describe the *blocking*
+        # operation, and it starts no operation of its own. Judge the blind-retry
+        # attempt, never the blocker's axis.
+        refused_by_pending = (
+            result.get("error") in REFUSED_BY_PENDING_ERRORS
+            and (result.get("blocking_operation_id") is not None
+                 or result.get("blocking_same_call") is True))
+
         status, invalid_raw = _normalize_status(result.get("execution_status"))
         delivery = result.get("delivery_status")
         if invalid_raw is not None:
@@ -511,7 +856,7 @@ class _ScanState:
 
         # Frozen D contract: `dispatched` must agree with the execution axis,
         # and a re-delivered cached response keeps the undelivered axis.
-        dispatched = result.get("dispatched")
+        dispatched = None if refused_by_pending else result.get("dispatched")
         if dispatched is not None and not isinstance(dispatched, bool):
             self.add("INVALID_DISPATCHED",
                      "write %r returned non-boolean dispatched=%r"
@@ -533,32 +878,14 @@ class _ScanState:
                      " undelivered axis" % (tool, delivery),
                      index, severity="warning")
 
-        # Rule 3: no conflicting write while an operation is pending.
-        for key, pending in list(self.pending.items()):
-            same_attempt = (
-                action_id is not None
-                and pending.action_id == action_id
-                and pending.signature == signature
-                and pending.rev == rev
-            )
-            if same_attempt:
-                continue
-            if pending.tool != tool or pending.signature != signature:
-                reason = "different_operation"
-            elif pending.rev != rev:
-                reason = "different_rev"
-            else:
-                reason = "different_action_id"
-            self.add(
-                "CONFLICTING_WRITE_WHILE_PENDING",
-                "write %r issued while operation %r is pending (%s);"
-                " only reads or an idempotent replay of the same action_id"
-                " are allowed" % (tool, pending.key, reason),
-                index,
-                pending_operation=pending.key,
-                pending_op=pending.tool,
-                reason=reason)
-            break
+        # Rule 3 (R5/A4): classify the conflict relation instead of treating
+        # every write while pending as the same violation.
+        conflict = self._pending_write_conflict(tool, args, action_id, rev,
+                                                signature)
+        if conflict is not None:
+            message, details = conflict
+            self.add("CONFLICTING_WRITE_WHILE_PENDING", message, index,
+                     **details)
 
         # Rules 1/2: uncertain retries must reuse the original action_id.
         for key, uncertain in list(self.uncertain.items()):
@@ -608,7 +935,9 @@ class _ScanState:
         # must never be misread as a rejection.
         execution = status
         error = result.get("error")
-        if execution is None:
+        if refused_by_pending:
+            execution = "rejected"
+        elif execution is None:
             if result.get("pending") is True:
                 execution = "running"
             elif ok is False:
@@ -630,30 +959,8 @@ class _ScanState:
                 " completion requires the shop to be CLOSED"
                 % (result.get("shop_closed_after"),), index)
 
-        # C: a trusted trade completion needs business_complete for the same
-        # client instance; a cash delta is supporting evidence only.
-        if tool == "confirm_trade" and (
-                ok is True or execution == "completed"
-                or "trade_completed" in claims):
-            business = result.get("business_complete")
-            unchanged = result.get("client_unchanged")
-            evidence = result.get("evidence")
-            if business is not True or unchanged is not True:
-                self.add(
-                    "TRADE_EVIDENCE_MISSING",
-                    "confirm_trade is presented as completed but"
-                    " business_complete=%r / client_unchanged=%r; both are"
-                    " required for a trusted trade"
-                    % (business, unchanged),
-                    index, business_complete=business,
-                    client_unchanged=unchanged)
-            elif (not isinstance(evidence, dict)
-                  or evidence.get("business_complete") is not True):
-                self.add(
-                    "TRADE_EVIDENCE_MISSING",
-                    "confirm_trade reports business_complete but the"
-                    " 'evidence' object is missing or does not confirm it",
-                    index, reason="evidence_object_missing")
+        # C (R5/A4): a whole-visit completion is not a single-trade fact.
+        self._check_trade_evidence(index, tool, result, ok, execution, claims)
 
         rejected = (execution in DEFINITIVE_REJECTION_STATUSES
                     or (ok is False and execution == "completed")
@@ -693,19 +1000,150 @@ class _ScanState:
                     " had succeeded" % (tool, dependency),
                     index, depends_on=dependency)
 
-        # Store / update the operation record.
-        key = action_id
-        if key is None:
-            key = "opid:%s" % operation_id
-        record = _Operation(
-            key=key, tool=tool, signature=signature, rev=rev,
-            action_id=action_id, operation_id=operation_id,
-            execution=execution, delivery=delivery, last_index=index)
-        self.operations[key] = record
-        if action_id is not None:
-            self.by_action_id[action_id] = record
-        self._apply_operation_state(record)
+        if not refused_by_pending:
+            self._track_run_change(index, tool, args, result, action_id,
+                                   operation_id, signature, rev)
+            # Store / update the operation record. A duplicate-call refusal is
+            # terminal and starts nothing, so it must not create a phantom
+            # pending operation (that would poison later conflict checks).
+            key = action_id
+            if key is None:
+                key = "opid:%s" % operation_id
+            record = _Operation(
+                key=key, tool=tool, signature=signature, rev=rev,
+                action_id=action_id, operation_id=operation_id,
+                execution=execution, delivery=delivery, last_index=index,
+                args=dict(args))
+            self.operations[key] = record
+            if action_id is not None:
+                self.by_action_id[action_id] = record
+            self._apply_operation_state(record)
         self._collect_claims(index, step)
+
+    def _pending_write_conflict(self, tool, args, action_id, rev, signature):
+        """Rule 3: return ``(message, details)`` for a conflicting write."""
+        for pending in list(self.pending.values()):
+            same_attempt = (
+                action_id is not None
+                and pending.action_id == action_id
+                and pending.signature == signature
+                and pending.rev == rev)
+            if same_attempt:
+                continue
+            relation, conflicting, reason = classify_pending_relation(
+                {"tool": pending.tool, "args": pending.args,
+                 "rev": pending.rev, "action_id": pending.action_id},
+                {"tool": tool, "args": args, "rev": rev,
+                 "action_id": action_id})
+            if not conflicting:
+                continue
+            return (
+                "write %r issued while operation %r is pending"
+                " (relation=%s, reason=%s); only reads, a modal-resolution"
+                " write or an idempotent replay of the same action_id are"
+                " allowed" % (tool, pending.key, relation, reason),
+                {"pending_operation": pending.key,
+                 "pending_op": pending.tool,
+                 "relation": relation,
+                 "reason": reason})
+        unconfirmed = self.unconfirmed_run_change
+        if unconfirmed is not None:
+            replay = (
+                action_id is not None
+                and unconfirmed.get("action_id") == action_id
+                and unconfirmed.get("signature") == signature
+                and unconfirmed.get("rev") == rev)
+            if not replay:
+                return (
+                    "write %r issued while a run change is requested but not"
+                    " confirmed (op %r from step %r); only reads and"
+                    " get_operation/wait_operation queries are safe until"
+                    " run_change_status=confirmed"
+                    % (tool, unconfirmed.get("tool"),
+                       unconfirmed.get("step_index")),
+                    {"pending_operation": unconfirmed.get("key"),
+                     "pending_op": unconfirmed.get("tool"),
+                     "relation": "run_changing",
+                     "reason": "run_change_unconfirmed"})
+        return None
+
+    def _track_run_change(self, index, tool, args, result, action_id,
+                          operation_id, signature, rev):
+        """Track a run change that was requested but is not confirmed yet.
+
+        R5/A1: ``run_change`` is the authoritative additive field. A first-run
+        prompt confirmation (``prompt_confirmed:true``) is a UI operation, not
+        a native run start, so it never registers a run change -- even when a
+        pre-A1 bridge left a stale ``run_change_status:"requested"`` on it.
+        """
+        raw = result.get("run_change")
+        if raw is not None and raw not in VALID_RUN_CHANGE_FIELDS:
+            self.add(
+                "INVALID_RUN_CHANGE_FIELD",
+                "write %r returned run_change=%r; expected %r or %r"
+                % (tool, raw, RUN_CHANGE_ISSUED, RUN_CHANGE_NOT_ISSUED),
+                index, run_change=raw)
+        if raw == RUN_CHANGE_ISSUED:
+            run_change = True
+        elif raw == RUN_CHANGE_NOT_ISSUED:
+            run_change = False
+        else:
+            run_change = (_effective_op(tool, args) in RUN_CHANGE_OPS
+                          and result.get("prompt_confirmed") is not True)
+        status = result.get("run_change_status")
+        confirmed = result.get("run_change_confirmed")
+        if confirmed is True or status == "confirmed":
+            self.unconfirmed_run_change = None
+            return
+        if not run_change:
+            return
+        if status in ("requested", "unknown") or confirmed is False:
+            self.unconfirmed_run_change = {
+                "key": action_id or operation_id,
+                "tool": tool,
+                "signature": signature,
+                "action_id": action_id,
+                "rev": rev,
+                "step_index": index,
+                "status": status,
+            }
+
+    def _check_trade_evidence(self, index, tool, result, ok, execution, claims):
+        """Rule 17: per-trade evidence, versioned by the trace schema.
+
+        v1 (legacy only) judged a completion by ``business_complete``; v2
+        judges it by this trade's own item/cash movement. A legacy trace whose
+        verdict differs under the current rule gets a
+        ``TRACE_SCHEMA_VERSION_MISSING`` warning so it is never silently
+        reinterpreted.
+        """
+        if tool != "confirm_trade":
+            return
+        if not (ok is True or execution == "completed"
+                or "trade_completed" in claims):
+            return
+        v1_problems = _trade_evidence_v1(result)
+        v2_problems = _trade_evidence_v2(result)
+        problems = v1_problems if self.schema_version == 1 else v2_problems
+        for problem in problems:
+            details = dict(problem)
+            reason = details.pop("reason")
+            message = details.pop("message")
+            self.add("TRADE_EVIDENCE_MISSING", message, index,
+                     reason=reason, **details)
+        if (self.schema_version < TRACE_SCHEMA_VERSION
+                and not self.schema_version_declared
+                and bool(v1_problems) != bool(v2_problems)):
+            self.add(
+                "TRACE_SCHEMA_VERSION_MISSING",
+                "this legacy (unversioned) trace contains a confirm_trade"
+                " whose verdict differs under the current schema %d trade"
+                " rule; re-export it with schema_version:%d instead of"
+                " reading it under the old rule"
+                % (TRACE_SCHEMA_VERSION, TRACE_SCHEMA_VERSION),
+                index, severity="warning",
+                suggested_schema_version=TRACE_SCHEMA_VERSION,
+                rule="trade_evidence")
 
     def _check_status_claims(self, index, step, result, status, operation_id):
         claim_text = step.get("claim_text")
@@ -816,6 +1254,10 @@ class _ScanState:
                              or result.get("process_restarted") is True)
         resolved = (unknown_operation
                     or status in TERMINAL_STATUSES)
+        if (unknown_operation
+                or result.get("run_change_confirmed") is True
+                or result.get("run_change_status") == "confirmed"):
+            self.unconfirmed_run_change = None
         if unknown_operation:
             # A restarted bridge lost the in-memory record: the previous
             # operation is definitively unobservable, never auto-replayed.
@@ -978,6 +1420,17 @@ class _ScanState:
                 return
         if result.get("day_changed") is True:
             return
+        # A2: the read that observes the higher day is itself external evidence.
+        # This is how an async sleep converges: not by poll counting, but by an
+        # actual state read showing day_before < day_after.
+        own_payload = _state_payload(result)
+        if own_payload is not None:
+            own_baseline = self._last_state_before(index)
+            before_day = (own_baseline.get("day")
+                          if isinstance(own_baseline, dict) else None)
+            own_day = own_payload.get("day")
+            if _numeric(before_day) and _numeric(own_day) and own_day > before_day:
+                return
         if exec_status in PENDING_STATUSES or exec_status == "uncertain":
             self.add(
                 "DAY_CHANGE_EVIDENCE_MISSING",
@@ -1047,7 +1500,7 @@ def validate_trace(trace):
 
 
 def validate_payload(payload):
-    """Validate a trace payload: a list of steps or ``{"steps": [...]}``."""
+    """Validate a trace payload: a versioned object, list or ``{"steps": ...}``."""
     if isinstance(payload, dict):
         steps = payload.get("steps")
         if not isinstance(steps, list):
@@ -1059,7 +1512,21 @@ def validate_payload(payload):
         raise TraceFormatError(
             "trace must be a list of steps or an object with 'steps'")
 
-    state = _ScanState()
+    schema_version, declared = _declared_schema_version(payload)
+    if declared and not _valid_schema_version(schema_version):
+        return [Violation(
+            "TRACE_SCHEMA_VERSION_UNSUPPORTED",
+            "trace declares schema_version=%r; this validator supports"
+            " schema_version %s (a missing version means the legacy"
+            " schema %d); refusing to interpret the trace under a guessed"
+            " rule"
+            % (schema_version,
+               " or ".join(str(v) for v in SUPPORTED_TRACE_SCHEMA_VERSIONS),
+               LEGACY_TRACE_SCHEMA_VERSION),
+            -1, details={"declared_schema_version": schema_version})]
+
+    state = _ScanState(schema_version=schema_version,
+                       schema_version_declared=declared)
     for index, raw in enumerate(steps):
         if not isinstance(raw, dict):
             state.add("INVALID_TRACE_STEP",
@@ -1111,6 +1578,9 @@ def main(argv=None):
 
     summary = summarize(violations)
     report = dict(summary)
+    # The schema version is part of the result: an unversioned trace is judged
+    # by the legacy rule and must never be mistaken for a current one.
+    report["trace_schema_version"] = _declared_schema_version(payload)[0]
     report["violations"] = [row.to_dict() for row in violations]
     print(json.dumps(report, ensure_ascii=False, sort_keys=True))
     return 0 if summary["ok"] else 1

@@ -1,0 +1,78 @@
+{
+  "schema_version": 2,
+  "description": "R5/A1: a first-run prompt confirmation is a UI operation, not a run start (run_change=not_issued); the subsequent real confirm_new_game start is a run change and is confirmed by a readable run identity. No run-change false positive may be reported.",
+  "steps": [
+    {
+      "tool": "get_new_game_options",
+      "args": {},
+      "result": {
+        "ok": true,
+        "readable": true,
+        "phase": "difficulty"
+      }
+    },
+    {
+      "tool": "confirm_new_game",
+      "args": {
+        "rev": 3,
+        "action_id": "act-prompt"
+      },
+      "rev": 3,
+      "result": {
+        "ok": true,
+        "op": "confirm_new_game",
+        "operation_id": "op-prompt",
+        "execution_status": "completed",
+        "delivery_status": "delivered",
+        "dispatch_status": "dispatched",
+        "dispatched": true,
+        "prompt_confirmed": true,
+        "prompt_id": "first_run_prompt",
+        "run_change": "not_issued",
+        "state": "bound",
+        "pending_error": null,
+        "rev": 3
+      }
+    },
+    {
+      "tool": "confirm_new_game",
+      "args": {
+        "rev": 4,
+        "action_id": "act-start"
+      },
+      "rev": 4,
+      "result": {
+        "ok": true,
+        "op": "confirm_new_game",
+        "operation_id": "op-start",
+        "execution_status": "completed",
+        "delivery_status": "delivered",
+        "dispatch_status": "dispatched",
+        "dispatched": true,
+        "run_change": "issued",
+        "run_change_status": "confirmed",
+        "run_change_confirmed": true,
+        "completion_evidence": {
+          "run_id": "run-42",
+          "slot": 54
+        },
+        "rev": 4
+      }
+    },
+    {
+      "tool": "get_state",
+      "args": {},
+      "result": {
+        "ok": true,
+        "in_game": true,
+        "day": 1,
+        "shop_state": "OPEN",
+        "cash": 120,
+        "client": null,
+        "legal_actions": [],
+        "candidate_actions": [],
+        "cloud_slot": 54
+      }
+    }
+  ]
+}

@@ -1,0 +1,111 @@
+{
+  "schema_version": 2,
+  "description": "R5/A2: sleep is asynchronous. Day unchanged is inconclusive, so the agent queries the operation and keeps reading; the later state read observing day 1 -> 2 is the evidence, and the query promotes the operation. No count-based failure and no blind retry.",
+  "steps": [
+    {
+      "tool": "get_state",
+      "args": {},
+      "result": {
+        "ok": true,
+        "in_game": true,
+        "day": 1,
+        "shop_state": "OPEN",
+        "cash": 600,
+        "client": null,
+        "legal_actions": [],
+        "candidate_actions": []
+      }
+    },
+    {
+      "tool": "sleep",
+      "args": {
+        "rev": 5,
+        "action_id": "act-sleep"
+      },
+      "rev": 5,
+      "result": {
+        "ok": false,
+        "op": "sleep",
+        "operation_id": "op-sleep",
+        "execution_status": "running",
+        "delivery_status": "delivered",
+        "dispatch_status": "dispatched",
+        "dispatched": true,
+        "pending": true,
+        "day_changed": false,
+        "readback": {
+          "readable": true,
+          "day_before": 1,
+          "day_after": 1,
+          "day_advanced": false,
+          "changed": false
+        },
+        "save_evidence": "save_unknown",
+        "save_completed": false,
+        "save_unknown": true,
+        "rev": 5
+      }
+    },
+    {
+      "tool": "get_state",
+      "args": {},
+      "result": {
+        "ok": true,
+        "in_game": true,
+        "day": 1,
+        "shop_state": "OPEN",
+        "cash": 600,
+        "client": null,
+        "legal_actions": [],
+        "candidate_actions": []
+      }
+    },
+    {
+      "tool": "get_operation",
+      "args": {
+        "operation_id": "op-sleep"
+      },
+      "result": {
+        "ok": false,
+        "status": "pending",
+        "operation_id": "op-sleep",
+        "execution_status": "running",
+        "delivery_status": "delivered",
+        "next": "call get_operation again; do not re-dispatch"
+      }
+    },
+    {
+      "tool": "get_state",
+      "args": {},
+      "result": {
+        "ok": true,
+        "in_game": true,
+        "day": 2,
+        "shop_state": "OPEN",
+        "cash": 600,
+        "client": null,
+        "legal_actions": [],
+        "candidate_actions": []
+      },
+      "claims": [
+        "day_changed"
+      ]
+    },
+    {
+      "tool": "get_operation",
+      "args": {
+        "operation_id": "op-sleep"
+      },
+      "result": {
+        "ok": true,
+        "known": true,
+        "operation_id": "op-sleep",
+        "op": "sleep",
+        "execution_status": "completed",
+        "delivery_status": "delivered",
+        "dispatch_status": "dispatched",
+        "dispatched": true
+      }
+    }
+  ]
+}

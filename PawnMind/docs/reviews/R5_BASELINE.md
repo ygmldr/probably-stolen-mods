@@ -96,6 +96,11 @@ Python 377 与 `SESSION_2026-11-18_FIRST_WEEK.md` 的 “Python 377 OK” 一致
 | `docs/eval/FIRST_WEEK_BENCHMARK_SPEC.md` | `de4b0ec74aded878` |
 | `src/Core/PolicyCatalog.g.cs` | `db70c5428933aa9c` |
 
+> **R5-A4 后更新（2026-11-18）**：`agent/trace_validator.py` 已升级为
+> `VALIDATOR_VERSION 1.2.0` / `TRACE_SCHEMA_VERSION 2`（sha256 变更，见 A4 提交），
+> `SKILL.md` 与 `FIRST_WEEK_BENCHMARK_SPEC.md` 已按 R5-A 事实修订。
+> 上表保留的是**启动基线**，用于回答“本轮改了什么”，不是当前值。
+
 ## 4. 证据差（本轮启动时必须记录的缺口）
 
 | # | 项 | 结论 | 处理 |

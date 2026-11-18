@@ -1,0 +1,119 @@
+{
+  "schema_version": 2,
+  "description": "A second confirm_trade on a different item is a different native call; the bridge allows it while the first trade is running, so the calibrated relation is independent (not a conflict).",
+  "steps": [
+    {
+      "tool": "get_state",
+      "args": {},
+      "result": {
+        "ok": true,
+        "in_game": true,
+        "day": 1,
+        "shop_state": "OPEN",
+        "cash": 600,
+        "client": null,
+        "legal_actions": [],
+        "candidate_actions": []
+      }
+    },
+    {
+      "tool": "confirm_trade",
+      "args": {
+        "rev": 5,
+        "action_id": "act-trade-1",
+        "item_id": 101,
+        "side": "buy"
+      },
+      "rev": 5,
+      "result": {
+        "ok": false,
+        "op": "confirm_trade",
+        "operation_id": "op-trade-1",
+        "execution_status": "running",
+        "delivery_status": "delivered",
+        "dispatch_status": "dispatched",
+        "dispatched": true,
+        "pending": true,
+        "item_id": 101,
+        "side": "buy",
+        "next": "wait_operation or get_operation; do not re-dispatch"
+      }
+    },
+    {
+      "tool": "confirm_trade",
+      "args": {
+        "rev": 6,
+        "action_id": "act-trade-2",
+        "item_id": 202,
+        "side": "sell"
+      },
+      "rev": 6,
+      "result": {
+        "ok": true,
+        "op": "confirm_trade",
+        "operation_id": "op-trade-2",
+        "execution_status": "completed",
+        "delivery_status": "delivered",
+        "dispatch_status": "dispatched",
+        "dispatched": true,
+        "item_id": 202,
+        "side": "sell",
+        "client_intent": "BUY",
+        "business_complete": false,
+        "visit_complete": false,
+        "client_unchanged": true,
+        "items_transferred": true,
+        "cash_moved": true,
+        "cash_changed": true,
+        "cash_before": 600,
+        "cash_after": 640,
+        "staged_item_id": 202,
+        "evidence": {
+          "called": true,
+          "error": null,
+          "business_complete": false,
+          "client_unchanged": true,
+          "items_transferred": true,
+          "cash_moved": true,
+          "cash_before": 600,
+          "cash_after": 640,
+          "staged_item_id_after": 202
+        },
+        "rev": 6
+      },
+      "claims": [
+        "trade_completed"
+      ]
+    },
+    {
+      "tool": "get_operation",
+      "args": {
+        "operation_id": "op-trade-1"
+      },
+      "result": {
+        "ok": true,
+        "known": true,
+        "operation_id": "op-trade-1",
+        "op": "confirm_trade",
+        "execution_status": "completed",
+        "delivery_status": "delivered",
+        "dispatch_status": "dispatched",
+        "dispatched": true
+      }
+    },
+    {
+      "tool": "get_state",
+      "args": {},
+      "result": {
+        "ok": true,
+        "in_game": true,
+        "day": 1,
+        "shop_state": "OPEN",
+        "cash": 640,
+        "client": null,
+        "legal_actions": [],
+        "candidate_actions": []
+      }
+    }
+  ]
+}

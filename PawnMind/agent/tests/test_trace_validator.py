@@ -651,6 +651,53 @@ class DayChangeSaveTests(unittest.TestCase):
         self.assertIn("DAY_CHANGE_EVIDENCE_MISSING",
                       codes(trace_validator.validate_trace(trace)))
 
+    def test_day_claim_on_observing_read_after_async_sleep_is_evidence(self):
+        # A2: a running sleep is inconclusive; convergence is proven by a later
+        # read or query, not by counting polls. Claiming day_changed on the read
+        # that actually observes the higher day is backed by external evidence.
+        trace = v2([
+            get_state(day=1),
+            write("sleep", action_id="act-sleep",
+                  result=dict(write_result("sleep", action_id="act-sleep",
+                                           operation_id="op-sleep", ok=False,
+                                           execution_status="running"),
+                              pending=True, dispatched=True,
+                              day_changed=False,
+                              readback=_valid_day_readback(1, 1))),
+            get_state(day=1),
+            step("get_operation", args={"operation_id": "op-sleep"},
+                 result={"ok": False, "status": "pending",
+                         "operation_id": "op-sleep",
+                         "execution_status": "running",
+                         "delivery_status": "delivered",
+                         "next": "call get_operation again"}),
+            step("get_state", result=state(day=2),
+                 claims=["day_changed"]),
+            operation("sleep", "op-sleep", "completed"),
+        ])
+        violations = trace_validator.validate_trace(trace)
+        self.assertEqual([], errors(violations), codes(violations))
+        self.assertNotIn("DAY_CHANGE_EVIDENCE_MISSING", codes(violations))
+
+    def test_premature_day_claim_while_sleep_running_stays_flagged(self):
+        trace = v2([
+            get_state(day=1),
+            write("sleep", action_id="act-sleep",
+                  result=dict(write_result("sleep", action_id="act-sleep",
+                                           operation_id="op-sleep", ok=False,
+                                           execution_status="running"),
+                              pending=True, dispatched=True,
+                              day_changed=False,
+                              readback=_valid_day_readback(1, 1)),
+                  claims=["day_changed"]),
+            get_state(day=2),
+        ])
+        violations = trace_validator.validate_trace(trace)
+        rows = [row for row in violations
+                if row.code == "DAY_CHANGE_EVIDENCE_MISSING"]
+        self.assertEqual(1, len(rows))
+        self.assertEqual("operation_not_terminal", rows[0].details.get("reason"))
+
     def test_save_success_without_file_evidence_is_rejected(self):
         trace = [
             self._sleep(write_result("sleep", action_id="act-sleep",
@@ -965,6 +1012,457 @@ class FrozenProtocolTests(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
+# R5/A4: trace schema version policy and the v2 per-trade evidence rule
+# ---------------------------------------------------------------------------
+
+SCHEMA_V1 = 1
+SCHEMA_V2 = 2
+_DEFAULT = object()
+
+
+def v1(trace):
+    return {"schema_version": SCHEMA_V1, "steps": trace}
+
+
+def v2(trace):
+    return {"schema_version": SCHEMA_V2, "steps": trace}
+
+
+def trade_v2_result(item_id=101, action_id="act-1", operation_id="op-1",
+                    business_complete=False, items_transferred=True,
+                    cash_moved=True, cash_before=500, cash_after=480,
+                    client_unchanged=True, evidence=_DEFAULT):
+    """A real R5 ``confirm_trade`` completion (same field contract as A3)."""
+    payload = write_result("confirm_trade", action_id=action_id,
+                           operation_id=operation_id)
+    payload.update({
+        "dispatched": True,
+        "business_complete": business_complete,
+        "visit_complete": business_complete,
+        "client_unchanged": client_unchanged,
+        "items_transferred": items_transferred,
+        "cash_moved": cash_moved,
+        "cash_changed": cash_before != cash_after,
+        "cash_before": cash_before,
+        "cash_after": cash_after,
+        "staged_item_id": item_id,
+        "client_intent": "SELL",
+    })
+    if evidence is _DEFAULT:
+        payload["evidence"] = {
+            "called": True,
+            "error": None,
+            "business_complete": business_complete,
+            "client_unchanged": client_unchanged,
+            "items_transferred": items_transferred,
+            "cash_moved": cash_moved,
+            "cash_before": cash_before,
+            "cash_after": cash_after,
+            "staged_item_id_after": item_id,
+        }
+    elif evidence is not None:
+        payload["evidence"] = evidence
+    return payload
+
+
+class TraceSchemaVersionTests(unittest.TestCase):
+    def test_v2_payload_is_accepted(self):
+        self.assertEqual([], trace_validator.validate_trace(v2([get_state(day=1)])))
+
+    def test_unsupported_schema_version_is_rejected(self):
+        violations = trace_validator.validate_trace(
+            {"schema_version": 3, "steps": [get_state(day=1)]})
+        self.assertEqual(["TRACE_SCHEMA_VERSION_UNSUPPORTED"], codes(violations))
+        self.assertEqual("error", violations[0].severity)
+
+    def test_non_integer_schema_version_is_rejected(self):
+        violations = trace_validator.validate_trace(
+            {"schema_version": "two", "steps": [get_state(day=1)]})
+        self.assertEqual(["TRACE_SCHEMA_VERSION_UNSUPPORTED"], codes(violations))
+
+    def test_legacy_partial_trade_is_validated_with_v1_rule_and_warns(self):
+        # The old rule required business_complete:true, so an unversioned R4
+        # partial trade is an error AND the operator is told the trace is
+        # legacy instead of being silently reinterpreted under v2 semantics.
+        trace = [write("confirm_trade", action_id="act-1",
+                       args={"item_id": 101, "side": "buy"},
+                       result=trade_v2_result())]
+        violations = trace_validator.validate_trace(trace)
+        self.assertIn("TRADE_EVIDENCE_MISSING", codes(violations))
+        rows = [row for row in violations
+                if row.code == "TRACE_SCHEMA_VERSION_MISSING"]
+        self.assertEqual(1, len(rows))
+        self.assertEqual("warning", rows[0].severity)
+        self.assertEqual(SCHEMA_V2, rows[0].details.get("suggested_schema_version"))
+
+    def test_legacy_visit_complete_only_is_not_silently_clean(self):
+        # v1 accepts business_complete-only; v2 rejects it. A legacy trace is
+        # still judged by v1 but the verdict difference is surfaced as a
+        # warning, never hidden.
+        result = trade_v2_result(business_complete=True, items_transferred=False,
+                                 cash_moved=False, cash_before=500,
+                                 cash_after=500)
+        trace = [write("confirm_trade", action_id="act-1",
+                       args={"item_id": 101, "side": "buy"}, result=result)]
+        violations = trace_validator.validate_trace(trace)
+        self.assertEqual([], errors(violations), codes(violations))
+        self.assertIn("TRACE_SCHEMA_VERSION_MISSING", codes(violations))
+
+    def test_explicit_v1_trace_uses_the_old_rule_without_warning(self):
+        trace = v1([write("confirm_trade", action_id="act-1",
+                          args={"item_id": 101, "side": "buy"},
+                          result=trade_v2_result())])
+        violations = trace_validator.validate_trace(trace)
+        self.assertIn("TRADE_EVIDENCE_MISSING", codes(violations))
+        self.assertNotIn("TRACE_SCHEMA_VERSION_MISSING", codes(violations))
+
+
+class TradeEvidenceV2Tests(unittest.TestCase):
+    def test_partial_trade_without_business_complete_is_clean(self):
+        trace = v2([write("confirm_trade", action_id="act-1",
+                          args={"item_id": 101, "side": "buy"},
+                          result=trade_v2_result(),
+                          claims=["trade_completed"])])
+        violations = trace_validator.validate_trace(trace)
+        self.assertNotIn("TRADE_EVIDENCE_MISSING", codes(violations))
+        self.assertEqual([], errors(violations), codes(violations))
+
+    def test_visit_complete_without_trade_effect_is_flagged(self):
+        result = trade_v2_result(business_complete=True, items_transferred=False,
+                                 cash_moved=False, cash_before=500,
+                                 cash_after=500)
+        trace = v2([write("confirm_trade", action_id="act-1",
+                          args={"item_id": 101, "side": "buy"},
+                          result=result)])
+        violations = trace_validator.validate_trace(trace)
+        rows = [row for row in violations
+                if row.code == "TRADE_EVIDENCE_MISSING"]
+        self.assertEqual(1, len(rows))
+        self.assertEqual("no_trade_effect", rows[0].details.get("reason"))
+
+    def test_cash_only_trade_is_clean(self):
+        # A purchase keeps the negotiated pointer on the bought item, so the
+        # cash delta alone proves that trade.
+        trace = v2([write("confirm_trade", action_id="act-1",
+                          args={"item_id": 101, "side": "buy"},
+                          result=trade_v2_result(items_transferred=False))])
+        self.assertEqual([], errors(trace_validator.validate_trace(trace)))
+
+    def test_item_only_barter_is_clean(self):
+        trace = v2([write("confirm_trade", action_id="act-1",
+                          args={"item_id": 101, "side": "sell"},
+                          result=trade_v2_result(items_transferred=True,
+                                                 cash_moved=False,
+                                                 cash_before=500,
+                                                 cash_after=500))])
+        self.assertEqual([], errors(trace_validator.validate_trace(trace)))
+
+    def test_trade_without_client_unchanged_is_flagged(self):
+        result = trade_v2_result(client_unchanged=False)
+        trace = v2([write("confirm_trade", action_id="act-1",
+                          args={"item_id": 101, "side": "buy"},
+                          result=result)])
+        violations = trace_validator.validate_trace(trace)
+        reasons = {row.details.get("reason") for row in violations
+                   if row.code == "TRADE_EVIDENCE_MISSING"}
+        self.assertIn("client_not_unchanged", reasons)
+
+    def test_trade_without_evidence_object_is_flagged(self):
+        result = trade_v2_result(evidence=None)
+        trace = v2([write("confirm_trade", action_id="act-1",
+                          args={"item_id": 101, "side": "buy"},
+                          result=result)])
+        violations = trace_validator.validate_trace(trace)
+        reasons = {row.details.get("reason") for row in violations
+                   if row.code == "TRADE_EVIDENCE_MISSING"}
+        self.assertIn("evidence_object_missing", reasons)
+
+    def test_inconsistent_evidence_object_is_flagged(self):
+        result = trade_v2_result()
+        result["evidence"] = dict(result["evidence"],
+                                  items_transferred=False)
+        trace = v2([write("confirm_trade", action_id="act-1",
+                          args={"item_id": 101, "side": "buy"},
+                          result=result)])
+        violations = trace_validator.validate_trace(trace)
+        reasons = {row.details.get("reason") for row in violations
+                   if row.code == "TRADE_EVIDENCE_MISSING"}
+        self.assertIn("evidence_items_mismatch", reasons)
+
+
+# ---------------------------------------------------------------------------
+# R5/A4: calibrated pending-conflict relation and run-change tracking
+# ---------------------------------------------------------------------------
+
+def pending_trade(item_id=101, action_id="act-1", operation_id="op-1",
+                  rev=5, tool="confirm_trade", side="buy", **extra):
+    result = dict(
+        write_result(tool, action_id=action_id, operation_id=operation_id,
+                     ok=False, execution_status="running"),
+        pending=True, dispatched=True)
+    result.update(extra)
+    args = {"item_id": item_id, "side": side} if tool == "confirm_trade" else {}
+    return write(tool, rev=rev, action_id=action_id, args=args, result=result)
+
+
+def pending_end_day(action_id="act-end", operation_id="op-end", rev=5):
+    result = dict(
+        write_result("end_day", action_id=action_id,
+                     operation_id=operation_id, ok=False,
+                     execution_status="running"),
+        pending=True, dispatched=True, error="shop_still_open")
+    return write("end_day", rev=rev, action_id=action_id, result=result)
+
+
+def completed_trade(item_id=101, action_id="act-2", operation_id="op-2",
+                    rev=6, business_complete=False):
+    return write(
+        "confirm_trade", rev=rev, action_id=action_id,
+        args={"item_id": item_id, "side": "buy"},
+        result=trade_v2_result(item_id=item_id, action_id=action_id,
+                               operation_id=operation_id,
+                               business_complete=business_complete))
+
+
+def resolve(operation_id="op-1", tool="confirm_trade", action_id="act-1",
+            execution_status="completed", **extra):
+    return operation(tool, operation_id, execution_status,
+                     action_id=action_id, **extra)
+
+
+class ConflictRelationUnitTests(unittest.TestCase):
+    """The relation classifier is pure and is tested directly."""
+
+    def _relation(self, pending, write_step):
+        return trace_validator.classify_pending_relation(pending, write_step)
+
+    @staticmethod
+    def _op(tool, args, rev=5, action_id="act-1"):
+        return {"tool": tool, "args": dict(args), "rev": rev,
+                "action_id": action_id}
+
+    def test_different_item_trade_is_independent(self):
+        relation, conflicting, _ = self._relation(
+            self._op("confirm_trade", {"item_id": 101, "side": "buy"}),
+            self._op("confirm_trade", {"item_id": 202, "side": "buy"},
+                     rev=6, action_id="act-2"))
+        self.assertEqual("independent", relation)
+        self.assertFalse(conflicting)
+
+    def test_same_item_is_a_conflict(self):
+        relation, conflicting, _ = self._relation(
+            self._op("confirm_trade", {"item_id": 101, "side": "buy"}),
+            self._op("move_item", {"item_id": 101, "target": "main"},
+                     rev=6, action_id="act-2"))
+        self.assertEqual("same_item", relation)
+        self.assertTrue(conflicting)
+
+    def test_same_op_is_a_conflict(self):
+        relation, conflicting, _ = self._relation(
+            self._op("end_day", {"dismiss_waiting": False}),
+            self._op("end_day", {"dismiss_waiting": True},
+                     rev=6, action_id="act-2"))
+        self.assertEqual("same_op", relation)
+        self.assertTrue(conflicting)
+
+    def test_modal_resolution_while_other_op_is_pending_is_allowed(self):
+        relation, conflicting, _ = self._relation(
+            self._op("end_day", {}),
+            self._op("answer_prompt", {"choice": "confirm"},
+                     rev=6, action_id="act-2"))
+        self.assertEqual("modal_resolution", relation)
+        self.assertFalse(conflicting)
+
+    def test_two_dialogue_writes_are_a_modal_conflict(self):
+        relation, conflicting, _ = self._relation(
+            self._op("choose_dialogue", {"index": 0}),
+            self._op("advance_dialogue", {}, rev=6, action_id="act-2"))
+        self.assertEqual("modal_resolution", relation)
+        self.assertTrue(conflicting)
+
+    def test_insufficient_evidence_is_unknown_not_allowed(self):
+        relation, conflicting, _ = self._relation(
+            self._op("confirm_trade", {"item_id": 101, "side": "buy"}),
+            self._op("end_day", {}, rev=6, action_id="act-2"))
+        self.assertEqual("unknown", relation)
+        self.assertTrue(conflicting)
+
+    def test_run_change_in_flight_is_run_changing(self):
+        relation, conflicting, _ = self._relation(
+            self._op("load_game", {}),
+            self._op("answer_prompt", {"choice": "confirm"},
+                     rev=6, action_id="act-2"))
+        self.assertEqual("run_changing", relation)
+
+
+class CalibratedPendingTests(unittest.TestCase):
+    def test_different_item_trade_while_pending_is_allowed(self):
+        trace = v2([
+            pending_trade(item_id=101),
+            completed_trade(item_id=202, rev=6),
+            resolve(),
+        ])
+        violations = trace_validator.validate_trace(trace)
+        self.assertEqual([], errors(violations), codes(violations))
+        self.assertNotIn("CONFLICTING_WRITE_WHILE_PENDING", codes(violations))
+
+    def test_same_item_write_while_pending_is_a_same_item_conflict(self):
+        trace = v2([
+            pending_trade(item_id=101),
+            completed_trade(item_id=101, rev=6),
+            resolve(),
+        ])
+        violations = trace_validator.validate_trace(trace)
+        rows = [row for row in violations
+                if row.code == "CONFLICTING_WRITE_WHILE_PENDING"]
+        self.assertEqual(1, len(rows))
+        self.assertEqual("same_item", rows[0].details.get("relation"))
+
+    def test_insufficient_evidence_write_while_pending_is_unknown(self):
+        trace = v2([
+            pending_trade(item_id=101),
+            write("end_day", rev=6, action_id="act-2",
+                  result=write_result("end_day", action_id="act-2",
+                                      shop_closed_after=True)),
+            resolve(),
+        ])
+        violations = trace_validator.validate_trace(trace)
+        rows = [row for row in violations
+                if row.code == "CONFLICTING_WRITE_WHILE_PENDING"]
+        self.assertEqual(1, len(rows))
+        self.assertEqual("unknown", rows[0].details.get("relation"))
+
+    def test_modal_resolution_while_end_day_pending_is_allowed(self):
+        trace = v2([
+            pending_end_day(),
+            write("answer_prompt", rev=6, action_id="act-answer",
+                  result=write_result("answer_prompt",
+                                      action_id="act-answer",
+                                      operation_id="op-answer")),
+            resolve(operation_id="op-end", tool="end_day",
+                    action_id="act-end"),
+        ])
+        violations = trace_validator.validate_trace(trace)
+        self.assertEqual([], errors(violations), codes(violations))
+
+    def test_dialogue_continuation_while_trade_pending_is_allowed(self):
+        trace = v2([
+            pending_trade(item_id=101),
+            write("advance_dialogue", rev=6, action_id="act-dialogue",
+                  result=write_result("advance_dialogue",
+                                      action_id="act-dialogue",
+                                      operation_id="op-dialogue")),
+            resolve(),
+        ])
+        violations = trace_validator.validate_trace(trace)
+        self.assertEqual([], errors(violations), codes(violations))
+
+    def test_duplicate_refusal_does_not_create_a_phantom_operation(self):
+        duplicate = write(
+            "confirm_trade", rev=6, action_id="act-2",
+            args={"item_id": 101, "side": "buy"},
+            result={"ok": False, "op": "confirm_trade",
+                    "error": "operation_pending",
+                    "blocking_operation_id": "op-1",
+                    "blocking_same_call": True,
+                    "execution_status": "running",
+                    "delivery_status": "delivered", "dispatched": True,
+                    "next": "call get_operation for the blocking id"})
+        trace = v2([pending_trade(item_id=101), duplicate, resolve()])
+        violations = trace_validator.validate_trace(trace)
+        self.assertEqual(["CONFLICTING_WRITE_WHILE_PENDING"],
+                         sorted(set(codes(violations))))
+
+    def test_run_change_pending_refusal_is_a_run_changing_conflict(self):
+        first = write(
+            "load_game", rev=3, action_id="act-load",
+            result=dict(write_result("load_game", action_id="act-load",
+                                     operation_id="op-load",
+                                     dispatched=True),
+                        run_change="issued",
+                        run_change_status="requested",
+                        run_change_confirmed=False))
+        retry = write(
+            "load_game", rev=3, action_id="act-load-2",
+            result={"ok": False, "op": "load_game",
+                    "error": "run_change_pending",
+                    "blocking_operation_id": "op-load",
+                    "run_change_status": "requested",
+                    "run_change_confirmed": False,
+                    "next": "call get_operation for the blocking id"})
+        confirmed = operation("load_game", "op-load", "completed",
+                              action_id="act-load",
+                              run_change_status="confirmed",
+                              run_change_confirmed=True)
+        violations = trace_validator.validate_trace(v2([first, retry,
+                                                        confirmed]))
+        rows = [row for row in violations
+                if row.code == "CONFLICTING_WRITE_WHILE_PENDING"]
+        self.assertEqual(1, len(rows))
+        self.assertEqual("run_changing", rows[0].details.get("relation"))
+
+    def test_prompt_confirmation_is_not_a_run_change(self):
+        prompt = write(
+            "confirm_new_game", rev=3, action_id="act-prompt",
+            result=dict(write_result("confirm_new_game",
+                                     action_id="act-prompt",
+                                     operation_id="op-prompt",
+                                     dispatched=True),
+                        prompt_confirmed=True,
+                        prompt_id="first_run",
+                        run_change="not_issued"))
+        start = write(
+            "confirm_new_game", rev=4, action_id="act-start",
+            result=dict(write_result("confirm_new_game",
+                                     action_id="act-start",
+                                     operation_id="op-start",
+                                     dispatched=True),
+                        run_change="issued",
+                        run_change_status="confirmed",
+                        run_change_confirmed=True))
+        violations = trace_validator.validate_trace(
+            v2([prompt, start, get_state(day=1)]))
+        self.assertEqual([], errors(violations), codes(violations))
+
+    def test_stale_prompt_run_change_status_is_not_a_run_change(self):
+        # Traces recorded before A1 may carry run_change_status=requested on a
+        # first-run prompt confirmation. prompt_confirmed is authoritative:
+        # that was a UI confirmation, never a native run start.
+        prompt = write(
+            "confirm_new_game", rev=3, action_id="act-prompt",
+            result=dict(write_result("confirm_new_game",
+                                     action_id="act-prompt",
+                                     operation_id="op-prompt",
+                                     dispatched=True),
+                        prompt_confirmed=True,
+                        prompt_id="first_run",
+                        run_change_status="requested",
+                        run_change_confirmed=False))
+        start = write(
+            "confirm_new_game", rev=4, action_id="act-start",
+            result=dict(write_result("confirm_new_game",
+                                     action_id="act-start",
+                                     operation_id="op-start",
+                                     dispatched=True),
+                        run_change_status="confirmed",
+                        run_change_confirmed=True))
+        violations = trace_validator.validate_trace(
+            v2([prompt, start, get_state(day=1)]))
+        self.assertEqual([], errors(violations), codes(violations))
+
+    def test_invalid_run_change_field_is_flagged(self):
+        write_step = write(
+            "confirm_new_game", rev=3, action_id="act-prompt",
+            result=dict(write_result("confirm_new_game",
+                                     action_id="act-prompt",
+                                     operation_id="op-prompt",
+                                     dispatched=True),
+                        run_change="maybe"))
+        violations = trace_validator.validate_trace(v2([write_step]))
+        self.assertIn("INVALID_RUN_CHANGE_FIELD", codes(violations))
+
+
+# ---------------------------------------------------------------------------
 # malformed trace / structure
 # ---------------------------------------------------------------------------
 
@@ -1063,11 +1561,80 @@ class CliTests(unittest.TestCase):
             exit_code = trace_validator.main(["/nonexistent/trace.json"])
         self.assertEqual(2, exit_code)
 
+    def test_cli_reports_declared_schema_version(self):
+        path = self._write_temp(v2([get_state(day=1)]))
+        exit_code, payload = self._run(path)
+        self.assertEqual(0, exit_code)
+        self.assertEqual(SCHEMA_V2, payload["trace_schema_version"])
+
+    def test_cli_reports_legacy_trace_schema_version(self):
+        path = self._write_temp([get_state(day=1)])
+        exit_code, payload = self._run(path)
+        self.assertEqual(0, exit_code)
+        self.assertEqual(SCHEMA_V1, payload["trace_schema_version"])
+
     def test_cli_counts_warnings_separately(self):
         path = self._write_temp([get_state(day=1)])
         exit_code, payload = self._run(path)
         self.assertEqual(0, exit_code)
         self.assertEqual({"error": 0, "warning": 0}, payload["counts"])
+
+
+# ---------------------------------------------------------------------------
+# independent JSON fixtures (agent/tests/fixtures)
+# ---------------------------------------------------------------------------
+
+FIXTURES_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
+
+
+def load_fixture(name):
+    with open(os.path.join(FIXTURES_DIR, name), encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+class TraceFixtureTests(unittest.TestCase):
+    """Positive/negative traces for the R5-A4 protocol changes."""
+
+    EXPECTED_CODES = {
+        "trade_partial_ok.json": [],
+        "trade_visit_complete_no_effect_invalid.json": [
+            "TRADE_EVIDENCE_MISSING"],
+        "pending_same_item_retry_conflict.json": [
+            "CONFLICTING_WRITE_WHILE_PENDING"],
+        "pending_different_item_ok.json": [],
+        "prompt_confirm_then_real_start_ok.json": [],
+        "sleep_async_converges_ok.json": [],
+    }
+
+    def test_fixtures_are_schema_version_2(self):
+        for name in self.EXPECTED_CODES:
+            payload = load_fixture(name)
+            self.assertEqual(SCHEMA_V2, payload.get("schema_version"), name)
+
+    def test_fixtures_validate_to_the_exact_code_set(self):
+        for name, expected in self.EXPECTED_CODES.items():
+            with self.subTest(fixture=name):
+                violations = trace_validator.validate_trace(load_fixture(name))
+                self.assertEqual(sorted(expected),
+                                 sorted({row.code for row in violations}))
+
+    def test_negative_fixtures_are_errors(self):
+        for name in ("trade_visit_complete_no_effect_invalid.json",
+                     "pending_same_item_retry_conflict.json"):
+            with self.subTest(fixture=name):
+                violations = trace_validator.validate_trace(load_fixture(name))
+                self.assertEqual(1, len(errors(violations)), codes(violations))
+
+    def test_fixture_cli_exit_codes_and_schema_version(self):
+        for name, expected in self.EXPECTED_CODES.items():
+            with self.subTest(fixture=name):
+                path = os.path.join(FIXTURES_DIR, name)
+                output = io.StringIO()
+                with contextlib.redirect_stdout(output):
+                    exit_code = trace_validator.main([path])
+                self.assertEqual(1 if expected else 0, exit_code, name)
+                report = json.loads(output.getvalue())
+                self.assertEqual(SCHEMA_V2, report["trace_schema_version"], name)
 
 
 # ---------------------------------------------------------------------------

@@ -1,0 +1,80 @@
+{
+  "schema_version": 2,
+  "description": "R5/A3: a real partial trade (business_complete=false, visit open) with this-trade item+cash evidence is a valid completion; the old business_complete:true rule would have wrongly flagged it.",
+  "steps": [
+    {
+      "tool": "get_state",
+      "args": {},
+      "result": {
+        "ok": true,
+        "in_game": true,
+        "day": 1,
+        "shop_state": "OPEN",
+        "cash": 600,
+        "client": null,
+        "legal_actions": [],
+        "candidate_actions": []
+      }
+    },
+    {
+      "tool": "confirm_trade",
+      "args": {
+        "rev": 7,
+        "action_id": "act-trade-1",
+        "item_id": 101,
+        "side": "sell"
+      },
+      "rev": 7,
+      "result": {
+        "ok": true,
+        "op": "confirm_trade",
+        "operation_id": "op-trade-1",
+        "execution_status": "completed",
+        "delivery_status": "delivered",
+        "dispatch_status": "dispatched",
+        "dispatched": true,
+        "item_id": 101,
+        "side": "sell",
+        "client_intent": "BUY",
+        "business_complete": false,
+        "visit_complete": false,
+        "client_unchanged": true,
+        "items_transferred": true,
+        "cash_moved": true,
+        "cash_changed": true,
+        "cash_before": 600,
+        "cash_after": 680,
+        "staged_item_id": 101,
+        "evidence": {
+          "called": true,
+          "error": null,
+          "business_complete": false,
+          "client_unchanged": true,
+          "items_transferred": true,
+          "cash_moved": true,
+          "cash_before": 600,
+          "cash_after": 680,
+          "staged_item_id_after": 101
+        },
+        "rev": 7
+      },
+      "claims": [
+        "trade_completed"
+      ]
+    },
+    {
+      "tool": "get_state",
+      "args": {},
+      "result": {
+        "ok": true,
+        "in_game": true,
+        "day": 1,
+        "shop_state": "OPEN",
+        "cash": 680,
+        "client": null,
+        "legal_actions": [],
+        "candidate_actions": []
+      }
+    }
+  ]
+}

@@ -1,7 +1,17 @@
-# PawnMind 已知限制（2026-11-10）
+# PawnMind 已知限制
 
-> 这份清单随迭代更新；每条都对应代码里的实际行为，不是“以后可能”。
-> 当前游戏版本 0.46D / 100-REV6，其他版本未验证。
+> 版本分节（不擦除历史）：**§1–§10 是 2026-11-10 基线原文（保留）**；**§11 是 2026-11-19 R5-A 离线修订**。
+> 两处冲突时以 §11 为准，旧原文不删除。每条都对应代码里的实际行为，不是“以后可能”。
+> 当前游戏版本 0.46D / 100-REV6（旧档记录），其他版本未验证。
+> 证据等级：**L3 真机 = 本轮 `NOT_RUN`**（无 Windows/游戏进程/授权）；
+> R4 真机结论来自开发者报告（`REPORTED`），未由本文档作者复核；离线源码/C#/Python 单测为 L1/L2。
+
+---
+
+# 第一部分：2026-11-10 基线（历史原文，保留）
+
+> 以下 §1–§10 为 2026-11-10 原文。其中“Python 8 项”“只验证顾客卖→玩家买”“未跨多日”等表述反映当时的证据状态，
+> **已过时**；请对照 §11 的 2026-11-19 修订阅读，不要直接把旧条目当当前事实。
 
 ## 1. 布局 / 形状
 
@@ -106,3 +116,63 @@ DEPRECATED: reflection-external refused by the game update of December 10, 2026
 - **`press` 只在 `run_mode=test` 下、且只对三个覆盖层按钮放行**
   （`_ControlOverLay/CloseOverlayButton`、`_DialogueOptionUI/Panel/CloseButton`、
   `ApplyButton`）。其余控件 `control_not_allowed`；其它模式 `press_forbidden`。
+
+---
+
+# 第二部分：2026-11-19 R5-A 离线修订（历史口径更新，L3 一律 NOT_RUN）
+
+## 11. R5-A 协议/证据口径更新
+
+> 依据：`docs/reviews/R5_HANDOFF_2026-11-19.md` §2、`docs/reviews/R5_BASELINE.md`、
+> `agent/trace_validator.py`（`VALIDATOR_VERSION = "1.2.0"`）、`skills/pawnmind-first-week/SKILL.md`。
+> 真机（L3）证据：本轮 **`NOT_RUN`**；R5-A 的 A1/A2/A3 只有源码 + 单测证据。
+
+### 11.1 交易：整趟访问完成 ≠ 单笔成交（R5/A3）
+
+- 单笔 `confirm_trade` 的 `completed` 判据：`client_unchanged == true` 且
+  （`items_transferred == true` **或** `cash_moved == true`），`evidence` 对象需与顶层证据一致。
+- `business_complete` / `visit_complete` 只描述“这位顾客整趟逛完了没有”，是**辅助归因**，
+  **不能单独证明单笔成交**：`business_complete:true` 且零 item/零现金变化必须 `uncertain`。
+- 反向保留 R4 已证实行为：`business_complete:false` 的真实 partial trade（顾客还要继续买）仍应 `completed`。
+- 证据漂移：旧 validator（`1.1.0`）和旧 Skill §5.2 把 `business_complete:true` 当成交必要条件，**该口径作废**；
+  trace 用 `schema_version: 2` 表达新口径，无版本历史 trace 按 v1 校验并给 `TRACE_SCHEMA_VERSION_MISSING` warning。
+- 旧的“只验证顾客卖→玩家买”已被 R4 报告（买卖两向、首周 8+16+8 笔）覆盖主张，但**原始轨迹缺失**
+  （`R5_BASELINE.md` E1/E2：32 vs 约 45 笔口径冲突、无 JSONL），仍只能标 `REPORTED`，不升级为 `VERIFIED`；
+  买卖成功路径的 L3 复核 = `NOT_RUN`。
+
+### 11.2 开局/跨局：first-run prompt 不是 run start（R5/A1）
+
+- `confirm_new_game` 有两个子动作：**first-run prompt 确认**（`prompt_confirmed:true`，`run_change:"not_issued"`；
+  UI 操作，不登记 run change、不会永久阻塞后续开局）与**真正新局 start**（`run_change:"issued"`，进入防盲重试）。
+- prompt-only 结果**不带** `run_change_status`/`run_change_confirmed`；`run_change_status:"confirmed"` 只能由
+  真实 run identity 读回产生（revision/day/scene 不能替代）。
+- 旧 Skill §1.2 “`confirm_new_game` 整局只调一次”作废：它把 prompt 确认与 run start 混为一谈。
+- 已知风险：pre-A1 轨迹可能在 prompt 确认上残留 `run_change_status:"requested"`；按 `prompt_confirmed` 为准。
+- 录制绑定只存在内存、重启后读不回的问题（§10.1）**未修复**；L3 复核 = `NOT_RUN`。
+
+### 11.3 睡觉/异步：没有“轮询 N 次就判失败/安全重试”（R5/A2）
+
+- `sleep` 的 `day` 不变只是**尚未观测到完成（inconclusive）**，不是失败；bridge 用 10s 单调时钟观察窗口，
+  窗口内无判决，超时无强证据 → `execution_status:"uncertain"` + `error:"sleep_unconfirmed"`。
+- `uncertain` 非终态：同 op 用新 `action_id` 再发会被 `operation_pending` 拒绝（防双推进）；后续观测到 day 增加
+  仍可 promote `completed`。只有可证明未派发（`native_not_called` + `dispatched:false`）才允许安全重试。
+- 旧口径“`sleepPolls >= 3` 且 day 未变 → `failed("day_not_changed")`”、“连续 `get_operation(id)` 两三次即收敛”
+  **作废**；轮询次数不是证据。
+- `get_operation("*")`：非终态列表上限 **20 条**，R5/A2 后响应带 `count`/`total_non_terminal`/`truncated`/
+  `truncation_note`；旧构建可能没有 `truncated` 字段，`count == 20` 时按“可能被截断”处理，不能当完整证据。
+- L3 复核 = `NOT_RUN`。
+
+### 11.4 UI 自动化 / press
+
+- `press` / `act` 是 **test-only** 通道（`run_mode=test` + `UiPressPolicy` 白名单），
+  **正式 Play 永远不依赖、不放开通用按键**；若是某工作流“必须 press 才能过”，停止并报告，不要把它写成 Play 能力。
+- §10.1 历史文本写“只对三个覆盖层按钮放行”；R4 代码 `UiPressPolicy` 实际已有**第四个日终确认路径**（`/Confirm/Buttons/Button`）。
+  该 test-only 路径不是 Play 能力，源码注释漂移由 Lead 负责同步；日终 typed 玩家等价动作（R5/B2）**未实现/未验证**（`NOT_RUN`）。
+
+### 11.5 测试覆盖（旧 §8 的 “Python 8 项” 已过时）
+
+- R5 启动基线（2026-11-18T19:16Z，`R5_BASELINE.md` 实测）：C# 纯逻辑 **794/0**、脚本门禁 **53/0**、
+  适配器契约 **506**、Python **377/0**、policy catalog 一致。
+- R5-A4（2026-11-19）：`agent/tests/test_trace_validator.py` 扩到 **115 项**（含 `agent/tests/fixtures/` 6 条正反轨迹），
+  全 Python 套件以本轮实跑输出为准；C# 侧 R5-A 数字以 Lead 报告为准（未由本文档作者复核）。
+- 仍未覆盖/未验证：多日真实经营、Play 模式、typed 日终弹窗、重启续档、跨局真机对账。全部 `NOT_RUN` 或 `REPORTED`。

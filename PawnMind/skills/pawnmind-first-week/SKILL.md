@@ -1,16 +1,20 @@
 # PawnMind 首周经营 Skill（pawnmind-first-week）
 
-> **状态：`OFFLINE_DRAFT`（离线草案，2026-11-17 Nightly Batch A / E 模块，D+C 合入后修订）。**
+> **状态：`OFFLINE_DRAFT`（离线草案；2026-11-17 Nightly Batch A / E，2026-11-19 R5-A 离线修订）。**
 > 本 Skill 依据仓库已实现并冻结的 MCP 协议编写，**不包含任何真机验证结论**。
 > 真机（L3）证据：`NOT_RUN`（无游戏进程、未读写存档、未安装 DLL）。
 > 通关率 / 效率收益：`NOT_MEASURED`，本文件不给出任何跑分。
+> R5-A 离线修订范围：A1 first-run prompt vs run-change、A2 sleep 异步收敛、A3 单笔成交证据（源码级 + C#/Python 单测），
+> **均未获真机验证**；L3 一律 `NOT_RUN`。轨迹校验：`agent/trace_validator.py` `VALIDATOR_VERSION = "1.2.0"`，
+> 当前 trace `schema_version: 2`；不带版本的历史 trace 按 v1 旧口径校验并给 `TRACE_SCHEMA_VERSION_MISSING` warning，不能被静默改写。
 
 - 适用游戏：*Probably Stolen* **0.46D**（`VERSION 100-Rev13`；以 `get_state` 的版本字段与 bridge 的 MVID 门禁为准）。
 - 适用工具面：`mcp_server.py --tools full`（**116** 个工具）或 `--tools recording`（**106** 个玩家等价工具）；
-  版本以 `tool_policy.json` 的 `policy_sha256`（当前 **`e0da5a24…`**）与 `docs/audit/tools-inventory.json` 为准。
+  版本以 `tool_policy.json` 的 `policy_sha256`（R5 基线 **`e0da5a24…`**，2026-11-18 实测；run 时必须实算复核）
+  与 `docs/audit/tools-inventory.json` 为准。工具数只作旁证，**哈希变化才算换基准**。
   本 Skill **只用首周最小闭环里已注册的工具**，未注册的工具名一律不要调用。
 - 适用模式：`run_mode=play`（进入游戏后）或显式 `test`。`bootstrap` 只用于主菜单只读探测。
-- 前置：`play_allowlist` 目前为空（无 live evidence），所以**真机 `play` 下写操作仍会被拒**——这是预期，不要改配置绕过。
+- 前置：`play_allowlist` 在 R5 启动基线（2026-11-18 实测）仍为空（无 live evidence），所以**真机 `play` 下写操作仍会被拒**——这是预期，不要改配置绕过；run 时以 `tool_policy.json` 实算为准。
 
 ---
 
@@ -21,8 +25,10 @@
 3. `shop_state == "MORNING"` → `open_shop()`。
 4. 顾客/议价 → `list_goods()` / `confirm_trade()`；对话 → `advance_dialogue()` / `choose_dialogue()`。
 5. 顾客处理完、没有待接待 → `end_day()`；**只有 `shop_closed_after == true` 才算关店完成**（关店≠换天）。
-6. `sleep()`（必须在 `end_day` 之后）→ 用 `wait_for_events()` 或 `get_state()` 等真实 `day` 变化；
-   `day_changed` 与 `save_evidence` 分开判断，再 `get_day_report()` 读晨报。
+6. `sleep()`（必须在 `end_day` 之后）→ 用 `wait_for_events()` / `get_state()` / `get_operation()` 等**可观测证据**：
+   `day` 不变只是**尚未观测到完成（inconclusive）**，不是失败；`day_changed` 与 `save_evidence` 分开判断；
+   超时无强证据时如实标 `uncertain`（`sleep_unconfirmed`），**不要**用新 `action_id` 再发一次 `sleep()`。
+   再 `get_day_report()` 读晨报。
 7. 第一周结束（`rent.days_left == 0`、房东 `client.intent == "RENT"`）→ 走对话付租，
    **只认外部结算回执**（见 §8）。
 8. 出现任何 `pending`/`uncertain` → `get_operation()` / `wait_operation()` 查询，**禁止用新的 action_id 盲重试**。
@@ -50,16 +56,28 @@
 3. `select_new_game_option()`：一次只点一个场景/特质/难度卡；回读 `selected_id` / `perks.selected_count` / `used_points`。
 4. `new_game_continue()`：逐页推进（场景 → 特质 → 难度）。
 5. `get_recording_save_status()`：确认录制已 armed 且专用槽是游戏下一个自动槽。
-6. `confirm_new_game()`：**整局只调一次**。触发原生 `InitialSave()`（真实写盘），调用后回读
-   `get_recording_save_status()` 与 `get_new_game_options()`，不要重试。
+6. `confirm_new_game()` 有**两个语义不同的子动作**，以响应里的 `run_change` 字段区分：
+   - **first-run prompt 确认（默认路径）**：菜单有 first-run prompt 时，`confirm_new_game()` 只确认提示，
+     响应 `prompt_confirmed:true` + `run_change:"not_issued"`。**这不是开局、不是 run-changing 动作**，
+     不触发跨局保护、也不会永久阻塞后续开局；确认后可再次 `confirm_new_game()` 真正开始新局。
+     旧 bridge 轨迹可能在该响应上残留 `run_change_status:"requested"`，**以 `prompt_confirmed` / `run_change` 为准**。
+   - **真正新局 start**：只有原生 `StartNewGame()` 被派发（或可能已派发）时才 `run_change:"issued"`，
+     此时才进入防盲重试保护；响应可能带 `run_change_status`（`requested` → `unknown` / `confirmed`）。
+     `run_change_confirmed:false`（含 `requested`/`unknown`）时**只用同一个 `action_id` 查 `get_operation()`**，
+     直到 `run_change_status:"confirmed"`；**禁止**用新 `action_id` 再发 start。
+   - 无论哪种，都回读 `get_recording_save_status()` 与 `get_new_game_options()`；step 1–5 的菜单选择不要重做。
+   - 旧口径“`confirm_new_game` 整局只调一次”已废止：它把 first-run prompt 与 run start 混为一谈。
 7. 若要读回一个已绑定的专用档：`load_recording_game()`（必须先由人把游戏退回主菜单；只读绑定槽）。
-   响应里的 `run_change_status` 通常先是 `"requested"`（`load_pending:true`）：
+   响应 `run_change:"issued"` + `run_change_status` 通常先是 `"requested"`：
    **不要**再发第二个 `action_id`；用同一个 `action_id` 轮 `get_operation()` 直到
-   `run_change_status:"confirmed"`（顶层会出现 `completion_evidence`）。
+   `run_change_status:"confirmed"`（顶层会出现 `completion_evidence`）。run identity 不可读 = `unknown`，
+   不等于没发生、也不等于已换局，只能查询不能自动重放。
 8. `get_state()` 确认 `in_game:true`、`day`、`run_summary`，然后进入 §2。
 
 **不要**调用通用 `act()` / `press()`，不要调用 `new_game()` / `load_game()` / `save_game()`：
 它们不在录制面（`--tools recording`）里，绕过菜单与槽位策略属于违规路径。
+`press` 是 `run_mode=test` 的 test-only 通道（且只对白名单控件放行），**正式 Play 永远不依赖 `press`**；
+如果某个工作流看起来“必须 press 才能过”，立即停止并报告，**不要**建议在 Play 打开 `press`。
 
 ---
 
@@ -126,7 +144,8 @@
 | `delivery_status` | `pending_delivery \| delivered \| undelivered`（只描述“调用方有没有拿到响应”） |
 | `dispatch_status` | `not_dispatched \| dispatched \| unknown`：是否真的调用了原生。`unknown` **不是**"没调用" |
 | `dispatched` | 与上一行同源的兼容布尔：`true` / `false` / **`null`**（`null` 即 unknown） |
-| `visit_complete` | 仅 `confirm_trade`：这位顾客**整趟**逛完了没有。`false` 表示这笔成交了、但顾客可能还要买 |
+| `run_change` | 仅 `confirm_new_game` / `load_game` / `load_recording_game`：`"issued"` = 真的派发（或可能已派发）跨局原生动作；`"not_issued"` = 未派发跨局动作（含 first-run prompt 确认与菜单拒绝）。**只有 `issued` 才进入跨局防盲重试** |
+| `visit_complete` | 仅 `confirm_trade`：这位顾客**整趟**逛完了没有。`false` 表示这笔成交了、但顾客可能还要买；**它不证明单笔成交** |
 
 规则：
 
@@ -143,10 +162,13 @@
    - `ok:true` 仅当 `execution_status:"completed"`；非终态时 `next` 给出下一步建议。
    - 未知 id：`ok:false` + `known:false` + `error:"unknown_operation"`；
      若期间发生 new game / 读档 / 进程重启，还会带 `process_restarted:true`，**禁止自动重放**。
-5. `get_operation("*")`：列出**非终态**操作（`{ok, count, operations:[{operation_id, op, execution_status,
-   delivery_status, dispatch_status, revoked…}]}`）。当一个 `sleep`/`save` 卡住、又已经掉出
-   `get_action_history` 的容量时，这是唯一能拿回它的 `action_id` 的办法；拿到后连续
-   `get_operation(id)` 两三次即可让它按读回结果收敛（`completed` 或 `failed`）。
+5. `get_operation("*")`：列出**非终态**操作，**列表有上限（最多 20 条）**：
+   `{ok, count, total_non_terminal, truncated, truncation_note, operations:[{operation_id, op,
+   execution_status, delivery_status, dispatch_status, revoked…}]}`。
+   - `truncated:true` 表示还有非终态操作没列出（`total_non_terminal > count`）：**不能把列表当完整证据**，
+     也不能因为“没看到某个操作”就认为它已结案；已知/怀疑卡住时用已知 `operation_id` 直接 `get_operation(id)`。
+   - 旧构建可能没有 `truncated` 字段；`count == 20` 时要按“可能被截断”处理。
+   - 该查询**只读**，不会推进或改写操作状态；拿到 id 后按真实读回/verifier 结果收敛，**没有“轮询几次就安全”的固定次数**。
 6. `wait_operation(operation_id, timeout_ms)`：Python 侧有界轮询（≤10s），不阻塞 Unity 主线程。
    - 终态返回终态 payload；
    - 超时返回 `ok:false` + `status:"pending"` + `execution_status` + `operation_id` + `next`
@@ -159,11 +181,23 @@
    `dispatch_status:"unknown"`（`dispatched:null`）就是这一类：原生可能已经执行，
    即使 `ok:false` 也**不能**当成"安全拒绝"重试；响应会带 `next` 说明。
    只有 `dispatch_status:"not_dispatched"` + `execution_status:"rejected"` 才是"世界无变化"。
-8. `pending` 操作存在时，不允许发出冲突写动作（不同 op 或不同 `rev`）；
-   读（`get_state()` 等）与同一 `action_id` 的幂等重放允许。
+8. `pending` 操作存在时，写动作按**冲突关系**判断（validator `CONFLICTING_WRITE_WHILE_PENDING` 同口径）：
+   - `same_op`：同一个原生调用（call-scoped op，如 `confirm_trade` 的 op+参数相同；其它 op 按 op 名）→ 冲突；
+   - `same_item`：两个写动作命中同一个 `item_id` → 冲突；
+   - `run_changing`：有跨局请求在飞行或已请求未 confirmed → 冲突（见规则 11）；
+   - `modal_resolution`：`answer_prompt` / `choose_dialogue` / `advance_dialogue` / `close_windows`
+     去解一个**别类** pending 操作等待的弹窗/对话 → 允许；两个对话类写互相竞争同一输入 → 冲突；
+   - `independent`：call-scoped 交易且 item 可证明不同 → 允许；
+   - **证据不足一律按冲突/保守处理（`unknown`），不是“全放行”**。
+   读（`get_state()` 等）与同一 `action_id` 的幂等重放永远允许。
 9. `delivery_status:"undelivered"`：响应丢失但执行事实可能已成立——用原 `action_id` 重查/重放拿回原证据
    （会带 `redelivered:true`），不要新建 id。
 10. 进程重启不承诺跨进程 exactly-once；durable intent 只证明“曾发出过”，不证明“执行到哪一步”。
+11. **跨局（run change）语义（R5/A1）**：first-run prompt 确认是独立 UI 操作，不是 native run start；
+    以响应 `run_change` 为准（`not_issued` vs `issued`）。`issued` 且 `run_change_confirmed:false`
+    （`requested`/`unknown`）时只能查询，不能新 `action_id` 重发；`run_change_status:"confirmed"`
+    只由**真实 run identity 读回**产生，revision/day/scene 变化不能替代 run identity。
+    prompt-only 结果**不带** `run_change_status`/`run_change_confirmed`。
 
 ---
 
@@ -201,15 +235,25 @@ confirm_trade(item_id=<该商品>, side=...)      # 用新的 action_id 重试
 4. **卖**：先 `list_inventory(container="main")` 拿 `item_id`，再
    `confirm_trade(item_id=<id>, side="sell", rev=<新 rev>)`。
 5. **回读验证**：再 `get_state()`，核对现金/库存/柜面变化；以物易物可能**零现金变化**。
-6. 只有 `execution_status:"completed"` 才算成交；**成交完成 ≠ 顾客工作流完成**，
+6. 只有 `execution_status:"completed"` **且满足 §5.2 单笔证据**才算成交；**成交完成 ≠ 顾客工作流完成**，
    后续对话用 `advance_dialogue()` / `choose_dialogue()` 继续，交易 completed/uncertain 都不阻塞对话。
 
-### 5.2 `confirm_trade` 成功证据（唯一可信来源）
+### 5.2 `confirm_trade` 成功证据（唯一可信来源，R5/A3 口径）
 
-`completed` 必须同时具备：
+`completed`（`ok:true`）必须同时具备**同一顾客、同一笔**的成交证据：
 
-- `business_complete: true`（**同一顾客**的业务完成）
-- `client_unchanged: true`（顾客身份未变，不能用别的顾客状态背书）
+- `client_unchanged: true`（顾客身份未变；不能用别的顾客状态背书）；
+- `items_transferred: true` **或** `cash_moved: true`：
+  - 现金变化可以证明买/卖本笔，但**不能**只凭现金变化判断整趟业务；
+  - 以物易物/换物可以**零现金变化**，此时靠 `items_transferred`；
+- `evidence` 对象要与顶层证据一致：`called:true`、`client_unchanged:true`，
+  且 `evidence.items_transferred` / cash 前后值不与顶层声明矛盾。
+
+**整趟访问完成 ≠ 单笔成交。** `business_complete` / `visit_complete` 只是归因上下文（auxiliary）：
+`business_complete:true` 但 `items_transferred:false` 且 `cash_moved:false` = **本笔没有成交证据**
+（旧实现曾把它当成功，是 R5/A3 修掉的 bug），必须返回 `uncertain`，不能报 `completed`。
+反向必须保留：R4 已真机验证的 partial trade 仍然有效——`business_complete:false`（顾客还要继续买）
++ 本笔 item/cash 证据 = `completed`，不能退回“必须整趟完成”的旧逻辑。
 
 响应同时带以下证据字段（用于审计与对账）：
 
@@ -219,9 +263,11 @@ confirm_trade(item_id=<该商品>, side=...)      # 用新的 action_id 重试
 | `item_id` / `side` | 请求的物品与方向 |
 | `staged_item_id` | 谈判桌上被接受的物品 |
 | `client_intent` | 当前顾客意图（BUY/SELL/BARTER/INFORMATION_DEALER/GUNSMITH…） |
-| `items_transferred` | 物品归属/桌面是否真的转移（辅助证据） |
-| `cash_before` / `cash_after` | 整数现金前后值；`cash_changed` 表示是否变化（**不能**用现金变化当唯一成功判据） |
-| `evidence` | 明细：`called`、`error`、`business_complete`、`client_unchanged`、`items_transferred`、`cash_before`、`cash_after`、`staged_item_id_after` |
+| `business_complete` / `visit_complete` | 顾客**整趟**业务是否完成；**辅助归因，不是单笔成交判据** |
+| `items_transferred` | 本笔物品归属/桌面是否真的转移（**成交证据之一**） |
+| `cash_moved` / `cash_changed` | 本笔现金是否变化（**成交证据之一**；barter 可为 `false`） |
+| `cash_before` / `cash_after` | 整数现金前后值（对账用；不能当唯一判据） |
+| `evidence` | 明细：`called`、`error`、`business_complete`、`client_unchanged`、`items_transferred`、`cash_moved`、`cash_before`、`cash_after`、`staged_item_id_after` |
 
 ### 5.3 拒绝与“静默失败”分类
 
@@ -233,8 +279,9 @@ confirm_trade(item_id=<该商品>, side=...)      # 用新的 action_id 重试
 `already_owned`、`trade_read_failed`。
 处理：接受拒绝，重新读状态、重新规划；不要重复发送同一请求“确认一下”。
 
-原生 accept 调用返回但**没有可信完成证据**（静默 return / 异常 / 业务未完成）：
-`error:"outcome_unverified"` + `execution_status:"uncertain"` + `dispatched:true`。
+原生 accept 调用返回但**没有可信完成证据**（静默 return / 异常 / 业务未完成 / 本笔无 item/cash 证据）：
+`error:"outcome_unverified"` + `execution_status:"uncertain"` + `dispatched:true`
+（本笔无证据时 `detail:"no_trade_evidence"`，业务未完成时 `detail:"business_not_complete"`）。
 - 这是 `uncertain`，**不是**失败也不是成功；
 - 只能查 `get_operation()` / `wait_operation()`，或复用原 `action_id`；
 - **禁止新 `action_id` 重试**（可能已成交，双成交 = 硬违规）；
@@ -276,10 +323,17 @@ confirm_trade(item_id=<该商品>, side=...)      # 用新的 action_id 重试
 ### 7.2 睡觉 `sleep()`
 
 - 前置：店铺已 `CLOSED`（`end_day()` 之后）；否则返回 `not_closed`。
-- `sleep()` 触发原生异步黑屏序列，**返回时 day 可能尚未变**：
-  - 用 `wait_for_events(since_rev=<当前 rev>)` 等到 revision 变化；
-  - 或短暂后 `get_state()` 回读，直到 `day` 增加 / `shop_state` 回到 `MORNING`/`OPEN`；
-  - 轮询要有上限，用本次回合的预算；不要死循环。
+- `sleep()` 触发原生异步黑屏序列，**返回时 day 可能尚未变**。R5/A2 语义（不要再用旧口径）：
+  - **`day` 不变只是“尚未观测到完成”，是 inconclusive，不是失败**；`day_changed:false` + `execution_status:"running"`
+    表示异步仍在进行；观察窗口内（bridge 侧 10s 单调时钟）不产生判决。
+  - 收敛只能靠**可观测证据**：`readback.day_advanced:true`、后续 `get_state().day` 增加、
+    或 `get_day_report()`/状态读回证明已换天；同时用 `get_operation()` / `wait_operation()` 查询同一 `action_id`。
+  - 超过观察窗口仍无证据 → `execution_status:"uncertain"` + `error:"sleep_unconfirmed"`：
+    **不是失败也不是成功**；uncertain 是非终态，同一 op 用新 `action_id` 再发会被 `operation_pending` 拒绝
+    （防双推进）。后续真实观测到 day 增加仍可把该操作 promote 为 `completed`（安全恢复证据）。
+  - 只有**可证明未派发**的原生 sleep（`error:"native_not_called"` + `dispatched:false`，世界无副作用）
+    才允许换新 `action_id` 重试；`outcome_unknown`/`dispatched:null` **禁止**重试。
+  - **禁止**“连续轮询 3 次后当失败/安全重试”的旧写法；轮询次数不是证据，有界等待 + 查询才是。
 - 完成判定分**两个独立事实**：
   - **换天**：`day_changed == true`（或 `readback.day_advanced == true`，或后续 `get_state().day` 增加）；
     `day_changed == false` 且 `execution_status:"running"` = 异步仍在进行 → `get_operation()` / `wait_operation()`，
@@ -374,6 +428,8 @@ confirm_trade(item_id=<该商品>, side=...)      # 用新的 action_id 重试
 | `unknown_operation`（`known:false`） | 记录“进程重启/run 变化/记录丢失”（可能带 `process_restarted:true`）；重新 `get_state()` 核对世界；不自动重放 |
 | `delivery_status:"undelivered"` | 响应丢失但执行事实可能已成立：用原 `action_id` 重查/重放拿回原结果（`redelivered:true`），不要新建 id |
 | `wait_operation` 超时（`ok:false + status:"pending"` + `next`） | 不是失败也不是成功；继续有界等待或停机记录 |
+| `sleep` 的 `error:"sleep_unconfirmed"` + `execution_status:"uncertain"` | 观察窗口内无换天证据：不是失败也不是成功；只查询/继续观测，**禁止新 action_id 重发**；后续观测到 day 增加可 promote `completed` |
+| `run_change:"issued"` + `run_change_confirmed:false`（`requested`/`unknown`） | 跨局动作可能已派发：只用原 `action_id` 查 `get_operation()` 到 `run_change_status:"confirmed"`；**禁止**新 id 重发 start/load |
 
 ### 9.4 存档 / 关店 / 换天
 
@@ -416,9 +472,9 @@ confirm_trade(item_id=<该商品>, side=...)      # 用新的 action_id 重试
 - `run_id + sequence + action_id + op + args + rev`（写动作发出前持久化）；
 - 响应两轴 + 派发事实：`operation_id`、`execution_status`、`delivery_status`、`dispatched`、
   `error`、`redelivered`、`next`；
-- 交易证据：`business_complete`、`client_unchanged`、`items_transferred`、`cash_before`、`cash_after`、
-  `cash_changed`、`staged_item_id`、`client_intent`、
-  `evidence.{called,error,business_complete,client_unchanged,items_transferred,cash_before,cash_after,staged_item_id_after}`；
+- 交易证据：`business_complete`、`visit_complete`（整趟，辅助归因）、`client_unchanged`、
+  `items_transferred`、`cash_moved`、`cash_changed`、`cash_before`、`cash_after`、`staged_item_id`、`client_intent`、
+  `evidence.{called,error,business_complete,client_unchanged,items_transferred,cash_moved,cash_before,cash_after,staged_item_id_after}`；
 - 关店/换天/落盘：`shop_closed_after`、`readback.day_advanced`、`day_changed`、`save_evidence`、
   `save_completed`、`save_unknown`；
 - 动作前后关键状态摘要：`day`、`shop_state`、`cash`、`inventory_count`、`back_counter_count`、
@@ -447,21 +503,23 @@ confirm_trade(item_id=<该商品>, side=...)      # 用新的 action_id 重试
 
 ---
 
-## 13. schema 已核对（最终，2026-11-18 Round 4 合入后）
+## 13. schema 已核对（2026-11-18 Round 4；2026-11-19 R5-A 离线修订）
 
 以下字段已与 `mcp_server.py` / `src/Bridge/` / `src/Core/` 实际实现核对
-（Round 4 / `docs/reviews/ROUND4_DISPOSITION.md`，policy sha `e0da5a24…`，
+（Round 4 / `docs/reviews/ROUND4_DISPOSITION.md`；R5-A 的 A1/A2/A3 只做源码 + C# 单测核对，
+**真机 L3 仍 `NOT_RUN`**；policy sha 以 R5 基线 `e0da5a24…` 为参照、run 时实算：
 工具 full=116 / recording=106）：
 
 | 主题 | 已核对 schema |
 |---|---|
-| 写响应 | `operation_id`、`execution_status`、`delivery_status`、`dispatch_status`、`dispatched`（true/false/**null**）、跨局时 `run_change_status`/`run_change_confirmed`、晋升后 `completion_evidence`/`initial_result`；`ok:true` 仅 completed；重复 ID → 原证据 + `delivery_status:"undelivered"` + `redelivered:true` |
-| 操作查询 | `get_operation` 返回 `known/ok/operation_id/op/execution_status/delivery_status/dispatch_status/dispatched/run_change_status/run_change_confirmed/completion_evidence/error/rev/result_rev/next`；未知 id `known:false` + `unknown_operation`（run 变化后带 `process_restarted:true`）；`wait_operation` 超时 `ok:false + status:"pending" + operation_id + execution_status + next` |
-| 交易证据 | `business_complete`、`client_unchanged`、`items_transferred`、`cash_before`、`cash_after`（整数）、`cash_changed`、`staged_item_id`、`client_intent`、`evidence.{called,error,business_complete,client_unchanged,items_transferred,cash_before,cash_after,staged_item_id_after}`；拒绝时 `dispatched:false`；静默 return → `error:"outcome_unverified"` + `execution_status:"uncertain"` |
+| 写响应 | `operation_id`、`execution_status`、`delivery_status`、`dispatch_status`、`dispatched`（true/false/**null**）、跨局时 `run_change_status`/`run_change_confirmed`/`run_change`（`"issued"`/`"not_issued"`；R5/A1）、晋升后 `completion_evidence`/`initial_result`；`ok:true` 仅 completed；重复 ID → 原证据 + `delivery_status:"undelivered"` + `redelivered:true`；重复调用被挡 → `operation_pending`/`run_change_pending` + `blocking_operation_id`（**未派发，不产生新 operation**） |
+| 操作查询 | `get_operation` 返回 `known/ok/operation_id/op/execution_status/delivery_status/dispatch_status/dispatched/run_change_status/run_change_confirmed/completion_evidence/error/rev/result_rev/next`；未知 id `known:false` + `unknown_operation`（run 变化后带 `process_restarted:true`）；`wait_operation` 超时 `ok:false + status:"pending" + operation_id + execution_status + next`；`get_operation("*")` 上限 20 条 + `count`/`total_non_terminal`/`truncated`/`truncation_note`（旧构建可能无 truncated 字段） |
+| 交易证据 | `business_complete`、`visit_complete`（整趟，辅助归因）、`client_unchanged`、`items_transferred`、`cash_moved`、`cash_before`、`cash_after`（整数）、`cash_changed`、`staged_item_id`、`client_intent`、`evidence.{called,error,business_complete,client_unchanged,items_transferred,cash_moved,cash_before,cash_after,staged_item_id_after}`；完成判据 = `client_unchanged` + (items 或 cash)；拒绝时 `dispatched:false`；静默 return/无本笔证据 → `error:"outcome_unverified"` + `execution_status:"uncertain"`（`detail:"no_trade_evidence"`/`"business_not_complete"`） |
 | 关店 | `execution_status:"completed"` ⇔ `shop_closed_after:true`；仍 OPEN → `ok:false + pending:true + execution_status:"running" + error:"shop_still_open"` |
-| 睡觉 | `day_changed`、`save_evidence`（`save_completed`/`save_unknown`）、`save_completed`、`save_unknown`；`last_save_time` 不算落盘证据；`day_changed:false` = running/pending；**日终面板没开时 `error:"end_of_day_panel_closed"` + `not_dispatched"`（世界没动，可换新 id 重试）**；卡住的 sleep 由 verifier 按 day 回读收敛为 `completed`/`failed("day_not_changed")` |
+| 睡觉 | `day_changed`、`save_evidence`（`save_completed`/`save_unknown`）、`save_completed`、`save_unknown`；`last_save_time` 不算落盘证据；`day_changed:false` = running/pending/inconclusive（**不是失败**）；**日终面板没开时 `error:"end_of_day_panel_closed"` + `not_dispatched"`（世界没动，可换新 id 重试）**；R5/A2：无 count-based failure，窗口（10s 单调时钟）内无判决，超时无证据 → `uncertain` + `error:"sleep_unconfirmed"`（非终态、拒绝新 id 重发；后续 day 增加可 promote `completed`）；只有 `native_not_called`+`dispatched:false` 可安全重试 |
 | 快照 | `legal_actions`（`availability="available"`）与 `candidate_actions`（`availability="unknown"`、`requires="native_guard"`）；举报用纯字段 `reported`/`is_wanted` |
-| 工具面 | full = 116，recording = 106；`get_operation` / `wait_operation` 已注册且均在 recording 面 |
+| 工具面 | full = 116，recording = 106；`get_operation` / `wait_operation` 已注册且均在 recording 面；工具数只作旁证，以 `policy_sha256` 为准 |
+| 轨迹校验 | `agent/trace_validator.py` `VALIDATOR_VERSION = "1.2.0"`；trace `schema_version: 2` 为当前口径；无版本历史 trace 按 v1 旧口径校验并给 `TRACE_SCHEMA_VERSION_MISSING` warning；未知版本 `TRACE_SCHEMA_VERSION_UNSUPPORTED` 直接拒绝 |
 | MCP 模式 | 注册面 = bridge 报告的 `run_mode`；`auto` 在 bridge 不可达/未知时 **locked**（只留本地 memory 工具），显式 `--mode test` 也必须 bridge 报告 `test`；运行中模式漂移 → `error:"mode_changed"`，需重启 MCP |
 
 若后续再改冻结协议：本表随 Lead 的协议变更同步；**不要再引入“待核对”字段**。

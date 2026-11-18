@@ -1,0 +1,66 @@
+{
+  "schema_version": 2,
+  "description": "A3 bug shape: the visit is complete but no item moved and no cash moved, so this single trade is NOT proven; reporting it completed must be an error even though business_complete/visit_complete are true.",
+  "steps": [
+    {
+      "tool": "get_state",
+      "args": {},
+      "result": {
+        "ok": true,
+        "in_game": true,
+        "day": 1,
+        "shop_state": "OPEN",
+        "cash": 600,
+        "client": null,
+        "legal_actions": [],
+        "candidate_actions": []
+      }
+    },
+    {
+      "tool": "confirm_trade",
+      "args": {
+        "rev": 8,
+        "action_id": "act-trade-2",
+        "item_id": 101,
+        "side": "buy"
+      },
+      "rev": 8,
+      "result": {
+        "ok": true,
+        "op": "confirm_trade",
+        "operation_id": "op-trade-2",
+        "execution_status": "completed",
+        "delivery_status": "delivered",
+        "dispatch_status": "dispatched",
+        "dispatched": true,
+        "item_id": 101,
+        "side": "buy",
+        "client_intent": "BUY",
+        "business_complete": true,
+        "visit_complete": true,
+        "client_unchanged": true,
+        "items_transferred": false,
+        "cash_moved": false,
+        "cash_changed": false,
+        "cash_before": 600,
+        "cash_after": 600,
+        "staged_item_id": 101,
+        "evidence": {
+          "called": true,
+          "error": null,
+          "business_complete": true,
+          "client_unchanged": true,
+          "items_transferred": false,
+          "cash_moved": false,
+          "cash_before": 600,
+          "cash_after": 600,
+          "staged_item_id_after": 101
+        },
+        "rev": 8
+      },
+      "claims": [
+        "trade_completed"
+      ]
+    }
+  ]
+}
