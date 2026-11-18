@@ -96,3 +96,4 @@ DEPRECATED: reflection-external refused by the game update of December 10, 2026
    本地 `Mods/` 安装不受影响；上工坊则需申请验证。
 
 > 结论：**PawnMind 目前只能本地使用**；工坊发布在 (1)(2)(3) 解决前是 BLOCKED。
+> 2026-11-18 决定：三项均暂缓，优先做玩法；清单与 `src/Game` 暂不改动。

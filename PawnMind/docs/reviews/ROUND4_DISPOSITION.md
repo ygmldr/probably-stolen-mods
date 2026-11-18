@@ -177,6 +177,9 @@ C# 仍是最终门禁。
   详见 `MOD_SCANNER_ROUND4.md` §7。
 - 本轮**未加** `files` 到清单：新增高权限能力属于 brief §8 的"必须停下并上报"，
   需要用户/产品决定（声明 vs 关闭截图 vs 阻塞发布）。
+- **用户决定（2026-11-18 23:35）**：`files` 与 `reflection-external` **均暂不处理**，
+  先把玩法（L3）跑起来；Gate C 维持 **BLOCKED**，`manifest.xml` 与 `src/Game` 不改。
+  复扫结论已完整落盘（`MOD_SCANNER_ROUND4.md` §6），后续任一时间点都可直接接续。
 - `reflection-external` 已声明，但 `NewGameMenuAdapter.cs:400` 的
   `view.GetType()` 是 computed type，属于官方**计划于 2026-12-10 拒绝**的能力。
   `SlotView` 是私有嵌套类（`_decomp/NewGamePerksUI.cs:7`），没有 `typeof()` 替代。
