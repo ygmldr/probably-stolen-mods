@@ -192,6 +192,17 @@ confirm_trade(27) → completed 700→675；28、29 连续成交 650、635
 **建议**：保留两层（防御纵深），但把 B2 的验证条件改写为"顾客预算在点击瞬间变化"
 这类竞态；正式 Play 前需要一次专门构造（例如多件合并出售导致总价超过预算）。
 
+## A.3.5 修复后的完整周（LIVE）
+
+在同一构建上把首周跑完（槽 55）：
+
+```
+Day 1 700 → Day 8 557
+Day 7 租金 200：last_payment id=rent_1_200, 762→562, paid_at_rev=423
+rent_paid_total=200, weeks_paid=1, weeks_missed=0；下周 due=209
+6 次跨日全部 sleep running → ~1.1s → completed，无双推进
+```
+
 ## A.4 本轮未做
 
 - F6（typed modal 身份绑定）：对应的就是 L3-3 里那条目前不可达的弹窗，优先级随之下调。
