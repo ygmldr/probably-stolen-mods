@@ -577,17 +577,27 @@ namespace PawnMind.Game
         /// </summary>
         public static bool IsStagingModalOpen()
         {
+            return ReadStagingModal() == ModalState.Blocked;
+        }
+
+        /// <summary>
+        /// R5.1/F4: Clear / Blocked / Unknown. An exception or a missing
+        /// CustomUIManager is Unknown, never Clear: "cannot read" must not read
+        /// as "nothing is in the way".
+        /// </summary>
+        public static ModalState ReadStagingModal()
+        {
             try
             {
                 GenericConfirmationUIManager confirmation = GenericConfirmationUIManager.Instance;
                 if (confirmation != null && confirmation.panel != null
                     && confirmation.panel.activeInHierarchy)
                 {
-                    return true;
+                    return ModalState.Blocked;
                 }
 
                 CustomUIManager manager = CustomUIManager.Instance;
-                if (manager == null) return false;
+                if (manager == null) return ModalState.Unknown;
 
                 GameObject negotiation = CustomWindowRoot(manager, "negotiation_tablet");
                 GameObject bargain = CustomWindowRoot(manager, "bargain_panel");
@@ -612,7 +622,8 @@ namespace PawnMind.Game
                         Transform child = root.GetChild(i);
                         if (child == null || !child.gameObject.activeSelf) continue;
                         if (child.gameObject == negotiation || child.gameObject == bargain) continue;
-                        if (child.name.StartsWith("custom_window_", StringComparison.Ordinal)) return true;
+                        if (child.name.StartsWith("custom_window_", StringComparison.Ordinal))
+                            return ModalState.Blocked;
                         // NegociationUIManager renames its own window root; any other
                         // renamed/unknown active layer child is treated as a blocker
                         // only when it is not one of the two excluded roots above and
@@ -620,14 +631,15 @@ namespace PawnMind.Game
                     }
                 }
             }
+            }
             catch
             {
-                // An unreadable modal state must not crash the action; the staging
-                // guard still requires every other field and the native readback.
-                return false;
+                // Cannot read the stack -> Unknown. The guard refuses staging on
+                // Unknown, so an exception can never look like a clear screen.
+                return ModalState.Unknown;
             }
 
-            return false;
+            return ModalState.Clear;
         }
 
         private static GameObject CustomWindowRoot(CustomUIManager manager, string windowId)

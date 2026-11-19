@@ -309,6 +309,7 @@ namespace PawnMind.Bridge
                 case StagingErrors.ReadFailed: return "staged_item_unreadable";
                 case StagingErrors.NegotiationUnreadable: return "negotiation_ui_unwired";
                 case StagingErrors.ModalOpen: return "blocking_modal_open";
+                case StagingErrors.ModalUnknown: return "modal_state_unknown";
                 case StagingErrors.ItemNotFound: return "item_not_found";
                 case StagingErrors.ItemSold: return "item_in_sold_container";
                 case StagingErrors.ItemUnreadable: return "item_state_unreadable";

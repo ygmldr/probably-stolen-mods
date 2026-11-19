@@ -74,7 +74,7 @@ namespace PawnMind.Game
                 }
             }
 
-            input.ModalOpen = GameState.IsStagingModalOpen();
+            input.Modal = GameState.ReadStagingModal();
 
             GameItem item;
             string container;

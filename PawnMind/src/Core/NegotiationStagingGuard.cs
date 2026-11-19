@@ -18,6 +18,9 @@ namespace PawnMind.Core
         /// <summary>A blocking native/custom modal owns the screen; a player cannot drag.</summary>
         public const string ModalOpen = "modal_open";
 
+        /// <summary>R5.1/F4: the blocking-modal read failed, so "clear" is unknown.</summary>
+        public const string ModalUnknown = "modal_unknown";
+
         public const string ItemNotFound = "item_not_found";
 
         /// <summary>The item is already in the sold container: it is no longer ours to stage.</summary>
@@ -70,7 +73,12 @@ namespace PawnMind.Core
         public bool NegotiationOpen;
 
         /// <summary>A native/custom modal covers the shop counters right now.</summary>
-        public bool ModalOpen;
+        /// <summary>
+        /// R5.1/F4: three states, not a bool. "I could not read the modal stack"
+        /// is not "nothing is blocking": an optimistic default let staging run
+        /// behind an unknown overlay.
+        /// </summary>
+        public ModalState Modal = ModalState.Clear;
 
         public int RequestedItemId;
         public bool ItemExists;
@@ -110,7 +118,8 @@ namespace PawnMind.Core
             if (intent.Length == 0 || intent == "UNDEFINED") return StagingErrors.IntentUndefined;
 
             if (!input.NegotiationReadable) return StagingErrors.NegotiationUnreadable;
-            if (input.ModalOpen) return StagingErrors.ModalOpen;
+            if (input.Modal == ModalState.Blocked) return StagingErrors.ModalOpen;
+            if (input.Modal == ModalState.Unknown) return StagingErrors.ModalUnknown;
 
             if (input.RequestedItemId <= 0 || !input.ItemExists) return StagingErrors.ItemNotFound;
 

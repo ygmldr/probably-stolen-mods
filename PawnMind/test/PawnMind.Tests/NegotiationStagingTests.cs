@@ -68,7 +68,7 @@ namespace PawnMind.Tests
                     ClientIntent = "BUY",
                     NegotiationReadable = true,
                     NegotiationOpen = NegotiationOpen,
-                    ModalOpen = false,
+                    Modal = ModalState.Clear,
                     RequestedItemId = itemId,
                     ItemExists = true,
                     ItemReadable = true,
@@ -116,7 +116,7 @@ namespace PawnMind.Tests
                 ClientIntent = "BUY",
                 NegotiationReadable = true,
                 NegotiationOpen = true,
-                ModalOpen = false,
+                Modal = ModalState.Clear,
                 RequestedItemId = 56,
                 ItemExists = true,
                 ItemReadable = true,
@@ -232,10 +232,22 @@ namespace PawnMind.Tests
             Assert.Contains((string)json["detail"], "negotiation", "the detail names the field");
         }
 
+        /// <summary>
+        /// R5.1/F4 (independent review 2026-11-19): an unreadable modal stack is not
+        /// a clear screen. The guard must refuse before any native staging call.
+        /// </summary>
+        [Test]
+        public static void R5_1_STAGE_01_Unknown_Modal_Refuses_Staging()
+        {
+            JObject json = Refused(g => g.Modal = ModalState.Unknown);
+            Assert.Equal(StagingErrors.ModalUnknown, (string)json["error"], "modal_unknown");
+            Assert.Equal("modal_state_unknown", (string)json["detail"], "the reason is actionable");
+        }
+
         [Test]
         public static void R5_STAGE_07_Modal_Occlusion_Refuses()
         {
-            JObject json = Refused(g => g.ModalOpen = true);
+            JObject json = Refused(g => g.Modal = ModalState.Blocked);
             Assert.Equal(StagingErrors.ModalOpen, (string)json["error"], "modal_open");
         }
 
@@ -534,7 +546,7 @@ namespace PawnMind.Tests
         public static void R5_STAGE_31_Refusal_Reports_Before_And_Null_After()
         {
             var port = new FakeStagingPort();
-            port.Guard.ModalOpen = true;
+            port.Guard.Modal = ModalState.Blocked;
             port.Guard.StagedItemId = 41;
             JObject json = Run(new NegotiationStagingService(port));
 

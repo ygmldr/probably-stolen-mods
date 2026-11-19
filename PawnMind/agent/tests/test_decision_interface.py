@@ -399,3 +399,65 @@ class TransportFailureTests(unittest.TestCase):
         self.assertEqual("open_shop", op)
         self.assertIn("rev", payload, "rev rides in the payload for this convention")
         self.assertIn("action_id", payload)
+
+
+class PendingWriteBarrierTests(unittest.TestCase):
+    """R5.1/F2: RUNNING is a pending write, not a hint.
+
+    Independent review 2026-11-19 (F2): the executor returned a hint and kept
+    accepting decisions, so a host that wrapped only BridgeClient (no
+    TraceRecorder) could dispatch a second conflicting write while the first was
+    still running. The barrier must live in the executor, not only in the
+    recorder.
+    """
+
+    def _executor(self, responses):
+        client = FakeClient()
+        client.responses = list(responses)
+        return client, Executor(client, frozenset({
+            "sleep", "end_day", "get_operation", "get_state"}), Budget(max_actions=20))
+
+    def test_running_write_blocks_the_next_write(self):
+        client, executor = self._executor([
+            {"ok": True, "op": "sleep", "execution_status": "running",
+             "operation_id": "op-1"},
+        ])
+        first = executor.execute(decision(tool="sleep"))
+        self.assertEqual(StepStatus.RUNNING, first.status, "the sleep is still running")
+
+        second = executor.execute(decision(tool="end_day"))
+
+        self.assertEqual(StepStatus.BLOCKED, second.status,
+                         "a second write must not be dispatched while one is pending")
+        self.assertEqual(1, len(client.calls), "only the first call reached the bridge")
+
+    def test_a_pure_query_is_still_allowed_while_pending(self):
+        client, executor = self._executor([
+            {"ok": True, "op": "sleep", "execution_status": "running",
+             "operation_id": "op-1"},
+            {"ok": True, "operation_id": "op-1", "execution_status": "running"},
+        ])
+        executor.execute(decision(tool="sleep"))
+
+        query = executor.execute(decision(tool="get_operation",
+                                          args={"operation_id": "op-1"}))
+
+        self.assertNotEqual(StepStatus.BLOCKED, query.status,
+                            "querying the pending operation is the safe move")
+        self.assertEqual(2, len(client.calls), "the query reached the bridge")
+
+    def test_terminal_readback_clears_the_barrier(self):
+        client, executor = self._executor([
+            {"ok": True, "op": "sleep", "execution_status": "running",
+             "operation_id": "op-1"},
+            {"ok": True, "operation_id": "op-1", "execution_status": "completed"},
+            {"ok": True, "op": "end_day", "execution_status": "completed"},
+        ])
+        executor.execute(decision(tool="sleep"))
+        executor.execute(decision(tool="get_operation", args={"operation_id": "op-1"}))
+
+        after = executor.execute(decision(tool="end_day"))
+
+        self.assertEqual(StepStatus.COMPLETED, after.status,
+                         "a terminal readback releases the barrier")
+        self.assertEqual(3, len(client.calls), "the released write was dispatched once")

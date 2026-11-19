@@ -304,6 +304,28 @@ def client_takes_kwargs(client):
     return "action_id" in signature.parameters
 
 
+def tool_purity(tool):
+    """'pure' tools cannot change the game; everything else is treated as a write.
+
+    Unknown tools fall back to 'write' so a missing policy entry can never widen
+    what may run while a write is pending (R5.1/F2).
+    """
+    try:
+        import sys
+
+        agent_dir = os.path.dirname(os.path.abspath(__file__))
+        if agent_dir not in sys.path:
+            sys.path.insert(0, agent_dir)
+        import tool_policy
+
+        policy = tool_policy.load_policy()
+        tools = policy.get("tools") or policy
+        entry = tools.get(tool) or {}
+        return entry.get("purity") or "write"
+    except Exception:
+        return "write"
+
+
 class Executor(object):
     """One decision in, one verified outcome out. The model never dispatches."""
 
@@ -324,6 +346,10 @@ class Executor(object):
         self.rev = None
         self.stopped = False
         self.stop_reason = None
+        # R5.1/F2: a write that came back RUNNING is still in flight. The
+        # barrier lives here, not only in TraceRecorder, because a host may
+        # wrap a bare BridgeClient.
+        self.pending_operation = None
 
     # ----------------------------------------------------------- policy
     @staticmethod
@@ -394,6 +420,19 @@ class Executor(object):
             return StepResult(StepStatus.BLOCKED, decision=decision, stop=True,
                               stop_reason=detail, hint=code)
 
+        if self.pending_operation is not None and tool_purity(decision.tool) != "pure":
+            try:
+                self.budget.tick_rejection()
+            except BudgetExceeded as error:
+                return self._stop(decision, error)
+            pending = self.pending_operation.get("id")
+            return StepResult(
+                StepStatus.BLOCKED, decision=decision,
+                hint="query get_operation(%r) first; a write is still pending"
+                     % (pending,),
+                stop_reason="pending_operation %r" % (pending,),
+            )
+
         try:
             self.budget.tick_action()
         except BudgetExceeded as error:
@@ -429,6 +468,7 @@ class Executor(object):
 
         if status == StepStatus.COMPLETED:
             self.budget.tick_success()
+            self._release_pending(decision)
             observation = self.observe()
             self._refresh_rev(observation)
             return StepResult(StepStatus.COMPLETED, decision=decision, request=request,
@@ -437,6 +477,8 @@ class Executor(object):
         if status == StepStatus.RUNNING:
             self.budget.tick_run()
             operation_id = response.get("operation_id") if isinstance(response, dict) else None
+            if operation_id:
+                self.pending_operation = {"id": operation_id, "tool": decision.tool}
             return StepResult(
                 StepStatus.RUNNING, decision=decision, request=request, response=response,
                 hint="call get_operation/wait_operation for %r; never re-dispatch"
@@ -459,6 +501,7 @@ class Executor(object):
                               response=response, stop=True, stop_reason=self.stop_reason)
 
         if status == StepStatus.REJECTED:
+            self._release_pending(decision)
             try:
                 self.budget.tick_rejection()
             except BudgetExceeded as error:
@@ -497,6 +540,18 @@ class Executor(object):
                 "dispatched": None,
                 "detail": str(error)[:200],
             }
+
+    def _release_pending(self, decision):
+        """A terminal readback of the pending operation lifts the barrier.
+
+        Only get_operation can do it: an unrelated tool finishing says nothing
+        about the write that is still in flight.
+        """
+        if self.pending_operation is None or decision.tool != "get_operation":
+            return
+        requested = decision.args.get("operation_id")
+        if requested is None or requested == self.pending_operation.get("id"):
+            self.pending_operation = None
 
     @staticmethod
     def _error_of(response):
