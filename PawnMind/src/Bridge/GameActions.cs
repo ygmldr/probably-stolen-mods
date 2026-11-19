@@ -83,7 +83,30 @@ namespace PawnMind.Bridge
                 return ActionResult.Failure("call_next_customer", blocked);
             }
 
-            store.TryCallNextClient();
+            // R5.3/B: the player entry is the bell (StoreBell.OnClick → RingBell),
+            // which also runs the tutorial hook, the audio cue and the
+            // "dismiss a dismissable client first" branch. TryCallNextClient skips
+            // all of that, so the bridge was not on the player path.
+            StoreBell bell;
+            try
+            {
+                bell = UnityEngine.Object.FindObjectOfType<StoreBell>();
+            }
+            catch (Exception)
+            {
+                return ActionResult.Failure("call_next_customer", "bell_unavailable");
+            }
+            if (bell == null) return ActionResult.Failure("call_next_customer", "bell_unavailable");
+
+            try
+            {
+                bell.OnClick();
+            }
+            catch (Exception)
+            {
+                return ActionResult.Failed("call_next_customer", "bell_failed");
+            }
+
             return ActionResult.Success("call_next_customer");
         }
 

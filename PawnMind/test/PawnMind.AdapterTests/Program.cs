@@ -150,6 +150,10 @@ namespace PawnMind.AdapterTests
             CheckMethod(assembly, "CustomUIManager", "CloseAllWindows");
             CheckMethod(assembly, "CustomUIManager", "GetLayerRoot");
 
+            // R5.3/B: call_next_customer goes through the native bell click.
+            CheckType(assembly, "StoreBell");
+            CheckMethod(assembly, "StoreBell", "OnClick");
+
             CheckType(assembly, "EndOfDayUIManager");
             CheckMethod(assembly, "EndOfDayUIManager", "OnEndDayButtonClick");
 

@@ -13,7 +13,7 @@
 | 操作 | 结论 | 一句话理由 |
 |---|---|---|
 | `open_shop` | **GRANTED_WITH_GAP** | 走原生 `StoreShutterButton.OnClick`，守卫镜像到 Core；**缺 post_read** |
-| `call_next_customer` | **GRANTED_WITH_GAP** | 守卫完备；走 `TryCallNextClient` 而非铃铛点击；**缺 post_read** |
+| `call_next_customer` | **GRANTED_WITH_GAP** | **已改走原生铃铛 `OnClick→RingBell`**（§3.1 关闭）；仍缺 post_read |
 | `advance_dialogue` | **GRANTED_WITH_GAP** | 前置检查充分；`OnAdvancePressed` 后**无回读** |
 | `choose_dialogue` | **GRANTED** | 前置 + 选中后回读对比 + 租金回执归因 |
 | `stage_negotiation_item` | **GRANTED** | 前置 + 后态回读（staged id / 在台 / 谈判开 / 顾客身份）+ 实机 A→B→A |
@@ -48,14 +48,16 @@
 | player_entry | `StoreBell.RingBell`（矩阵）；实际代码走 `store.TryCallNextClient()`（`GameActions.cs:84`） |
 | native_guards | `lockNextBellFlag`、`storeState==OPEN`、`CanNextClient()` |
 | pre_read | `Core.ShopBellPolicy.Evaluate(...)`（`:76-81`） |
-| call_path | `store.TryCallNextClient()` —— **内部方法，不是铃铛点击** |
+| call_path | `StoreBell.OnClick()` → `RingBell()`（原生铃铛；修复前是内部 `TryCallNextClient`） |
 | post_read | **无**（`:85` 直接 Success） |
 | negative_test | `ShopBellPolicy` 单测 |
 | L3_evidence | 真实叫号（多次），`client` 由 null → 名字 |
 | AI_enabled | 是（pilot） |
 
-**差异**：矩阵记的是铃铛点击；实现是内部方法。铃铛点击会多一层动画/音效与拦截，
-内部方法跳过了它。目前守卫把同样的前置条件镜像了一遍，但"业务路径一致"这条**不满足**。
+**已修复（2026-11-20）**：改为 `FindObjectOfType<StoreBell>()` 后调用 `OnClick()`。
+`RingBell()` 还会跑教程钩子、音频，以及"先送走可送走的顾客"分支——内部方法把
+这些全跳过了。实机验证：`call_next_customer → completed`，导师正常到场。
+适配器契约新增 `StoreBell` 类型与 `OnClick`（契约 526 → 528）。
 
 ### 2.3 `advance_dialogue`
 | 字段 | 值 |
@@ -169,9 +171,7 @@
 
 ## 3. 审计中发现、需要后续补的（按严重度）
 
-1. **`call_next_customer` 走内部方法而非原生铃铛点击**（P1）
-   矩阵的 player_entry 是 `StoreBell.RingBell`；实现是 `store.TryCallNextClient()`。
-   前置条件被镜像了，但绕过了铃铛本身的动画/拦截逻辑。修法：改调铃铛的 `OnClick`。
+1. ~~`call_next_customer` 走内部方法而非原生铃铛点击~~ —— **已修**（见 §2.2）。
 
 2. **四处缺 post_read**（P1/P2）
    `open_shop`、`call_next_customer`、`advance_dialogue`、`dismiss_current_client`
