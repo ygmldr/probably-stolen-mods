@@ -41,7 +41,52 @@ from pawnmind_client import BridgeClient, BridgeError
 
 TOOL_SET_FULL = "full"
 TOOL_SET_RECORDING = "recording"
-TOOL_SET_CHOICES = (TOOL_SET_FULL, TOOL_SET_RECORDING)
+# R5.3/A3: the surface an autonomous pilot may use. Reads are every pure tool the
+# recording surface already carries; writes are the Day-1 core set only. The
+# player-legality audit (2026-11-19) asked for an explicit, short, verified
+# allowlist instead of "whatever the recording set happens to contain".
+TOOL_SET_PILOT = "pilot"
+TOOL_SET_CHOICES = (TOOL_SET_FULL, TOOL_SET_RECORDING, TOOL_SET_PILOT)
+
+PILOT_WRITES = frozenset({
+    # store front, day cycle
+    "open_shop", "call_next_customer", "end_day", "sleep", "close_windows",
+    "dismiss_tutorial_hints",
+    # dialogue
+    "advance_dialogue", "choose_dialogue",
+    # negotiation and the one staging primitive
+    "stage_negotiation_item", "confirm_trade", "dismiss_current_client",
+    "answer_prompt",
+    # stocking (A1 hardened move_item; post-readback still an open item)
+    "move_item",
+    # starting the recorded run goes through the native new-game menu
+    "open_new_game_menu", "new_game_continue", "new_game_next_page",
+    "select_new_game_option", "focus_new_game_selected_perk",
+    "blur_new_game_option", "confirm_new_game",
+})
+
+
+def pilot_reads():
+    """Every pure tool on the recording surface, from the policy (single source)."""
+    try:
+        import os
+        import sys
+
+        agent_dir = os.path.dirname(os.path.abspath(__file__))
+        if agent_dir not in sys.path:
+            sys.path.insert(0, agent_dir)
+        import tool_policy
+
+        policy = tool_policy.load_policy()
+        tools = policy.get("tools") or policy
+        return frozenset(
+            name for name in RECORDING_TOOL_NAMES
+            if (tools.get(name) or {}).get("purity") == "pure")
+    except Exception:
+        # Fail closed: without the policy there is no read surface to grant.
+        return frozenset()
+
+
 
 #: Recording mode registers exactly this set; every other tool stays
 #: unregistered. `demo_agent.ALLOWED_OPS` must stay a subset;
@@ -169,6 +214,9 @@ RECORDING_TOOL_NAMES = frozenset({
     "wine_add_ingredient",
     "wine_status",
 })
+# R5.3/A3: the pilot surface is the curated writes plus the policy-pure reads.
+PILOT_TOOL_NAMES = frozenset(PILOT_WRITES) | pilot_reads()
+
 
 CALENDAR_MIN_DAYS = 1
 CALENDAR_MAX_DAYS = 14
@@ -457,6 +505,8 @@ def build_server(client, tool_set=TOOL_SET_FULL, memory_provider=None,
         def decorator(function):
             name = function.__name__
             if tool_set == TOOL_SET_RECORDING and name not in RECORDING_TOOL_NAMES:
+                return function
+            if tool_set == TOOL_SET_PILOT and name not in PILOT_TOOL_NAMES:
                 return function
             # F5: expose only what the current run mode can actually execute. The
             # C# gate stays the final authority; this only stops a model from

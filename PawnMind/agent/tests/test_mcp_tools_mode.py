@@ -261,6 +261,25 @@ class ToolsModeTests(ModeTestCase):
         for required in EXPECTED_RECORDING_TOOLS:
             self.assertIn(required, names, "missing recording tool: " + required)
 
+    def test_pilot_surface_is_the_curated_day_one_set(self):
+        names = self._list_tool_names("--tools", "pilot")
+
+        self.assertEqual(set(mcp_server.PILOT_TOOL_NAMES), names)
+        for required in ("get_state", "open_shop", "stage_negotiation_item",
+                         "confirm_trade", "end_day", "sleep", "answer_prompt"):
+            self.assertIn(required, names, "the pilot needs " + required)
+
+        # Everything the player-legality audit flagged as writing state directly,
+        # plus the ops with no Day-1 use, stays off this surface.
+        for forbidden in ("buy_wholesale", "buy_upgrade", "set_label", "go_out",
+                          "machine_insert", "machine_collect", "barter_accept",
+                          "arrest_wanted", "scavenge", "use_tool", "call",
+                          "phone_advance", "report_client", "analyze_item"):
+            self.assertNotIn(forbidden, names, "not in the pilot surface: " + forbidden)
+
+        self.assertLess(len(names), len(mcp_server.RECORDING_TOOL_NAMES),
+                        "the pilot surface must be strictly smaller than recording")
+
     def test_default_memories_db_lives_beside_the_events_db(self):
         path = mcp_server._default_memories_db()
         self.assertTrue(path.endswith(
