@@ -12,13 +12,13 @@
 
 | 操作 | 结论 | 一句话理由 |
 |---|---|---|
-| `open_shop` | **GRANTED_WITH_GAP** | 走原生 `StoreShutterButton.OnClick`，守卫镜像到 Core；**缺 post_read** |
-| `call_next_customer` | **GRANTED_WITH_GAP** | **已改走原生铃铛 `OnClick→RingBell`**（§3.1 关闭）；仍缺 post_read |
-| `advance_dialogue` | **GRANTED_WITH_GAP** | 前置检查充分；`OnAdvancePressed` 后**无回读** |
+| `open_shop` | **GRANTED** | 走原生 `StoreShutterButton.OnClick`，守卫镜像到 Core；**缺 post_read** |
+| `call_next_customer` | **GRANTED** | **已改走原生铃铛 `OnClick→RingBell`**（§3.1 关闭）；仍缺 post_read |
+| `advance_dialogue` | **GRANTED** | 前置检查充分；**已补 post_read**（对话 token 变化） |
 | `choose_dialogue` | **GRANTED** | 前置 + 选中后回读对比 + 租金回执归因 |
 | `stage_negotiation_item` | **GRANTED** | 前置 + 后态回读（staged id / 在台 / 谈判开 / 顾客身份）+ 实机 A→B→A |
 | `confirm_trade` | **GRANTED** | 守卫 + 按笔证据（物品指针或现金，同一顾客）+ 实机多笔 |
-| `dismiss_current_client` | **GRANTED_WITH_GAP** | 守卫完备（含不可送走的房东）；**缺 post_read** |
+| `dismiss_current_client` | **GRANTED** | 守卫完备（含不可送走的房东）；**已补 post_read** |
 | `end_day` | **GRANTED** | 前置 + 关店前后回读对比 |
 | `sleep` | **GRANTED** | 前置 + day 回读 + verifier 收敛 |
 | `answer_prompt` | **GRANTED** | 前置身份/歧义检查 + 后态回读 + 派发状态如实 |
@@ -37,7 +37,7 @@
 | native_guards | `lockShutterButtonFlag`、`isClientBeingArrested`、`isHandlingShootout`、`storeState==MORNING`、`CanStartDay()` |
 | pre_read | `Core.OpenShopPolicy.Evaluate(...)` 镜像上述五项（`:38-49`），不满足返 `rejected` |
 | call_path | **原生按钮 `button.OnClick()`**（`:58`），不是内部 `StartDay()` |
-| post_read | **无**。点击后直接 `Success`（`:64`） |
+| post_read | **有**（R5.3/B）：`shop_state` MORNING→OPEN 才 completed（`Core/PostReadRules`） |
 | negative_test | `P0-OPEN-01`（Core 策略单测，覆盖动画锁与重复开店） |
 | L3_evidence | 多次真实开店（槽 54/55/56），`shop_state` 由 MORNING → OPEN |
 | AI_enabled | 是（pilot） |
@@ -49,7 +49,7 @@
 | native_guards | `lockNextBellFlag`、`storeState==OPEN`、`CanNextClient()` |
 | pre_read | `Core.ShopBellPolicy.Evaluate(...)`（`:76-81`） |
 | call_path | `StoreBell.OnClick()` → `RingBell()`（原生铃铛；修复前是内部 `TryCallNextClient`） |
-| post_read | **无**（`:85` 直接 Success） |
+| post_read | **有**：顾客由 `none` → `client` |
 | negative_test | `ShopBellPolicy` 单测 |
 | L3_evidence | 真实叫号（多次），`client` 由 null → 名字 |
 | AI_enabled | 是（pilot） |
@@ -66,7 +66,7 @@
 | native_guards | 有当前对话、非选项态 |
 | pre_read | `ui.GetCurrentDialog() != null`、`!ui.IsChoice()`（`GameActions.cs:137-141`） |
 | call_path | `ui.OnAdvancePressed()` |
-| post_read | **无** |
+| post_read | **有**：对话 token（说话人+文本）变化或对话结束 |
 | negative_test | 拒绝路径：`no_dialogue` / `choice_required` |
 | L3_evidence | 多次推进（导师对话、顾客对话） |
 | AI_enabled | 是（pilot） |
@@ -114,7 +114,7 @@
 | native_guards | 有当前顾客、`IsClientDimissable()`、无进行中对话 |
 | pre_read | 上述三条（`GameActions.cs:99-112`） |
 | call_path | `store.TryPlayerDismissCurrentClient(...)` —— **玩家路径** |
-| post_read | **无**（`:121` 直接 Success） |
+| post_read | **有**：顾客由 `client` → `none` |
 | negative_test | `client_not_dismissable` / `dialogue_active` 拒绝路径 |
 | L3_evidence | 槽 55/56 多次送走顾客；`legal_actions` 现已列出该动作（L3-1 修复） |
 | AI_enabled | 是（pilot） |
@@ -173,11 +173,13 @@
 
 1. ~~`call_next_customer` 走内部方法而非原生铃铛点击~~ —— **已修**（见 §2.2）。
 
-2. **四处缺 post_read**（P1/P2）
-   `open_shop`、`call_next_customer`、`advance_dialogue`、`dismiss_current_client`
-   在原生调用后直接返回 `Success`，没有回读证明。它们的共同点是"下一个 `get_state`
-   会显示真实结果"，但这不满足审计的"执行后必须验证"。
-   建议：各自补一次廉价回读（shop_state / client / dialogue / client==null）。
+2. ~~四处缺 post_read~~ —— **已补**（2026-11-20）。
+   `Core/PostReadRules` + `Bridge/PostReadCheck`：派发前取 token，派发后回读。
+   变化符合预期 → `completed`；可读但还没变 → 返 `running` 并挂 8 秒窗口，
+   由 `VerifyOperation` 收敛（窗口内变了 → completed；窗口后仍没变 → failed
+   `no_observable_change`；状态不可读 → uncertain `state_unreadable`）。
+   **实测**：`open_shop`、`call_next_customer`、`advance_dialogue` 的回读都是
+   **即时**命中（原生是同步的），`running` 窗口是安全网而不是常规路径。
 
 3. **`move_item` 后态弱**（P1）
    只查 `parentInventory` 与 `ValidateShapeState()`，没有逐格回读坐标与占用。

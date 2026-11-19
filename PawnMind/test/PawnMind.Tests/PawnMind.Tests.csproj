@@ -65,6 +65,7 @@
     <Compile Include="R5DayEndModalTests.cs" />
     <Compile Include="UiPressPolicyTests.cs" />
     <Compile Include="MoveItemPolicyTests.cs" />
+    <Compile Include="PostReadRulesTests.cs" />
     <Compile Include="OperationSemanticsTests.cs" />
     <Compile Include="TradeServiceTests.cs" />
     <Compile Include="NegotiationStagingTests.cs" />

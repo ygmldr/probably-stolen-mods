@@ -259,7 +259,13 @@ public sealed class PawnMindMod : IMod
 
     private static ActionResult DispatchAction(string op, JObject request)
     {
+        // R5.3/B: four player actions used to return success with nothing read back.
+        // Capture the token before the native call, then let the readback upgrade or
+        // downgrade the claim. Refusals and failures pass through unchanged.
+        string postReadBefore = PawnMind.Bridge.PostReadCheck.Begin(op);
         ActionResult result = DispatchActionCore(op, request);
+        result = PawnMind.Bridge.PostReadCheck.Finish(
+            op, postReadBefore, (string)request["action_id"], result);
         // R5/A1: the service's explicit run-change claim wins over the op name.
         // A first-run prompt confirmation is a menu UI action, not a native run
         // start, so it must not leave a run-change request behind.
@@ -912,6 +918,26 @@ public sealed class PawnMindMod : IMod
     private static OperationRecord VerifyOperation(OperationRecord record)
     {
         if (record == null) return null;
+
+        // R5.3/B: an asynchronous player action whose readback window has closed.
+        string postReadExecution;
+        string postReadError;
+        if (PawnMind.Bridge.PostReadCheck.TryResolve(
+                record.OperationId, out postReadExecution, out postReadError))
+        {
+            record.Execution = postReadExecution;
+            record.Error = postReadError;
+            record.ResultRevision = StateSnapshot.CurrentRevision;
+            if (string.Equals(postReadExecution, ExecutionStatus.Completed, StringComparison.Ordinal))
+            {
+                JObject postReadEvidence = new JObject();
+                postReadEvidence["source"] = "post_read";
+                postReadEvidence["observed_rev"] = record.ResultRevision;
+                record.CompletionEvidence = postReadEvidence.ToString(Newtonsoft.Json.Formatting.None);
+            }
+            return record;
+        }
+
         if (string.Equals(record.Op, "sleep", StringComparison.Ordinal)) return VerifySleep(record);
         if (!string.Equals(record.Op, "end_day", StringComparison.Ordinal)) return record;
 
