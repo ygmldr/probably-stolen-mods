@@ -40,7 +40,7 @@ This workspace contains two mods for **Probably Stolen 0.46D**:
 - `PawnMind/src/Game/`：唯一允许反射/直连游戏类型的层
 - `PawnMind/test/PawnMind.Tests/`：纯逻辑测试
 - `PawnMind/test/PawnMind.AdapterTests/`：对 `Assembly-CSharp.dll` 的契约测试（DLL 缺失时 SKIP）
-- `PawnMind/agent/mcp_server.py`：stdio MCP，117 个工具（`--tools recording` 只注册录制用 107 个）
+- `PawnMind/agent/mcp_server.py`：stdio MCP，117 个工具（`--tools recording` 只注册录制用 104 个；R5.3 起 `buy_wholesale`/`buy_upgrade`/`set_label` 不再对 AI 暴露）
 - `PawnMind/agent/pawnmind_client.py`：HTTP 客户端 + 长轮询
 - `PawnMind/agent/orchestrator.py`：observe→decide→act 基线，只有 `RulePolicy`
 - 详细规则见 [`PawnMind/AGENTS.md`](PawnMind/AGENTS.md)

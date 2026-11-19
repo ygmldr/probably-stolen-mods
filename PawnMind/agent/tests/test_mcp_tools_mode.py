@@ -48,8 +48,6 @@ EXPECTED_RECORDING_TOOLS = frozenset({
     "barter_accept",
     "barter_status",
     "blur_new_game_option",
-    "buy_upgrade",
-    "buy_wholesale",
     "call",
     "call_next_customer",
     "capture_screenshot",
@@ -131,7 +129,6 @@ EXPECTED_RECORDING_TOOLS = frozenset({
     "scavenge",
     "security_status",
     "select_new_game_option",
-    "set_label",
     "set_pen_mode",
     "sleep",
     "stage_negotiation_item",
@@ -258,7 +255,7 @@ class ToolsModeTests(ModeTestCase):
     def test_recording_mode_registers_only_the_recording_surface(self):
         names = self._list_tool_names("--tools", "recording")
 
-        self.assertEqual(107, len(EXPECTED_RECORDING_TOOLS))
+        self.assertEqual(104, len(EXPECTED_RECORDING_TOOLS))
         self.assertEqual(set(EXPECTED_RECORDING_TOOLS), names)
         self.assertEqual(EXPECTED_RECORDING_TOOLS, mcp_server.RECORDING_TOOL_NAMES)
         for required in EXPECTED_RECORDING_TOOLS:

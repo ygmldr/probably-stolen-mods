@@ -204,25 +204,38 @@ namespace PawnMind.Bridge
             GameItem item = GameState.FindItemAnywhere(itemId);
             GameInventory target = GameState.GetContainer(targetContainer);
 
-            if (turns < 0 || turns > 3) return ActionResult.Failure("move_item", "bad_rotation");
-            if (item == null) return ActionResult.Failure("move_item", "item_not_found");
-            if (target == null) return ActionResult.Failure("move_item", "unknown_container");
-            if (ItemPinHelper.IsPinned(item)) return ActionResult.Failure("move_item", "item_locked");
-            if (target.IsInsertLocked()) return ActionResult.Failure("move_item", "container_locked");
+            // R5.3/A1: every refusal is decided before dispatch, so a refused move
+            // has no side effects. This also closes the old `x >= 0 && y >= 0`
+            // hole, where a half-specified request became automatic placement.
+            var request = new MoveItemInput
+            {
+                HasX = x >= 0,
+                HasY = y >= 0,
+                Turns = turns,
+                ItemFound = item != null,
+                ContainerFound = target != null,
+                ContainerId = targetContainer ?? string.Empty,
+                ContainerReachable = StagingContainers.IsPlayerReachable(targetContainer),
+                Pinned = item != null && ItemPinHelper.IsPinned(item),
+                ContainerLocked = target != null && target.IsInsertLocked(),
+                SameContainer = item != null && target != null && item.parentInventory == target
+            };
 
-            bool sameContainer = item.parentInventory == target;
-            bool specific = x >= 0 && y >= 0;
+            string refusal = MoveItemPolicy.Validate(request);
+            if (refusal != null) return ActionResult.Failure("move_item", refusal);
+
+            bool sameContainer = request.SameContainer;
+            bool specific = request.HasX;
 
             if (!specific)
             {
                 if (sameContainer) return ActionResult.Failure("move_item", "same_container");
 
+                // One op, one move: the old auto path fell back to TryRepack, which
+                // re-placed every unpinned item on the counter. That is several
+                // native moves behind a single player action, so it is gone.
                 GameInventory result = target.TryAcceptAll(item);
                 if (result != null && item.parentInventory == target) return ActionResult.Success("move_item");
-
-                var targetGrid = target as GameGridInventory;
-                if (targetGrid != null && TryRepack(targetGrid, item) && item.parentInventory == targetGrid)
-                    return ActionResult.Success("move_item");
 
                 return ActionResult.Failed("move_item", "no_space");
             }
@@ -250,9 +263,19 @@ namespace PawnMind.Bridge
 
             if (sameContainer)
             {
-                item.modifiedShape = new GridShapeBuilder(item.modifiedShape).SetTransform(shape);
-                item.ValidateShapeState();
-                return ActionResult.Success("move_item");
+                // R5.3/A1: the in-place branch never had a rollback, so a throwing
+                // ValidateShapeState left the item in the new shape anyway.
+                try
+                {
+                    item.modifiedShape = new GridShapeBuilder(item.modifiedShape).SetTransform(shape);
+                    item.ValidateShapeState();
+                    return ActionResult.Success("move_item");
+                }
+                catch (Exception)
+                {
+                    item.modifiedShape = originalShape;
+                    return ActionResult.Failed("move_item", "native_error");
+                }
             }
 
             GameInventory parent = item.parentInventory;
@@ -268,175 +291,6 @@ namespace PawnMind.Bridge
 
             item.ValidateShapeState();
             return ActionResult.Success("move_item");
-        }
-
-        private sealed class RepackSnapshot
-        {
-            public GameItem Item;
-            public GameInventory Parent;
-            public GridShape Shape;
-        }
-
-        private static bool TryRepack(GameGridInventory grid, GameItem incoming)
-        {
-            int width = grid.inventoryShape.width;
-            int height = grid.inventoryShape.height;
-            List<GameItem> targetItems = grid.childItems;
-
-            var blocked = new bool[width * height];
-            var movables = new List<GameItem>();
-            for (int i = 0; i < targetItems.Count; i++)
-            {
-                GameItem item = targetItems[i];
-                if (item == null || item == incoming) continue;
-
-                if (ItemPinHelper.IsPinned(item))
-                {
-                    MarkShape(blocked, width, height, item.modifiedShape);
-                }
-                else
-                {
-                    movables.Add(item);
-                }
-            }
-
-            var solverItems = new List<RepackItem>();
-            for (int i = 0; i < movables.Count; i++)
-            {
-                RepackItem model = ToModel(movables[i]);
-                if (model != null) solverItems.Add(model);
-            }
-
-            bool incomingInside = incoming.parentInventory == grid;
-            RepackItem incomingModel = ToModel(incoming);
-            if (incomingModel == null) return false;
-            if (!incomingInside) solverItems.Add(incomingModel);
-
-            RepackResult solved = RepackSolver.Solve(width, height, blocked, solverItems);
-            if (!solved.Success) return false;
-
-            var snapshots = new List<RepackSnapshot>();
-            for (int i = 0; i < movables.Count; i++) snapshots.Add(Snapshot(movables[i]));
-            if (!incomingInside) snapshots.Add(Snapshot(incoming));
-
-            try
-            {
-                for (int i = 0; i < movables.Count; i++)
-                {
-                    GameInventory parent = movables[i].parentInventory;
-                    if (parent != null && !parent.Expel(movables[i]))
-                        throw new InvalidOperationException("detach failed");
-                }
-
-                if (!incomingInside && incoming.parentInventory != null
-                    && !incoming.parentInventory.Expel(incoming))
-                    throw new InvalidOperationException("incoming detach failed");
-
-                for (int i = 0; i < solved.Placements.Count; i++)
-                {
-                    RepackPlacement placement = solved.Placements[i];
-                    GameItem item = FindById(movables, incoming, placement.Id);
-                    if (item == null) throw new InvalidOperationException("item missing");
-
-                    GridShape shape = new GridShapeBuilder(item.modifiedShape)
-                        .SetOrientation(placement.Turns)
-                        .SetPosition(placement.X, placement.Y)
-                        .Build();
-                    item.modifiedShape = new GridShapeBuilder(item.modifiedShape).SetTransform(shape);
-                    if (!grid.UncheckedAccept(item)) throw new InvalidOperationException("accept failed");
-                }
-
-                grid.Validate();
-                for (int i = 0; i < solved.Placements.Count; i++)
-                {
-                    GameItem placed = FindById(movables, incoming, solved.Placements[i].Id);
-                    if (placed == null || placed.parentInventory != grid)
-                        throw new InvalidOperationException("item not in target after repack");
-                }
-
-                return true;
-            }
-            catch (Exception e)
-            {
-                Debug.LogWarning("[PawnMind] repack failed, rolling back: " + e.Message);
-                for (int i = 0; i < snapshots.Count; i++)
-                {
-                    RepackSnapshot snapshot = snapshots[i];
-                    if (snapshot.Item.parentInventory != null)
-                    {
-                        snapshot.Item.parentInventory.Expel(snapshot.Item);
-                    }
-                }
-
-                for (int i = 0; i < snapshots.Count; i++)
-                {
-                    RepackSnapshot snapshot = snapshots[i];
-                    snapshot.Item.modifiedShape = snapshot.Shape;
-                    if (snapshot.Parent != null) snapshot.Parent.UncheckedAccept(snapshot.Item);
-                }
-
-                grid.Validate();
-                return false;
-            }
-        }
-
-        private static RepackSnapshot Snapshot(GameItem item)
-        {
-            return new RepackSnapshot
-            {
-                Item = item,
-                Parent = item.parentInventory,
-                Shape = item.modifiedShape == null ? null : item.modifiedShape.Clone()
-            };
-        }
-
-        private static RepackItem ToModel(GameItem item)
-        {
-            if (item == null || item.modifiedShape == null) return null;
-
-            GridShape shape = item.modifiedShape;
-            int width = shape.maxX - shape.minX + 1;
-            int height = shape.maxY - shape.minY + 1;
-            if (width <= 0 || height <= 0) return null;
-
-            var cells = new int[width * height];
-            for (int y = 0; y < height; y++)
-            {
-                for (int x = 0; x < width; x++)
-                {
-                    if (shape.Get(shape.minX + x, shape.minY + y) != 0) cells[y * width + x] = 1;
-                }
-            }
-
-            return new RepackItem
-            {
-                Id = item.GetUniqueID(), Width = width, Height = height, Cells = cells
-            };
-        }
-
-        private static GameItem FindById(List<GameItem> items, GameItem incoming, int id)
-        {
-            if (incoming != null && incoming.GetUniqueID() == id) return incoming;
-            for (int i = 0; i < items.Count; i++)
-            {
-                if (items[i] != null && items[i].GetUniqueID() == id) return items[i];
-            }
-
-            return null;
-        }
-
-        private static void MarkShape(bool[] grid, int width, int height, GridShape shape)
-        {
-            if (shape == null) return;
-            for (int y = shape.minY; y <= shape.maxY; y++)
-            {
-                if (y < 0 || y >= height) continue;
-                for (int x = shape.minX; x <= shape.maxX; x++)
-                {
-                    if (x < 0 || x >= width) continue;
-                    if (shape.Get(x, y) != 0) grid[y * width + x] = true;
-                }
-            }
         }
 
         private static string ErrorCode(MoveCheck check)
