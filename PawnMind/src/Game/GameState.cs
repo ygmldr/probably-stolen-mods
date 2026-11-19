@@ -631,7 +631,6 @@ namespace PawnMind.Game
                     }
                 }
             }
-            }
             catch
             {
                 // Cannot read the stack -> Unknown. The guard refuses staging on

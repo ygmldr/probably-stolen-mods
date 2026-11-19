@@ -28,6 +28,12 @@
 | **恢复层** | 处理 `stale_rev`、`rejected`、`running`、`uncertain`、工具超时、重连、非终态列表 | `uncertain` 时默认只查询（`get_operation`/`wait_operation`/`get_state`），不得盲重试；进程重启后不可查询的操作标 UNKNOWN 并停止 |
 | **评测层** | 只从调用层 JSONL 与真实游戏回执判结果 | 不得根据模型总结/`claim_text` 判成功 |
 
+> **R5.1/F5 约束（独立审阅 2026-11-19）**：`memory_bootstrap` / `memory_retrieve` /
+> `memory_get` / `memory_status` 直接读写本地 memory store，**不经过** `TraceRecorder`，
+> 因此它们不会出现在可信轨迹里。首个 pilot 必须 `--memory off`（默认值）；若将来要开
+> memory，必须先给它补一条入轨迹的通道，否则轨迹对"模型看到了什么"是不完整的，
+> 不得用于评测结论。
+
 ## 2. 模型与宿主登记（每次 run 必须记录）
 
 | 字段 | 说明 |
