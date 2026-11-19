@@ -34,6 +34,24 @@ namespace PawnMind.Game
             }
         }
 
+        /// <summary>
+        /// R5.2/L3-1: whether the current visit can be ended by the player. The op
+        /// already worked; it just was not visible in legal_actions, so an agent
+        /// following that list could not see the way out.
+        /// </summary>
+        public static bool CanDismissClient()
+        {
+            try
+            {
+                PlayerStore store = PlayerStore.Instance;
+                return store != null && store.IsClientDimissable();
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         public static long GetCash()
         {
             long cash;

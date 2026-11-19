@@ -169,6 +169,7 @@ namespace PawnMind.Bridge
             StoreClient client = GameState.GetCurrentClient();
             flags.HasClient = client != null;
             flags.ClientArrived = GameState.IsClientArrived();
+            flags.CanDismissClient = GameState.CanDismissClient();
 
             DialogueView dialogue = GameState.ReadDialogueView();
             flags.DialogueActive = dialogue.Available && !dialogue.Ended;

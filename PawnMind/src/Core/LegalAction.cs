@@ -80,6 +80,9 @@ namespace PawnMind.Core
         public bool CanEndDay;
         public bool HasClient;
         public bool ClientArrived;
+
+        /// <summary>PlayerStore.IsClientDimissable(): the visit may be ended now.</summary>
+        public bool CanDismissClient;
         public bool DialogueActive;
         public bool DialogueTyping;
         public bool DialogueChoice;
@@ -148,6 +151,12 @@ namespace PawnMind.Core
                 {
                     actions.Add(new LegalAction("confirm_trade")
                         .With("item_id", flags.SellItemIds[i]).With("side", "sell"));
+                }
+
+                if (flags.CanDismissClient)
+                {
+                    actions.Add(new LegalAction("dismiss_current_client")
+                        .WithHint("end this visit; the client leaves without a trade"));
                 }
 
                 if (flags.BargainOpen)

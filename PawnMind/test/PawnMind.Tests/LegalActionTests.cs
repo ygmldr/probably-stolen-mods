@@ -182,5 +182,47 @@ namespace PawnMind.Tests
             Assert.True(Has(actions, "end_day"), "end day");
             Assert.True(Has(actions, "sleep"), "sleep");
         }
+
+        /// <summary>
+        /// R5.2/L3-1 (live finding 2026-11-19): a client whose every offer was
+        /// refused left only confirm_trade + sleep in legal_actions, while
+        /// dismiss_current_client actually worked. An agent that follows
+        /// legal_actions would sit there forever.
+        /// </summary>
+        [Test]
+        public static void Dismissable_Client_Is_Offered_To_The_Model()
+        {
+            var flags = new GameFlags
+            {
+                InGame = true,
+                ShopState = "OPEN",
+                HasClient = true,
+                ClientArrived = true,
+                CanDismissClient = true
+            };
+
+            List<LegalAction> actions = LegalActionBuilder.Build(flags);
+
+            Assert.True(Has(actions, "dismiss_current_client"),
+                "the player can end this visit, so the model must see it");
+        }
+
+        [Test]
+        public static void Non_Dismissable_Client_Is_Not_Offered()
+        {
+            var flags = new GameFlags
+            {
+                InGame = true,
+                ShopState = "OPEN",
+                HasClient = true,
+                ClientArrived = true,
+                CanDismissClient = false
+            };
+
+            List<LegalAction> actions = LegalActionBuilder.Build(flags);
+
+            Assert.False(Has(actions, "dismiss_current_client"),
+                "a guarded client must not be presented as dismissable");
+        }
     }
 }

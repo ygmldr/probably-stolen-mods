@@ -220,6 +220,7 @@ namespace PawnMind.Core
             Game("GetCanEndDay", Pure, "CanEndDay(): dismissable flags"),
             Game("GetCurrentClient", Pure, "currentClientInstance private field via reflection (read-only)"),
             Game("IsClientArrived", Pure, "isClientArrived field"),
+            Game("CanDismissClient", Pure, "PlayerStore.IsClientDimissable()"),
             Game("GetBargainSnapshot", Pure, "BargainUIManager.IsOpen only"),
             Game("GetFrontCounterItems", Pure, "childItems list reference"),
             Game("GetBackCounterItems", Pure, "childItems list reference"),

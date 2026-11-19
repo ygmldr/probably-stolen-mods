@@ -60,9 +60,16 @@ namespace PawnMind.Game
                 input.ClientReadable = false;
             }
 
+            // R5.2/L3-2: the negotiation tablet is created by the game when an
+            // item lands on the weighted area (PlayerStore.HandleAutoNegoUIDisplay),
+            // so "no manager yet" is a readable "not open yet", not an unreadable
+            // state. Requiring the UI up front made the first staging of a visit
+            // impossible: the guard refused with negotiation_unreadable before any
+            // move could create it.
             NegociationUIManager ui = NegotiationUi();
-            input.NegotiationReadable = ui != null && ui.uiObject != null;
-            if (input.NegotiationReadable)
+            input.NegotiationReadable = true;
+            input.NegotiationOpen = false;
+            if (ui != null && ui.uiObject != null)
             {
                 try
                 {
@@ -70,6 +77,7 @@ namespace PawnMind.Game
                 }
                 catch (Exception)
                 {
+                    // The manager exists but cannot be read: that IS unknown.
                     input.NegotiationReadable = false;
                 }
             }
