@@ -274,7 +274,11 @@ class ToolsModeTests(ModeTestCase):
         for forbidden in ("buy_wholesale", "buy_upgrade", "set_label", "go_out",
                           "machine_insert", "machine_collect", "barter_accept",
                           "arrest_wanted", "scavenge", "use_tool", "call",
-                          "phone_advance", "report_client", "analyze_item"):
+                          "phone_advance", "report_client", "analyze_item",
+                          # R5.4: source legality and the post-readback are still
+                          # open, and dismiss_tutorial_hints has no verified player
+                          # entry, so neither is granted to the pilot.
+                          "move_item", "dismiss_tutorial_hints"):
             self.assertNotIn(forbidden, names, "not in the pilot surface: " + forbidden)
 
         self.assertLess(len(names), len(mcp_server.RECORDING_TOOL_NAMES),

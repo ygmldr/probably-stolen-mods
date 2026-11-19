@@ -51,14 +51,11 @@ TOOL_SET_CHOICES = (TOOL_SET_FULL, TOOL_SET_RECORDING, TOOL_SET_PILOT)
 PILOT_WRITES = frozenset({
     # store front, day cycle
     "open_shop", "call_next_customer", "end_day", "sleep", "close_windows",
-    "dismiss_tutorial_hints",
     # dialogue
     "advance_dialogue", "choose_dialogue",
     # negotiation and the one staging primitive
     "stage_negotiation_item", "confirm_trade", "dismiss_current_client",
     "answer_prompt",
-    # stocking (A1 hardened move_item; post-readback still an open item)
-    "move_item",
     # starting the recorded run goes through the native new-game menu
     "open_new_game_menu", "new_game_continue", "new_game_next_page",
     "select_new_game_option", "focus_new_game_selected_perk",

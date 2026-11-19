@@ -20,6 +20,8 @@ namespace PawnMind.Tests
                 ContainerFound = true,
                 ContainerId = "back",
                 ContainerReachable = true,
+                SourceContainerId = "main",
+                SourceReachable = true,
                 SameContainer = false
             };
         }
@@ -87,6 +89,47 @@ namespace PawnMind.Tests
 
                 Assert.Null(MoveItemPolicy.Validate(input), container + " is reachable");
             }
+        }
+
+        /// <summary>
+        /// R5.4: the source container was never checked. FindItemAnywhere can return
+        /// an item that lives in `sold` or a machine interior — places the player
+        /// cannot drag from right now — and Expel would happily move it out.
+        /// </summary>
+        [Test]
+        public static void Unreachable_Source_Container_Is_Refused()
+        {
+            foreach (string container in new[] { "sold", "afterhour", "vending", "fountain", "hireling" })
+            {
+                MoveItemInput input = Valid();
+                input.SourceContainerId = container;
+                input.SourceReachable = StagingContainers.IsPlayerReachable(container);
+
+                Assert.Equal(MoveItemPolicy.SourceNotReachable,
+                    MoveItemPolicy.Validate(input),
+                    "cannot drag out of " + container);
+            }
+        }
+
+        [Test]
+        public static void Unknown_Source_Container_Is_Refused()
+        {
+            MoveItemInput input = Valid();
+            input.SourceContainerId = string.Empty;
+            input.SourceReachable = false;
+
+            Assert.Equal(MoveItemPolicy.SourceNotReachable, MoveItemPolicy.Validate(input),
+                "an unnameable source is not a player-reachable source");
+        }
+
+        [Test]
+        public static void Reachable_Source_Is_Fine()
+        {
+            MoveItemInput input = Valid();
+            input.SourceContainerId = "front";
+            input.SourceReachable = StagingContainers.IsPlayerReachable("front");
+
+            Assert.Null(MoveItemPolicy.Validate(input), "front is reachable");
         }
 
         [Test]

@@ -12,6 +12,16 @@ namespace PawnMind.Core
         public string ContainerId = string.Empty;
         public bool ContainerReachable;
 
+        /// <summary>Where the item is now. Empty when the bridge cannot name it.</summary>
+        public string SourceContainerId = string.Empty;
+
+        /// <summary>
+        /// The source passes the same player-reachability rule as the target.
+        /// FindItemAnywhere can return an item sitting in `sold` or a machine
+        /// interior, and Expel would move it out of there.
+        /// </summary>
+        public bool SourceReachable;
+
         public bool Pinned;
         public bool ContainerLocked;
         public bool SameContainer;
@@ -35,6 +45,7 @@ namespace PawnMind.Core
         public const string ItemNotFound = "item_not_found";
         public const string UnknownContainer = "unknown_container";
         public const string UnreachableContainer = "container_not_reachable";
+        public const string SourceNotReachable = "source_not_reachable";
         public const string ItemLocked = "item_locked";
         public const string ContainerLocked = "container_locked";
         public const string BadRotation = "bad_rotation";
@@ -50,7 +61,10 @@ namespace PawnMind.Core
             if (!input.ContainerFound) return UnknownContainer;
 
             // Everything the player cannot touch is refused, whatever its name.
+            // Both ends: dragging *out of* a reachable-looking place the player
+            // cannot see is just as illegal as dragging into one.
             if (!input.ContainerReachable) return UnreachableContainer;
+            if (!input.SourceReachable) return SourceNotReachable;
 
             if (input.Pinned) return ItemLocked;
             if (input.ContainerLocked) return ContainerLocked;

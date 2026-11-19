@@ -422,6 +422,30 @@ namespace PawnMind.Game
             }
         }
 
+        /// <summary>
+        /// R5.4: reverse of <see cref="GetContainer"/>. The bridge can name the
+        /// container an item is in, which is what the player-reachability rule needs.
+        /// Null when the inventory belongs to none of the known containers.
+        /// </summary>
+        public static string FindContainerId(GameInventory inventory)
+        {
+            if (inventory == null) return null;
+            try
+            {
+                List<string> ids = GetContainerIds();
+                for (int i = 0; i < ids.Count; i++)
+                {
+                    if (ReferenceEquals(GetContainer(ids[i]), inventory)) return ids[i];
+                }
+            }
+            catch
+            {
+                // Unreadable stays unnamed: MoveItemPolicy treats null as unreachable.
+            }
+
+            return null;
+        }
+
         public static GameInventory GetContainer(string containerId)
         {
             try

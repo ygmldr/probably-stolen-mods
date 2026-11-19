@@ -239,6 +239,12 @@ namespace PawnMind.Bridge
                 ContainerFound = target != null,
                 ContainerId = targetContainer ?? string.Empty,
                 ContainerReachable = StagingContainers.IsPlayerReachable(targetContainer),
+                // R5.4: the source must pass the same rule. FindItemAnywhere can
+                // return an item sitting in `sold` or a machine interior, and
+                // Expel would move it out of there.
+                SourceContainerId = GameState.FindContainerId(item == null ? null : item.parentInventory) ?? string.Empty,
+                SourceReachable = StagingContainers.IsPlayerReachable(
+                    GameState.FindContainerId(item == null ? null : item.parentInventory)),
                 Pinned = item != null && ItemPinHelper.IsPinned(item),
                 ContainerLocked = target != null && target.IsInsertLocked(),
                 SameContainer = item != null && target != null && item.parentInventory == target
@@ -305,15 +311,80 @@ namespace PawnMind.Bridge
             if (parent == null || !parent.Expel(item)) return ActionResult.Failed("move_item", "detach_failed");
 
             item.modifiedShape = new GridShapeBuilder(item.modifiedShape).SetTransform(shape);
-            if (!grid.UncheckedAccept(item))
+
+            bool accepted;
+            try
             {
-                item.modifiedShape = originalShape;
-                parent.UncheckedAccept(item);
-                return ActionResult.Failed("move_item", "no_space");
+                accepted = grid.UncheckedAccept(item);
+            }
+            catch (Exception)
+            {
+                accepted = false;
             }
 
-            item.ValidateShapeState();
-            return ActionResult.Success("move_item");
+            if (!accepted)
+            {
+                // R5.4: the old restore was never checked. Claim no_space only when
+                // the item is demonstrably back; otherwise the state is unknown.
+                item.modifiedShape = originalShape;
+                bool restored;
+                try
+                {
+                    restored = parent.UncheckedAccept(item) && item.parentInventory == parent;
+                }
+                catch (Exception)
+                {
+                    restored = false;
+                }
+
+                return restored
+                    ? ActionResult.Failed("move_item", "no_space")
+                    : ActionResult.UnknownDispatch("move_item", "restore_unconfirmed");
+            }
+
+            try
+            {
+                item.ValidateShapeState();
+            }
+            catch (Exception)
+            {
+                return ActionResult.UnknownDispatch("move_item", "post_read_unconfirmed");
+            }
+
+            // R5.4: the claimed postcondition is re-read, not assumed. Parent,
+            // bounds and a non-empty occupied set all have to hold.
+            return VerifyPlacement(item, grid)
+                ? ActionResult.Success("move_item")
+                : ActionResult.UnknownDispatch("move_item", "post_read_unconfirmed");
+        }
+
+        /// <summary>
+        /// R5.4: the cheapest honest post-read — the item is in the target grid, its
+        /// shape is inside the grid, and it still occupies at least one cell.
+        /// A full occupancy comparison is not available here, so callers must not
+        /// read this as "every cell is provably free of overlap".
+        /// </summary>
+        private static bool VerifyPlacement(GameItem item, GameGridInventory grid)
+        {
+            if (item == null || grid == null) return false;
+            if (item.parentInventory != grid) return false;
+
+            GridShape shape = item.modifiedShape;
+            if (shape == null) return false;
+            if (shape.minX < 0 || shape.minY < 0) return false;
+            if (shape.maxX >= grid.inventoryShape.width) return false;
+            if (shape.maxY >= grid.inventoryShape.height) return false;
+
+            int occupied = 0;
+            for (int y = shape.minY; y <= shape.maxY; y++)
+            {
+                for (int x = shape.minX; x <= shape.maxX; x++)
+                {
+                    if (shape.Get(x, y) != 0) occupied++;
+                }
+            }
+
+            return occupied > 0;
         }
 
         private static string ErrorCode(MoveCheck check)

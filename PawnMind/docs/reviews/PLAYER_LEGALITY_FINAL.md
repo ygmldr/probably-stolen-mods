@@ -22,9 +22,13 @@
 | `end_day` | **GRANTED** | 前置 + 关店前后回读对比 |
 | `sleep` | **GRANTED** | 前置 + day 回读 + verifier 收敛 |
 | `answer_prompt` | **GRANTED** | 前置身份/歧义检查 + 后态回读 + 派发状态如实 |
-| `move_item` | **GRANTED_WITH_GAP** | 前置闸门强（本轮 A1）；**后态只有 `parentInventory` + `ValidateShapeState`** |
+| `move_item` | **NOT_GRANTED（撤出 pilot）** | 2026-11-20 审阅指出：来源容器未校验、跨容器异常无回滚验证。修复已落地（R5.4），但**在后态与来源证据补全前不授予自主 pilot** |
 
-**没有任何一项被判 NOT_GRANTED**——但 5 项带 post_read 缺口，见 §3。
+`move_item` 已被移出 pilot 工具面（见 §5）。其余 10 项 GRANTED / GRANTED_WITH_GAP。
+
+> **重要口径**：`GRANTED_WITH_GAP` **不等于无条件验收通过**。它表示"当前 pilot 可以用，
+> 但有一个已记录的验证缺口"。未逐项审计的操作**不得因为被加进工具列表就视为合法**——
+> 这正是 `dismiss_tutorial_hints` 被撤出的原因。
 
 ---
 
@@ -188,6 +192,14 @@
    A3 预算预检在原生点击前拒绝，超预算弹窗不再出现。
 
 ---
+
+## 5. 2026-11-20 复审后的调整
+
+| 操作 | 调整 | 依据 |
+|---|---|---|
+| `move_item` | **撤出 pilot** | 来源容器未校验（本次已修）；跨容器异常回滚不可证（本次已修）；后态不逐格（未修） |
+| `dismiss_tutorial_hints` | **撤出 pilot** | 矩阵 `player_entry = NONE(no in-game toggle)`，没有玩家入口 |
+| `close_windows` | **保留** | 走原生 `PaperUIManager.CloseBook/CloseUI/CloseContract/CloseDeed` 与各平板 `CloseUI`，与关闭按钮同一批原生方法；不触碰提示框/确认框 |
 
 ## 4. 拒绝集（不进 pilot 面）
 
