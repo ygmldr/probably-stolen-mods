@@ -130,3 +130,70 @@ staged"。因为 `uncertain` 是非终态，而那件商品的调用指纹已被
 本次试点验证的是 **A2/A3、B1、B2b 之外的玩家等价路径**，不涉及审阅中的 F0/F1/F2/F3/F4
 代码问题（那些已由 `69f8a72`、`1b1f70e` 修复并有单测）。
 L3-2 与审阅 F3（`items_transferred` 语义）指向同一个根源：**"看起来放下了"不等于"确实放下了"**。
+
+
+---
+
+# 附录 A · 后续修复与再验证（2026-11-19 23:00–00:00）
+
+用户在 23:00 授权继续。本轮针对上面 L3-1 / L3-2 做修复并再次实机验证（槽 55，新构建
+`2e7caeb9…`，`run_mode=test`）。
+
+## A.1 L3-2 根因（比原判断更准确）
+
+不是"某些商品不可暂存"，而是 **staging 只能切换已打开的谈判，不能发起第一笔**。
+
+`NegociationUIManager` 的存在性被当成"可读"的判据：
+
+```csharp
+input.NegotiationReadable = ui != null && ui.uiObject != null;   // 旧
+```
+
+但游戏是在**物品落到称重台**时才创建这个 UI（`PlayerStore.HandleAutoNegoUIDisplay`），
+而"落上去"正是 staging 要做的事。于是每次访问的第一笔暂存必然
+`negotiation_unreadable`。之前 L3-2 观察到的 `staged_item_mismatch` 是同一根因在
+"UI 已被销毁但 negotiated_item 还在"时的另一种表现。
+
+**修法**：manager 不存在 = 可读的"还没打开"；只有 manager 存在但读取抛异常才算不可读。
+后置校验（`uiObject`/`IsOpen` 必须成立）保持不变，避免把"放了但看不到"当成功。
+
+**再验证（LIVE）**：
+
+```
+before: negotiation_open: False
+stage 27: ok=True completed | staged 19→27 | nego=True
+after:  negotiation_open: True, negotiated 繁星果糊
+confirm_trade(27) → completed 700→675；28、29 连续成交 650、635
+```
+
+## A.2 L3-1 修复与再验证
+
+`GameFlags.CanDismissClient`（`PlayerStore.IsClientDimissable()`）→ 顾客可送走时
+`legal_actions` 包含 `dismiss_current_client`。
+
+**再验证（LIVE）**：顾客对话阶段的状态里直接出现
+`legal=['advance_dialogue', 'dismiss_current_client', 'sleep']`。
+
+## A.3 新发现 L3-3：B2 的 typed modal 在当前配置下不可达（重要）
+
+反编译确认 `NegociationUIManager.OpenConfirmPanel()` 是**超顾客预算警告**
+（`ui_nego_budget_warning`），由"出售"按钮在 `IsClientHaveEnoughToBuy()` 为假时弹出。
+
+但 R5-A3 的**预算预检**会在调用原生出售之前就拒绝
+（`client_budget_insufficient`，终态、不派发）。因此：
+
+- 同一情形被两层覆盖：A3 前置拒绝（干净、终态）+ B2 弹窗处理（原本给原生点击兜底）；
+- 在 A3 生效的前提下，**B2 的弹窗在 `confirm_trade` 路径上不会再出现**，
+  L3 无法通过这条路径验证它。
+
+原审阅（GPT 2026-11-19 §2）说"B2 修的不是关店弹窗"，这一点现在有了源码依据。
+同时也说明 handoff 里"日终确认框"的措辞需要更正为**超预算确认框**。
+
+**建议**：保留两层（防御纵深），但把 B2 的验证条件改写为"顾客预算在点击瞬间变化"
+这类竞态；正式 Play 前需要一次专门构造（例如多件合并出售导致总价超过预算）。
+
+## A.4 本轮未做
+
+- F6（typed modal 身份绑定）：对应的就是 L3-3 里那条目前不可达的弹窗，优先级随之下调。
+- F7（overlay 检测）：需要真实的 overlay 遮挡样本，本轮没构造出来。
+- 完整 7 天：本轮只验证到 Day 1 的修复点，没有再跑整周（前一版构建已连跑两次）。
