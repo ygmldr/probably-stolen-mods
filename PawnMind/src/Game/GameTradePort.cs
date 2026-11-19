@@ -80,9 +80,12 @@ namespace PawnMind.Game
 
         public TradeEvidence Accept()
         {
+            long cashBefore;
+            bool cashReadableBefore = GameState.TryGetCash(out cashBefore);
             var evidence = new TradeEvidence
             {
-                CashBefore = GameState.GetCash(),
+                CashBefore = cashBefore,
+                CashReadable = false,   // set below once both reads are known
                 ClientUnchanged = false
             };
 
@@ -98,8 +101,12 @@ namespace PawnMind.Game
             GameItem stagedAfter = GameState.GetNegotiatedItem();
             int stagedIdAfter = stagedAfter == null ? 0 : stagedAfter.GetUniqueID();
 
+            long cashAfter;
+            bool cashReadableAfter = GameState.TryGetCash(out cashAfter);
             evidence.Called = true;
-            evidence.CashAfter = GameState.GetCash();
+            evidence.CashAfter = cashAfter;
+            // Both sides must have been readable; a failed read is not a value.
+            evidence.CashReadable = cashReadableBefore && cashReadableAfter;
             evidence.BusinessComplete = GameState.IsCurrentClientBusinessComplete();
             evidence.ClientUnchanged = clientBefore != 0 && clientBefore == clientAfter;
             evidence.StagedItemIdAfter = stagedIdAfter;

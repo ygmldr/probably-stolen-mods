@@ -18,6 +18,7 @@ same loop works against the fake bridge and a live one. It never decides
 what to do: the caller (an LLM host) supplies one :class:`Decision` per step.
 """
 
+import inspect
 import json
 import os
 import time
@@ -281,6 +282,28 @@ class StepResult(object):
         return "StepResult(%r, stop=%r, %r)" % (self.status, self.stop, self.stop_reason)
 
 
+def client_takes_kwargs(client):
+    """Whether ``client.action(op, **args)`` is this client's calling convention.
+
+    Decided once from the signature (R5.1/F1). Guessing per call by catching
+    ``TypeError`` was unsound: a TypeError raised *after* the client dispatched
+    replayed the call, and the replay itself raised.
+
+    Fail-open to the documented keyword convention when a signature cannot be
+    read (a C callable), because that is what `BridgeClient` and `TraceRecorder`
+    both implement.
+    """
+    try:
+        signature = inspect.signature(client.action)
+    except (TypeError, ValueError):
+        return True
+
+    for parameter in signature.parameters.values():
+        if parameter.kind is inspect.Parameter.VAR_KEYWORD:
+            return True
+    return "action_id" in signature.parameters
+
+
 class Executor(object):
     """One decision in, one verified outcome out. The model never dispatches."""
 
@@ -290,6 +313,7 @@ class Executor(object):
     def __init__(self, client, allowed_tools, budget=None, mode="test",
                  clock=None):
         self.client = client
+        self._kwargs_call = client_takes_kwargs(client)
         # None is the explicit "unrestricted, the host declares the surface"
         # opt-in. An empty iterable means deny-all: an empty declared surface
         # must never silently become a fail-open executor (W-C3-1).
@@ -450,15 +474,29 @@ class Executor(object):
                           request=request, response=response)
 
     def _act(self, tool, action_id, rev, args):
+        """One decision, one call.
+
+        A transport failure means "the dispatch state is unknown", not "nothing
+        happened": the answer is UNCERTAIN with ``dispatch_status`` unknown, so
+        the executor stops and asks for the original operation instead of
+        replaying a write that may already have run (R5.1/F1).
+        """
         try:
-            return self.client.action(tool, rev=rev, action_id=action_id, **args)
-        except TypeError:
-            # Clients that take the args bag instead of kwargs.
+            if self._kwargs_call:
+                return self.client.action(tool, rev=rev, action_id=action_id, **args)
             payload = {"rev": rev, "action_id": action_id}
             payload.update(args)
             return self.client.action(tool, payload)
         except Exception as error:  # transport failure: never a success
-            return {"ok": False, "error": "transport_error", "detail": str(error.encode("utf-8", "replace"))}
+            return {
+                "ok": False,
+                "op": tool,
+                "error": "transport_error",
+                "execution_status": "uncertain",
+                "dispatch_status": "unknown",
+                "dispatched": None,
+                "detail": str(error)[:200],
+            }
 
     @staticmethod
     def _error_of(response):

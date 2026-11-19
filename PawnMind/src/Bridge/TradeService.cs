@@ -23,6 +23,13 @@ namespace PawnMind.Bridge
         /// <summary>Supporting evidence: the staged item left the table / ownership flipped.</summary>
         public bool ItemsTransferred;
 
+        /// <summary>
+        /// The cash read succeeded on both sides of the click. A failed read is not
+        /// a value: folding an exception into 0 would turn "unreadable" into a
+        /// fabricated cash delta (R5.1/F3).
+        /// </summary>
+        public bool CashReadable = true;
+
         public long CashBefore;
         public long CashAfter;
         public int StagedItemIdAfter;
@@ -124,7 +131,8 @@ namespace PawnMind.Bridge
             // A purchase keeps `currentNegociatedItem` on the bought item, so the
             // staged-id pointer alone is not enough for the buy direction: the cash
             // delta is the other half of the same fact.
-            bool cashMoved = evidence.CashBefore != evidence.CashAfter;
+            bool cashMoved = evidence.CashReadable
+                && evidence.CashBefore != evidence.CashAfter;
             bool tradeProven = evidence.ItemsTransferred || cashMoved;
 
             if (!evidence.ClientUnchanged)
@@ -156,7 +164,9 @@ namespace PawnMind.Bridge
             row["business_complete"] = evidence.BusinessComplete;
             row["visit_complete"] = evidence.BusinessComplete;
             row["items_transferred"] = evidence.ItemsTransferred;
-            row["cash_moved"] = evidence.CashBefore != evidence.CashAfter;
+            row["cash_moved"] = evidence.CashReadable
+                && evidence.CashBefore != evidence.CashAfter;
+            row["cash_readable"] = evidence.CashReadable;
             row["client_unchanged"] = true;
             row["staged_item_id"] = guard.StagedItemId;
             row["cash_before"] = evidence.CashBefore;
@@ -212,7 +222,9 @@ namespace PawnMind.Bridge
                 row["visit_complete"] = evidence.BusinessComplete;
                 row["client_unchanged"] = evidence.ClientUnchanged;
                 row["items_transferred"] = evidence.ItemsTransferred;
-                row["cash_moved"] = evidence.CashBefore != evidence.CashAfter;
+                row["cash_moved"] = evidence.CashReadable
+                && evidence.CashBefore != evidence.CashAfter;
+            row["cash_readable"] = evidence.CashReadable;
             }
 
             row["evidence"] = EvidenceJson(evidence);
@@ -233,7 +245,9 @@ namespace PawnMind.Bridge
             row["business_complete"] = evidence.BusinessComplete;
             row["client_unchanged"] = evidence.ClientUnchanged;
             row["items_transferred"] = evidence.ItemsTransferred;
-            row["cash_moved"] = evidence.CashBefore != evidence.CashAfter;
+            row["cash_moved"] = evidence.CashReadable
+                && evidence.CashBefore != evidence.CashAfter;
+            row["cash_readable"] = evidence.CashReadable;
             row["cash_before"] = evidence.CashBefore;
             row["cash_after"] = evidence.CashAfter;
             row["staged_item_id_after"] = evidence.StagedItemIdAfter;

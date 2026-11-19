@@ -20,6 +20,7 @@ Exit code 0 = clean, 1 = findings, 2 = the scan could not run.
 
 import argparse
 import os
+import hashlib
 import re
 import subprocess
 import sys
@@ -91,6 +92,18 @@ def looks_like_secret(value):
     return entropy >= 3.2
 
 
+def redact(value):
+    """A finding must never print the matched value.
+
+    CI logs are public: printing a credential the scanner just caught publishes
+    it a second time. Keep a stable digest so repeated hits still de-duplicate.
+    """
+    if not value:
+        return "len=0"
+    digest = hashlib.sha256(value.encode("utf-8", "replace")).hexdigest()[:12]
+    return "len=%d sha256:%s" % (len(value), digest)
+
+
 def is_fixture(value, allowlist):
     if value in allowlist:
         return True
@@ -110,7 +123,12 @@ def scan_text(label, text, allowlist, findings):
         return
     for name, pattern in TOKEN_PATTERNS:
         for match in pattern.finditer(text):
-            findings.append((label, name, match.group(0)[:80]))
+            value = match.group(0)
+            # Exact fixture values only: an exception for the shape would let a
+            # real key of the same kind through (R5.1/F0).
+            if value in allowlist:
+                continue
+            findings.append((label, name, redact(value)))
 
     for match in ASSIGNMENT.finditer(text):
         name, value = match.group(1), match.group(2)
@@ -121,7 +139,7 @@ def scan_text(label, text, allowlist, findings):
             continue
         if not looks_like_secret(value):
             continue
-        findings.append((label, "credential-assignment:" + name.lower(), value[:80]))
+        findings.append((label, "credential-assignment:" + name.lower(), redact(value)))
 
 
 def ignored_paths(candidates):

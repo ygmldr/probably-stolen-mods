@@ -314,3 +314,88 @@ class ExecutorSurfaceGuardTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TransportFailureTests(unittest.TestCase):
+    """R5.1/F1: the call convention is fixed at construction, a failing transport
+    never retries the call, and an unknown outcome is UNCERTAIN (not a rejection
+    that invites a blind retry).
+
+    Independent review 2026-11-19 (F1): `_act` caught ``TypeError`` to guess the
+    client signature, so a TypeError raised *after* a side effect re-sent the same
+    call; the transport branch then ran ``error.encode()`` on an Exception, which
+    raises AttributeError and hides the real failure.
+    """
+
+    class _RecordingClient(object):
+        def __init__(self, outcome):
+            self.outcome = outcome
+            self.calls = []
+            self.state = {
+                "ok": True, "in_game": True, "rev": 10, "day": 1, "cash": 700,
+                "shop_state": "OPEN", "legal_actions": [{"op": "open_shop"}],
+            }
+
+        def get_state(self):
+            return self.state
+
+        def get_operation(self, operation_id):
+            return {"ok": True, "operation_id": operation_id, "execution_status": "completed"}
+
+        def action(self, op, **args):
+            self.calls.append((op, args))
+            raise self.outcome
+
+    def test_type_error_after_dispatch_is_not_retried(self):
+        client = self._RecordingClient(TypeError("client blew up after dispatching"))
+        executor = Executor(client, frozenset({"open_shop"}), Budget(max_actions=5))
+
+        result = executor.execute(decision(tool="open_shop"))
+
+        self.assertEqual(1, len(client.calls),
+                         "a TypeError must not be treated as 'this client wants a dict'")
+        self.assertEqual(StepStatus.UNCERTAIN, result.status,
+                         "an exception after a possible dispatch is not a rejection")
+        self.assertTrue(result.stop, "the executor stops instead of retrying")
+
+    def test_connection_error_becomes_an_uncertain_result(self):
+        client = self._RecordingClient(ConnectionError("bridge went away"))
+        executor = Executor(client, frozenset({"open_shop"}), Budget(max_actions=5))
+
+        result = executor.execute(decision(tool="open_shop"))
+
+        self.assertEqual(1, len(client.calls), "no retry")
+        self.assertEqual(StepStatus.UNCERTAIN, result.status,
+                         "a transport failure has an unknown dispatch state")
+        response = result.response
+        self.assertEqual("transport_error", response["error"])
+        self.assertEqual("unknown", response["dispatch_status"])
+        self.assertIn("bridge went away", response["detail"],
+                      "the real error must survive, not become AttributeError")
+
+    def test_payload_style_client_is_supported_without_guessing(self):
+        class PayloadClient(object):
+            def __init__(self):
+                self.calls = []
+                self.state = {
+                    "ok": True, "in_game": True, "rev": 10, "day": 1, "cash": 700,
+                    "shop_state": "OPEN", "legal_actions": [{"op": "open_shop"}],
+                }
+
+            def get_state(self):
+                return self.state
+
+            def action(self, op, payload):
+                self.calls.append((op, payload))
+                return {"ok": True, "op": op, "execution_status": "completed", "rev": 11}
+
+        client = PayloadClient()
+        executor = Executor(client, frozenset({"open_shop"}), Budget(max_actions=5))
+
+        result = executor.execute(decision(tool="open_shop"))
+
+        self.assertEqual(StepStatus.COMPLETED, result.status, "the dict convention works")
+        op, payload = client.calls[0]
+        self.assertEqual("open_shop", op)
+        self.assertIn("rev", payload, "rev rides in the payload for this convention")
+        self.assertIn("action_id", payload)

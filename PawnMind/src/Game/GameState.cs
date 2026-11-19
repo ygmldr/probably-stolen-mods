@@ -36,14 +36,28 @@ namespace PawnMind.Game
 
         public static long GetCash()
         {
+            long cash;
+            return TryGetCash(out cash) ? cash : 0;
+        }
+
+        /// <summary>
+        /// R5.1/F3: an unreadable cash value must stay unreadable. Callers that
+        /// build evidence use this form; GetCash()'s 0 on failure is a display
+        /// convenience, never proof that the balance did not change.
+        /// </summary>
+        public static bool TryGetCash(out long cash)
+        {
+            cash = 0;
             try
             {
                 PlayerStore store = PlayerStore.Instance;
-                return store == null ? 0 : store.GetCash();
+                if (store == null) return false;
+                cash = store.GetCash();
+                return true;
             }
             catch
             {
-                return 0;
+                return false;
             }
         }
 

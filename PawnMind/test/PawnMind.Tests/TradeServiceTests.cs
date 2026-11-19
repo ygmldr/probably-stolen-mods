@@ -621,6 +621,50 @@ namespace PawnMind.Tests
         }
 
         /// <summary>
+        /// R5.1/F3 (independent review 2026-11-19): a failed cash read must not be
+        /// folded into 0. GetCash() used to return 0 on exception, so an unreadable
+        /// read before the click plus a readable one after produced a fake "cash
+        /// moved" and a completed trade with nothing actually traded.
+        /// </summary>
+        [Test]
+        public static void R5_1_TRADE_01_Unreadable_Cash_Is_Not_A_Cash_Delta()
+        {
+            var port = new FakeTradePort();
+            port.Guard.StagedItemOwned = true;
+            port.Evidence.BusinessComplete = false;
+            port.Evidence.ItemsTransferred = false;
+            port.Evidence.CashReadable = false;   // the read threw; 0 is not a value
+            port.Evidence.CashBefore = 0;
+            port.Evidence.CashAfter = 700;
+
+            JObject json = Run(new TradeService(port), "sell");
+
+            Assert.False((bool)json["ok"], "an unreadable cash value proves nothing");
+            Assert.Equal("uncertain", (string)json["execution_status"], "uncertain");
+            Assert.False((bool)json["cash_moved"], "no cash evidence was collected");
+        }
+
+        /// <summary>
+        /// R5.1/F3: when the item really did leave the table an unreadable cash read
+        /// does not invalidate the trade — the item is independent evidence.
+        /// </summary>
+        [Test]
+        public static void R5_1_TRADE_02_Item_Evidence_Still_Proves_The_Trade()
+        {
+            var port = new FakeTradePort();
+            port.Guard.StagedItemOwned = true;
+            port.Evidence.BusinessComplete = false;
+            port.Evidence.ItemsTransferred = true;
+            port.Evidence.CashReadable = false;
+
+            JObject json = Run(new TradeService(port), "sell");
+
+            Assert.True((bool)json["ok"], "the item moved, so the sale happened");
+            Assert.Equal("completed", (string)json["execution_status"], "completed");
+            Assert.False((bool)json["cash_moved"], "still no cash evidence");
+        }
+
+        /// <summary>
         /// R5-TRADE-03: buying from the client keeps the staged pointer on the bought
         /// item, so the cash delta is the per-trade evidence for the buy direction.
         /// </summary>
